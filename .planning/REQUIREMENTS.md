@@ -11,12 +11,12 @@
 - [ ] **BASE-02**: A maintainer can measure monotonic timestamps from captured audio through segmentation, transcription, context selection, generation, and visible UI acknowledgement.
 - [ ] **BASE-03**: A maintainer can observe real transcription and assistance queue depth, oldest-item age, throughput, cancellation, and dropped or superseded work rather than placeholder metrics.
 - [ ] **BASE-04**: A maintainer can measure CPU, memory, battery impact, model/provider choice, and error rates per meeting scenario without sending evaluation data off-device by default.
-- [ ] **BASE-05**: A user can stop, restart, and recover an interrupted meeting without duplicate meeting records, silent transcript loss, or ambiguous completion state.
+- [x] **BASE-05**: A user can stop, restart, and recover an interrupted meeting without duplicate meeting records, silent transcript loss, or ambiguous completion state.
 - [ ] **BASE-06**: A maintainer can declare explicit go/no-go thresholds for later live-assistance experiments using baseline evidence rather than assumed performance.
 
 ### Meeting Identity and Privacy Boundaries
 
-- [ ] **IDENT-01**: A meeting receives one durable Rust-owned identifier before preparation or recording begins, and recording, recovery, documents, transcript, analysis, and series membership reuse it.
+- [x] **IDENT-01**: A meeting receives one durable Rust-owned identifier before preparation or recording begins, and recording, recovery, documents, transcript, analysis, and series membership reuse it.
 - [ ] **IDENT-02**: Final transcript segments are persisted incrementally and idempotently with stable evidence identifiers and capture-completeness metadata.
 - [ ] **IDENT-03**: Repeated recovery or retry operations reconcile to the same meeting and transcript evidence instead of creating duplicates.
 - [ ] **PRIV-01**: A user can see whether each configured transcription, summary, document-processing, or generation path is local or remote and what destination receives data.
@@ -130,9 +130,9 @@
 | BASE-02 | Phase 1 | Pending |
 | BASE-03 | Phase 1 | Pending |
 | BASE-04 | Phase 1 | Pending |
-| BASE-05 | Phase 1 | Pending |
+| BASE-05 | Phase 1 | Complete |
 | BASE-06 | Phase 1 | Pending |
-| IDENT-01 | Phase 1 | Pending |
+| IDENT-01 | Phase 1 | Complete |
 | IDENT-02 | Phase 1 | Pending |
 | IDENT-03 | Phase 1 | Pending |
 | PRIV-01 | Phase 1 | Pending |
@@ -182,6 +182,7 @@
 | HARD-07 | Phase 6 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 54 total
 - Mapped to phases: 54
 - Unmapped: 0
