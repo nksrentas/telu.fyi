@@ -594,6 +594,13 @@ fn format_recording_time(seconds: f64) -> String {
     mod tests {
         use super::*;
 
+        fn worker_source() -> &'static str {
+            include_str!("worker.rs")
+                .split("#[cfg(test)]")
+                .next()
+                .expect("worker implementation before test module")
+        }
+
         #[test]
         fn keeps_short_acknowledgements() {
             assert!(should_emit_transcript("Yes"));
@@ -604,5 +611,49 @@ fn format_recording_time(seconds: f64) -> String {
         fn drops_empty_and_whitespace_only() {
             assert!(!should_emit_transcript(""));
             assert!(!should_emit_transcript("   "));
+        }
+
+        #[test]
+        fn transcript_evidence_commit_precedes_canonical_publication() {
+            let source = worker_source();
+            let persist = source
+                .find("upsert_final_evidence")
+                .expect("final worker output must call the evidence repository");
+            let canonical = source
+                .find("is_canonical: true")
+                .expect("committed final output must be explicitly canonical");
+
+            assert!(
+                persist < canonical,
+                "the durable evidence write must occur before canonical publication"
+            );
+        }
+
+        #[test]
+        fn transcript_evidence_failure_is_typed_and_suppresses_canonical_publication() {
+            let source = worker_source();
+            assert!(
+                source.contains("TranscriptEvidencePersistenceFailure"),
+                "repository failure must produce a typed incomplete fact"
+            );
+            assert!(
+                source.contains("TRANSCRIPT_EVIDENCE_PERSISTENCE_FAILED"),
+                "repository failure must carry a stable machine-readable code"
+            );
+            assert!(
+                source.contains("transcript-evidence-persistence-failed"),
+                "the typed failure fact must cross the event boundary"
+            );
+        }
+
+        #[test]
+        fn transcript_evidence_partials_remain_provisional_and_non_citable() {
+            let source = worker_source();
+            assert!(
+                source.contains("evidence_id: None")
+                    && source.contains("is_canonical: false")
+                    && source.contains("is_final: false"),
+                "partial output must have no evidence identity, finality, or canonical status"
+            );
         }
     }

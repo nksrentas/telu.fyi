@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml transcript_evidence --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::transcription::worker::tests::transcript_evidence_commit_precedes_canonical_publication\nnot ok 2 - audio::transcription::worker::tests::transcript_evidence_failure_is_typed_and_suppresses_canonical_publication\nnot ok 3 - audio::transcription::worker::tests::transcript_evidence_partials_remain_provisional_and_non_citable\nok 4 - database::repositories::transcript::transcript_evidence_repository_tests::transcript_evidence_repository_inserts_one_final_for_existing_meeting\nok 5 - database::repositories::transcript::transcript_evidence_repository_tests::transcript_evidence_repository_redelivery_preserves_identity_and_row_count\nok 6 - database::repositories::transcript::transcript_evidence_repository_tests::transcript_evidence_repository_rejects_partial_segments\n1..6\n# tests 6\n# pass 3\n# fail 3\n# cancelled 0\n",
+  "targetTest": "audio::transcription::worker::tests::transcript_evidence_commit_precedes_canonical_publication",
+  "expected": "Final worker output commits durable evidence before canonical publication, emits a typed incomplete fact on write failure, and keeps partial output provisional and non-citable",
+  "actual": "Three named worker contract assertions failed because final output still publishes without a repository write, no typed evidence failure exists, and partial DTOs have no explicit non-citable state"
+}
