@@ -58,6 +58,7 @@ pub struct TranscriptUpdate {
     pub is_final: bool,
     pub is_canonical: bool,
     pub capture_completeness: Option<CaptureCompleteness>,
+    pub delivery_token: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -111,6 +112,7 @@ fn build_transcript_update(
         is_final: !is_partial,
         is_canonical: false,
         capture_completeness: None,
+        delivery_token: None,
     }
 }
 
@@ -388,12 +390,10 @@ pub fn start_transcription_task<R: Runtime>(
                                                         .map_err(|_| ())
                                                     },
                                                     move |canonical| {
-                                                        canonical_app
-                                                            .emit("transcript-update", canonical)
-                                                            .map_err(|_| {
-                                                                "canonical_transcript_emit_failed"
-                                                                    .to_string()
-                                                            })
+                                                        crate::audio::recording_commands::emit_canonical_transcript(
+                                                            &canonical_app,
+                                                            canonical,
+                                                        )
                                                     },
                                                     move |failure| {
                                                         failure_app

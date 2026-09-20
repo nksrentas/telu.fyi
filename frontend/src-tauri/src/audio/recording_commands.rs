@@ -4,16 +4,21 @@
 // Delegates to transcription and recording modules for actual implementation.
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use log::{debug, error, info, warn};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use sqlx::{Error as SqlxError, SqlitePool};
+use std::collections::HashMap;
 use std::future::Future;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::task::JoinHandle;
+use uuid::Uuid;
 
 use crate::database::repositories::meeting::{MeetingCompleteness, MeetingsRepository};
 pub use crate::database::repositories::meeting::StartMeetingResult;
@@ -117,6 +122,18 @@ static TRANSCRIPT_LISTENER_ID: Mutex<Option<tauri::EventId>> = Mutex::new(None);
 // it never mints or remaps an ID.
 static CURRENT_MEETING: Mutex<Option<StartMeetingResult>> = Mutex::new(None);
 
+const UI_ACKNOWLEDGED_STAGE: &str = "ui_acknowledged";
+const DELIVERY_TOKEN_TTL: Duration = Duration::from_secs(5 * 60);
+const RESERVED_FUTURE_STAGES: [&str; 6] = [
+    "context_selected",
+    "generation_started",
+    "generation_completed",
+    "generation_cancelled",
+    "generation_superseded",
+    "visible_suggestion",
+];
+static DELIVERY_TRACKER: Lazy<DeliveryTracker> = Lazy::new(DeliveryTracker::new);
+
 const TRANSCRIPTION_RUNTIME_START_ERROR_CODE: &str =
     "TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED";
 const TRANSCRIPTION_RUNTIME_USER_MESSAGE: &str = "Speech recognition could not initialize. Restart Meetily. If the problem continues, repair or reinstall the app.";
@@ -136,6 +153,205 @@ pub struct TranscriptionStatus {
     pub chunks_in_queue: usize,
     pub is_processing: bool,
     pub last_activity_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DeliveryToken(String);
+
+impl DeliveryToken {
+    fn new() -> Self {
+        Self(Uuid::new_v4().to_string())
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PendingDelivery {
+    meeting_id: String,
+    evidence_id: String,
+    emitted_at: Instant,
+    emitted_at_utc: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DeliveryAckError {
+    UnknownToken,
+    IdentityMismatch,
+    StaleToken,
+    ReservedFutureStage,
+    InvalidStage,
+    TrackerPoisoned,
+}
+
+impl DeliveryAckError {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::UnknownToken => "UI_ACK_UNKNOWN_TOKEN",
+            Self::IdentityMismatch => "UI_ACK_IDENTITY_MISMATCH",
+            Self::StaleToken => "UI_ACK_STALE_TOKEN",
+            Self::ReservedFutureStage => "UI_ACK_RESERVED_FUTURE_STAGE",
+            Self::InvalidStage => "UI_ACK_INVALID_STAGE",
+            Self::TrackerPoisoned => "UI_ACK_TRACKER_UNAVAILABLE",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct UiAcknowledgement {
+    pub stage: String,
+    pub delivery_token: String,
+    pub meeting_id: String,
+    pub evidence_id: String,
+    pub emitted_at_utc: DateTime<Utc>,
+    pub acknowledged_at_utc: DateTime<Utc>,
+    pub duration_micros: u64,
+}
+
+pub struct DeliveryTracker {
+    pending: Mutex<HashMap<String, PendingDelivery>>,
+}
+
+impl DeliveryTracker {
+    fn new() -> Self {
+        Self {
+            pending: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn register_at(
+        &self,
+        meeting_id: &str,
+        evidence_id: &str,
+        emitted_at: Instant,
+        emitted_at_utc: DateTime<Utc>,
+    ) -> std::result::Result<DeliveryToken, DeliveryAckError> {
+        let mut pending = self.pending.lock().map_err(|_| DeliveryAckError::TrackerPoisoned)?;
+        pending.retain(|_, delivery| {
+            emitted_at
+                .checked_duration_since(delivery.emitted_at)
+                .unwrap_or_default()
+                <= DELIVERY_TOKEN_TTL
+        });
+        let token = DeliveryToken::new();
+        pending.insert(token.0.clone(), PendingDelivery {
+            meeting_id: meeting_id.to_string(),
+            evidence_id: evidence_id.to_string(),
+            emitted_at,
+            emitted_at_utc,
+        });
+        Ok(token)
+    }
+
+    fn acknowledge_at(
+        &self,
+        token: &DeliveryToken,
+        meeting_id: &str,
+        evidence_id: &str,
+        acknowledged_at: Instant,
+        acknowledged_at_utc: DateTime<Utc>,
+    ) -> std::result::Result<UiAcknowledgement, DeliveryAckError> {
+        validate_phase1_stage_name(UI_ACKNOWLEDGED_STAGE)?;
+        let mut pending = self.pending.lock().map_err(|_| DeliveryAckError::TrackerPoisoned)?;
+        let delivery = pending
+            .get(token.as_str())
+            .cloned()
+            .ok_or(DeliveryAckError::UnknownToken)?;
+
+        if delivery.meeting_id != meeting_id || delivery.evidence_id != evidence_id {
+            return Err(DeliveryAckError::IdentityMismatch);
+        }
+        let elapsed = acknowledged_at
+            .checked_duration_since(delivery.emitted_at)
+            .unwrap_or_default();
+        if elapsed > DELIVERY_TOKEN_TTL {
+            pending.remove(token.as_str());
+            return Err(DeliveryAckError::StaleToken);
+        }
+
+        pending.remove(token.as_str());
+        Ok(UiAcknowledgement {
+            stage: UI_ACKNOWLEDGED_STAGE.to_string(),
+            delivery_token: token.0.clone(),
+            meeting_id: delivery.meeting_id,
+            evidence_id: delivery.evidence_id,
+            emitted_at_utc: delivery.emitted_at_utc,
+            acknowledged_at_utc,
+            duration_micros: elapsed.as_micros().try_into().unwrap_or(u64::MAX),
+        })
+    }
+
+    fn discard(&self, token: &DeliveryToken) {
+        if let Ok(mut pending) = self.pending.lock() {
+            pending.remove(token.as_str());
+        }
+    }
+}
+
+fn validate_phase1_stage_name(stage: &str) -> std::result::Result<(), DeliveryAckError> {
+    if stage == UI_ACKNOWLEDGED_STAGE {
+        return Ok(());
+    }
+    if RESERVED_FUTURE_STAGES.contains(&stage) {
+        return Err(DeliveryAckError::ReservedFutureStage);
+    }
+    Err(DeliveryAckError::InvalidStage)
+}
+
+/// Publish only a canonical, already-persisted final. Registering here keeps
+/// the delivery token downstream of the persistence-before-publish boundary.
+pub(crate) fn emit_canonical_transcript<R: Runtime>(
+    app: &AppHandle<R>,
+    canonical: &TranscriptUpdate,
+) -> std::result::Result<(), String> {
+    let meeting_id = canonical.meeting_id.as_deref()
+        .ok_or_else(|| "canonical_transcript_missing_meeting_id".to_string())?;
+    let evidence_id = canonical.evidence_id.as_deref()
+        .ok_or_else(|| "canonical_transcript_missing_evidence_id".to_string())?;
+    if !canonical.is_final || !canonical.is_canonical {
+        return Err("canonical_transcript_invalid_finality".to_string());
+    }
+
+    let token = DELIVERY_TRACKER
+        .register_at(meeting_id, evidence_id, Instant::now(), Utc::now())
+        .map_err(|error| error.code().to_string())?;
+    let mut delivered = canonical.clone();
+    delivered.delivery_token = Some(token.0.clone());
+    if app.emit("transcript-update", &delivered).is_err() {
+        DELIVERY_TRACKER.discard(&token);
+        return Err("canonical_transcript_emit_failed".to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn acknowledge_transcript_visible(
+    delivery_token: String,
+    meeting_id: String,
+    evidence_id: String,
+) -> std::result::Result<UiAcknowledgement, String> {
+    let acknowledgement = DELIVERY_TRACKER
+        .acknowledge_at(
+            &DeliveryToken(delivery_token),
+            &meeting_id,
+            &evidence_id,
+            Instant::now(),
+            Utc::now(),
+        )
+        .map_err(|error| error.code().to_string())?;
+    info!(
+        "stage={} meeting_id={} evidence_id={} duration_micros={} emitted_at_utc={} acknowledged_at_utc={}",
+        acknowledgement.stage,
+        acknowledgement.meeting_id,
+        acknowledgement.evidence_id,
+        acknowledgement.duration_micros,
+        acknowledgement.emitted_at_utc,
+        acknowledgement.acknowledged_at_utc,
+    );
+    Ok(acknowledgement)
 }
 
 #[derive(Debug)]
@@ -1930,29 +2146,82 @@ mod meeting_identity_contract_tests {
 
 #[cfg(test)]
 mod ui_acknowledgement_contract_tests {
+    use super::{
+        validate_phase1_stage_name, DeliveryAckError, DeliveryToken, DeliveryTracker,
+        DELIVERY_TOKEN_TTL, RESERVED_FUTURE_STAGES, UI_ACKNOWLEDGED_STAGE,
+    };
+    use chrono::{Duration as ChronoDuration, Utc};
+    use std::time::{Duration, Instant};
+
     #[test]
     fn ui_acknowledgement_registers_one_correlated_delivery() {
-        let commands = include_str!("recording_commands.rs");
+        let tracker = DeliveryTracker::new();
+        let emitted_at = Instant::now();
+        let emitted_at_utc = Utc::now();
+        let token = tracker
+            .register_at("meeting-1", "evidence-1", emitted_at, emitted_at_utc)
+            .unwrap();
+        let acknowledgement = tracker
+            .acknowledge_at(
+                &token,
+                "meeting-1",
+                "evidence-1",
+                emitted_at + Duration::from_millis(7),
+                emitted_at_utc + ChronoDuration::milliseconds(7),
+            )
+            .unwrap();
         let worker = include_str!("transcription/worker.rs");
 
-        assert!(
-            commands.contains(concat!("struct Delivery", "Tracker"))
-                && commands.contains(concat!("ui_", "acknowledged"))
-                && worker.contains(concat!("delivery_", "token")),
-            "a committed final must receive one Rust-owned token correlated to meeting and evidence identity before event emission"
-        );
+        assert_eq!(acknowledgement.stage, UI_ACKNOWLEDGED_STAGE);
+        assert_eq!(acknowledgement.delivery_token, token.0);
+        assert_eq!(acknowledgement.meeting_id, "meeting-1");
+        assert_eq!(acknowledgement.evidence_id, "evidence-1");
+        assert_eq!(acknowledgement.duration_micros, 7_000);
+        assert!(worker.contains("emit_canonical_transcript"));
+        assert!(worker.contains(concat!("delivery_", "token")));
     }
 
     #[test]
     fn ui_acknowledgement_rejects_unknown_duplicate_and_future_stage_names() {
-        let commands = include_str!("recording_commands.rs");
-
-        assert!(
-            commands.contains(concat!("Unknown", "Token"))
-                && commands.contains(concat!("Identity", "Mismatch"))
-                && commands.contains(concat!("RESERVED_FUTURE", "_STAGES")),
-            "unknown, duplicate, mismatched, and Phase-4-only acknowledgements must not fabricate a duration"
+        let tracker = DeliveryTracker::new();
+        let now = Instant::now();
+        let now_utc = Utc::now();
+        let unknown = DeliveryToken("unknown".to_string());
+        assert_eq!(
+            tracker.acknowledge_at(&unknown, "meeting-1", "evidence-1", now, now_utc),
+            Err(DeliveryAckError::UnknownToken),
         );
+
+        let token = tracker.register_at("meeting-1", "evidence-1", now, now_utc).unwrap();
+        assert_eq!(
+            tracker.acknowledge_at(&token, "other-meeting", "evidence-1", now, now_utc),
+            Err(DeliveryAckError::IdentityMismatch),
+        );
+        assert!(tracker.acknowledge_at(&token, "meeting-1", "evidence-1", now, now_utc).is_ok());
+        assert_eq!(
+            tracker.acknowledge_at(&token, "meeting-1", "evidence-1", now, now_utc),
+            Err(DeliveryAckError::UnknownToken),
+        );
+
+        let stale = tracker
+            .register_at(
+                "meeting-1",
+                "evidence-2",
+                now - DELIVERY_TOKEN_TTL - Duration::from_millis(1),
+                now_utc,
+            )
+            .unwrap();
+        assert_eq!(
+            tracker.acknowledge_at(&stale, "meeting-1", "evidence-2", now, now_utc),
+            Err(DeliveryAckError::StaleToken),
+        );
+
+        for stage in RESERVED_FUTURE_STAGES {
+            assert_eq!(
+                validate_phase1_stage_name(stage),
+                Err(DeliveryAckError::ReservedFutureStage),
+            );
+        }
     }
 
     #[test]

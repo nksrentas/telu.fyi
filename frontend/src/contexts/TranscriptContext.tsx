@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode, MutableRefObject } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useRef, useCallback, ReactNode, MutableRefObject } from 'react';
 import { Transcript } from '@/types';
 import { toast } from 'sonner';
 import { useRecordingState } from './RecordingStateContext';
@@ -72,6 +72,9 @@ function toDisplayTranscript(update: TranscriptUpdate): EvidenceAwareTranscript 
   return {
     ...common,
     id: `provisional:${update.meeting_id}:${update.source_segment_key}:${update.sequence_id}`,
+    is_partial: true,
+    is_final: false,
+    is_canonical: false,
   };
 }
 
@@ -89,11 +92,63 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
   const finalFlushRef = useRef<(() => void) | null>(null);
   const currentMeetingIdRef = useRef<string | null>(null);
+  const pendingAcknowledgementsRef = useRef(new Map<string, {
+    meetingId: string;
+    evidenceId: string;
+  }>());
+  const scheduledAcknowledgementsRef = useRef(new Set<string>());
+  const acknowledgementFramesRef = useRef(new Set<number>());
 
   // Keep ref updated with current transcripts
   useEffect(() => {
     transcriptsRef.current = transcripts;
   }, [transcripts]);
+
+  // A layout effect runs only after React commits the final transcript state.
+  // The following animation frame includes browser scheduling without claiming
+  // that a physical pixel was observed on screen.
+  useLayoutEffect(() => {
+    const committedEvidenceIds = new Set(
+      transcripts
+        .filter(transcript => transcript.is_canonical && transcript.evidence_id)
+        .map(transcript => transcript.evidence_id as string),
+    );
+
+    for (const [deliveryToken, correlation] of pendingAcknowledgementsRef.current) {
+      if (
+        !committedEvidenceIds.has(correlation.evidenceId)
+        || scheduledAcknowledgementsRef.current.has(deliveryToken)
+      ) {
+        continue;
+      }
+
+      scheduledAcknowledgementsRef.current.add(deliveryToken);
+      const frame = requestAnimationFrame(() => {
+        acknowledgementFramesRef.current.delete(frame);
+        transcriptService.acknowledgeTranscriptVisible(
+          deliveryToken,
+          correlation.meetingId,
+          correlation.evidenceId,
+        )
+          .catch(error => {
+            console.warn('Renderer transcript acknowledgement rejected:', error);
+          })
+          .finally(() => {
+            pendingAcknowledgementsRef.current.delete(deliveryToken);
+            scheduledAcknowledgementsRef.current.delete(deliveryToken);
+          });
+      });
+      acknowledgementFramesRef.current.add(frame);
+    }
+  }, [transcripts]);
+
+  useEffect(() => () => {
+    for (const frame of acknowledgementFramesRef.current) {
+      cancelAnimationFrame(frame);
+    }
+    acknowledgementFramesRef.current.clear();
+    scheduledAcknowledgementsRef.current.clear();
+  }, []);
 
   const projectStartMeeting = useCallback(async (payload: StartMeetingResult) => {
     const projectedMeetingId = currentMeetingIdRef.current
@@ -384,9 +439,19 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
             buffer_size_before: transcriptBuffer.size
           });
 
+          if (isCanonicalFinalTranscript(update)) {
+            pendingAcknowledgementsRef.current.set(update.delivery_token, {
+              meetingId: update.meeting_id,
+              evidenceId: update.evidence_id,
+            });
+          }
+
           // Check for duplicate sequence_id before processing
           if (transcriptBuffer.has(update.sequence_id)) {
             console.log('🚫 MAIN LISTENER: Duplicate sequence_id, skipping buffer:', update.sequence_id);
+            if (isCanonicalFinalTranscript(update)) {
+              setTranscripts(previous => [...previous]);
+            }
             return;
           }
 

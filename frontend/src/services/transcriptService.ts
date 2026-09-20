@@ -31,7 +31,7 @@ export interface FinalTranscriptUpdate extends TranscriptUpdateBase {
   is_final: true;
   is_canonical: true;
   capture_completeness: CaptureCompleteness;
-  delivery_token?: string;
+  delivery_token: string;
 }
 
 export type TranscriptUpdate = ProvisionalTranscriptUpdate | FinalTranscriptUpdate;
@@ -50,6 +50,8 @@ export function isCanonicalFinalTranscript(
     && update.source.length > 0
     && typeof update.source_segment_key === 'string'
     && update.source_segment_key.length > 0
+    && typeof update.delivery_token === 'string'
+    && update.delivery_token.length > 0
     && Number.isFinite(update.audio_start_time)
     && Number.isFinite(update.audio_end_time)
     && (update.capture_completeness === 'complete'
@@ -73,6 +75,16 @@ export interface ModelDownloadCompletePayload {
   modelName: string;
 }
 
+export interface UiAcknowledgement {
+  stage: 'ui_acknowledged';
+  delivery_token: string;
+  meeting_id: string;
+  evidence_id: string;
+  emitted_at_utc: string;
+  acknowledged_at_utc: string;
+  duration_micros: number;
+}
+
 /**
  * Transcript Service
  * Singleton service for managing transcription operations and transcript history
@@ -92,6 +104,18 @@ export class TranscriptService {
    */
   async getTranscriptionStatus(): Promise<TranscriptionStatus> {
     return invoke<TranscriptionStatus>('get_transcription_status');
+  }
+
+  async acknowledgeTranscriptVisible(
+    deliveryToken: string,
+    meetingId: string,
+    evidenceId: string,
+  ): Promise<UiAcknowledgement> {
+    return invoke<UiAcknowledgement>('acknowledge_transcript_visible', {
+      deliveryToken,
+      meetingId,
+      evidenceId,
+    });
   }
 
   // Event Listeners
