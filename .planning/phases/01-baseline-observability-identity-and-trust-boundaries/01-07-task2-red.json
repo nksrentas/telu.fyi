@@ -1,0 +1,8 @@
+{
+  "command": "node --test .github/verify-phase1-finalization-ui.test.cjs",
+  "exitCode": 1,
+  "output": "TAP version 13\nnot ok 1 - stop swaps controls for in-place finalization while the transcript remains mounted\nnot ok 2 - finalization renders authoritative zero, one, many, and oldest-age copy\nnot ok 3 - incomplete terminal state remains visible with deliberate meeting and gap actions\nnot ok 4 - status is polite and throttled without percentage or completion inference\n1..4\n# tests 4\n# pass 0\n# fail 4\n# cancelled 0\n",
+  "targetTest": "finalization renders authoritative zero, one, many, and oldest-age copy",
+  "expected": "Stopping swaps the fixed-bottom controls for a transcript-preserving card that renders Rust depth and oldest age, keeps incomplete results actionable, and announces authoritative changes politely without percentages or completion inference",
+  "actual": "Four named source-contract tests failed because the existing overlays rendered generic inferred messages, exposed no authoritative snapshots or terminal actions, did not throttle polite announcements, and left the recording controls visible during stop"
+}
