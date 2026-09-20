@@ -124,16 +124,68 @@
 
 ## Traceability
 
-Roadmap phase mappings are populated during roadmap creation.
-
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| BASE-01 | Phase 1 | Pending |
+| BASE-02 | Phase 1 | Pending |
+| BASE-03 | Phase 1 | Pending |
+| BASE-04 | Phase 1 | Pending |
+| BASE-05 | Phase 1 | Pending |
+| BASE-06 | Phase 1 | Pending |
+| IDENT-01 | Phase 1 | Pending |
+| IDENT-02 | Phase 1 | Pending |
+| IDENT-03 | Phase 1 | Pending |
+| PRIV-01 | Phase 1 | Pending |
+| PRIV-02 | Phase 1 | Pending |
+| PRIV-03 | Phase 1 | Pending |
+| KNOW-01 | Phase 2 | Pending |
+| KNOW-02 | Phase 2 | Pending |
+| KNOW-03 | Phase 2 | Pending |
+| KNOW-04 | Phase 2 | Pending |
+| KNOW-05 | Phase 2 | Pending |
+| KNOW-06 | Phase 2 | Pending |
+| KNOW-07 | Phase 2 | Pending |
+| KNOW-08 | Phase 2 | Pending |
+| DOC-01 | Phase 3 | Pending |
+| DOC-02 | Phase 3 | Pending |
+| DOC-03 | Phase 3 | Pending |
+| DOC-04 | Phase 3 | Pending |
+| PREP-01 | Phase 3 | Pending |
+| PREP-02 | Phase 3 | Pending |
+| PREP-03 | Phase 3 | Pending |
+| PREP-04 | Phase 3 | Pending |
+| PREP-05 | Phase 3 | Pending |
+| LIVE-01 | Phase 4 | Pending |
+| LIVE-02 | Phase 4 | Pending |
+| LIVE-03 | Phase 4 | Pending |
+| LIVE-04 | Phase 4 | Pending |
+| LIVE-05 | Phase 4 | Pending |
+| LIVE-06 | Phase 4 | Pending |
+| LIVE-07 | Phase 4 | Pending |
+| LIVE-08 | Phase 4 | Pending |
+| LIVE-09 | Phase 4 | Pending |
+| LIVE-10 | Phase 4 | Pending |
+| SERIES-01 | Phase 5 | Pending |
+| SERIES-02 | Phase 5 | Pending |
+| SERIES-03 | Phase 5 | Pending |
+| SERIES-04 | Phase 5 | Pending |
+| SERIES-05 | Phase 5 | Pending |
+| SERIES-06 | Phase 5 | Pending |
+| SERIES-07 | Phase 5 | Pending |
+| SERIES-08 | Phase 5 | Pending |
+| HARD-01 | Phase 6 | Pending |
+| HARD-02 | Phase 6 | Pending |
+| HARD-03 | Phase 6 | Pending |
+| HARD-04 | Phase 6 | Pending |
+| HARD-05 | Phase 6 | Pending |
+| HARD-06 | Phase 6 | Pending |
+| HARD-07 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 54 total
-- Mapped to phases: 0
-- Unmapped: 54
+- Mapped to phases: 54
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-20*
-*Last updated: 2026-09-20 after initial definition*
+*Last updated: 2026-09-20 after roadmap creation*
