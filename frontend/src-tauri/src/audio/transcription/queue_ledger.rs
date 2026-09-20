@@ -1,11 +1,12 @@
 //! Per-meeting accounting for transcription work.
 //!
-//! The public contract is introduced with behavior-first tests below. The
-//! initial implementation deliberately exposes only an empty snapshot so the
-//! RED commit records the missing conservation behavior without relying on a
-//! compiler or fixture failure.
+//! The ledger is deliberately content-free: it retains work IDs, monotonic
+//! timestamps, and typed outcomes, but never audio or transcript text. Counts
+//! in [`QueueSnapshot`] are derived from the authoritative work records so
+//! conservation cannot drift from separately maintained counters.
 
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -52,10 +53,13 @@ pub enum QueueTransitionError {
     InvalidCapacity,
     InvalidMeetingId,
     InvalidWorkId,
+    MeetingIdConflict(String),
     DuplicateWorkId(String),
     UnknownWorkId(String),
     AlreadyStarted(String),
     AlreadyTerminal(String),
+    TimestampBeforeAdmission(String),
+    SequenceExhausted,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,6 +99,14 @@ pub struct QueueGap {
 pub struct QueueLedger {
     meeting_id: String,
     capacity: usize,
+    state: Mutex<QueueLedgerState>,
+}
+
+#[derive(Debug, Default)]
+struct QueueLedgerState {
+    next_event_sequence: u64,
+    work: Vec<QueueWorkRecord>,
+    gaps: Vec<QueueGap>,
 }
 
 impl QueueLedger {
@@ -112,6 +124,7 @@ impl QueueLedger {
         Ok(Self {
             meeting_id,
             capacity,
+            state: Mutex::new(QueueLedgerState::default()),
         })
     }
 
@@ -121,61 +134,189 @@ impl QueueLedger {
 
     pub fn accept(
         &self,
-        _work_id: impl Into<String>,
-        _accepted_at: Instant,
+        work_id: impl Into<String>,
+        accepted_at: Instant,
     ) -> Result<u64, QueueTransitionError> {
-        Ok(0)
+        let work_id = validate_work_id(work_id.into())?;
+        let mut state = self.lock_state();
+        ensure_new_work_id(&state, &work_id)?;
+        let event_sequence = next_event_sequence(&mut state)?;
+        state.work.push(QueueWorkRecord {
+            work_id,
+            event_sequence,
+            accepted_at,
+            started_at: None,
+            terminal_at: None,
+            outcome: None,
+        });
+        Ok(event_sequence)
     }
 
-    pub fn start(
-        &self,
-        _work_id: &str,
-        _started_at: Instant,
-    ) -> Result<(), QueueTransitionError> {
+    pub fn start(&self, work_id: &str, started_at: Instant) -> Result<(), QueueTransitionError> {
+        let mut state = self.lock_state();
+        let record = find_work_mut(&mut state, work_id)?;
+        if record.outcome.is_some() {
+            return Err(QueueTransitionError::AlreadyTerminal(work_id.to_string()));
+        }
+        if record.started_at.is_some() {
+            return Err(QueueTransitionError::AlreadyStarted(work_id.to_string()));
+        }
+        if started_at < record.accepted_at {
+            return Err(QueueTransitionError::TimestampBeforeAdmission(
+                work_id.to_string(),
+            ));
+        }
+        record.started_at = Some(started_at);
         Ok(())
     }
 
     pub fn finish(
         &self,
-        _work_id: &str,
-        _outcome: WorkOutcome,
-        _terminal_at: Instant,
+        work_id: &str,
+        outcome: WorkOutcome,
+        terminal_at: Instant,
     ) -> Result<(), QueueTransitionError> {
+        let mut state = self.lock_state();
+        let record = find_work_mut(&mut state, work_id)?;
+        if record.outcome.is_some() {
+            return Err(QueueTransitionError::AlreadyTerminal(work_id.to_string()));
+        }
+        let earliest = record.started_at.unwrap_or(record.accepted_at);
+        if terminal_at < earliest {
+            return Err(QueueTransitionError::TimestampBeforeAdmission(
+                work_id.to_string(),
+            ));
+        }
+        record.terminal_at = Some(terminal_at);
+        record.outcome = Some(outcome);
         Ok(())
     }
 
     pub fn reject(
         &self,
-        _work_id: impl Into<String>,
-        _reason: RejectionReason,
-        _rejected_at: Instant,
+        work_id: impl Into<String>,
+        reason: RejectionReason,
+        rejected_at: Instant,
     ) -> Result<u64, QueueTransitionError> {
-        Ok(0)
+        let work_id = validate_work_id(work_id.into())?;
+        let mut state = self.lock_state();
+        ensure_new_work_id(&state, &work_id)?;
+        let event_sequence = next_event_sequence(&mut state)?;
+        state.gaps.push(QueueGap {
+            work_id,
+            event_sequence,
+            rejected_at,
+            reason,
+        });
+        Ok(event_sequence)
     }
 
-    pub fn snapshot(&self, _now: Instant) -> QueueSnapshot {
-        QueueSnapshot {
+    pub fn snapshot(&self, now: Instant) -> QueueSnapshot {
+        let state = self.lock_state();
+        let mut snapshot = QueueSnapshot {
             capacity: self.capacity,
             depth: 0,
             active: 0,
             oldest_age_ms: None,
-            accepted: 0,
+            accepted: state.work.len() as u64,
             started: 0,
             completed: 0,
             failed: 0,
             cancelled: 0,
             superseded: 0,
-            rejected: 0,
+            rejected: state.gaps.len() as u64,
+        };
+        let mut oldest_accepted_at = None;
+
+        for record in &state.work {
+            if record.started_at.is_some() {
+                snapshot.started += 1;
+            }
+            match record.outcome {
+                Some(WorkOutcome::Completed) => snapshot.completed += 1,
+                Some(WorkOutcome::Failed(_)) => snapshot.failed += 1,
+                Some(WorkOutcome::Cancelled(_)) => snapshot.cancelled += 1,
+                Some(WorkOutcome::Superseded(_)) => snapshot.superseded += 1,
+                None => {
+                    snapshot.depth += 1;
+                    if record.started_at.is_some() {
+                        snapshot.active += 1;
+                    }
+                    oldest_accepted_at = match oldest_accepted_at {
+                        Some(oldest) if oldest <= record.accepted_at => Some(oldest),
+                        _ => Some(record.accepted_at),
+                    };
+                }
+            }
         }
+
+        snapshot.oldest_age_ms = oldest_accepted_at.map(|accepted_at| {
+            now.saturating_duration_since(accepted_at)
+                .as_millis()
+                .min(u64::MAX as u128) as u64
+        });
+        debug_assert_eq!(
+            snapshot.accepted,
+            snapshot.depth
+                + snapshot.completed
+                + snapshot.failed
+                + snapshot.cancelled
+                + snapshot.superseded
+        );
+        snapshot
     }
 
     pub fn work_records(&self) -> Vec<QueueWorkRecord> {
-        Vec::new()
+        self.lock_state().work.clone()
     }
 
     pub fn gaps(&self) -> Vec<QueueGap> {
-        Vec::new()
+        self.lock_state().gaps.clone()
     }
+
+    fn lock_state(&self) -> std::sync::MutexGuard<'_, QueueLedgerState> {
+        self.state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+}
+
+fn validate_work_id(work_id: String) -> Result<String, QueueTransitionError> {
+    if work_id.trim().is_empty() {
+        Err(QueueTransitionError::InvalidWorkId)
+    } else {
+        Ok(work_id)
+    }
+}
+
+fn ensure_new_work_id(state: &QueueLedgerState, work_id: &str) -> Result<(), QueueTransitionError> {
+    if state.work.iter().any(|record| record.work_id == work_id)
+        || state.gaps.iter().any(|gap| gap.work_id == work_id)
+    {
+        Err(QueueTransitionError::DuplicateWorkId(work_id.to_string()))
+    } else {
+        Ok(())
+    }
+}
+
+fn next_event_sequence(state: &mut QueueLedgerState) -> Result<u64, QueueTransitionError> {
+    let sequence = state.next_event_sequence;
+    state.next_event_sequence = state
+        .next_event_sequence
+        .checked_add(1)
+        .ok_or(QueueTransitionError::SequenceExhausted)?;
+    Ok(sequence)
+}
+
+fn find_work_mut<'a>(
+    state: &'a mut QueueLedgerState,
+    work_id: &str,
+) -> Result<&'a mut QueueWorkRecord, QueueTransitionError> {
+    state
+        .work
+        .iter_mut()
+        .find(|record| record.work_id == work_id)
+        .ok_or_else(|| QueueTransitionError::UnknownWorkId(work_id.to_string()))
 }
 
 #[cfg(test)]

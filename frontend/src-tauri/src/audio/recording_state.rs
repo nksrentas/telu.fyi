@@ -1,11 +1,12 @@
+use anyhow::Result;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::mpsc;
-use anyhow::Result;
 
-use super::devices::AudioDevice;
 use super::buffer_pool::AudioBufferPool;
+use super::devices::AudioDevice;
+use super::transcription::queue_ledger::{QueueLedger, QueueTransitionError};
 
 /// Device type for audio chunks
 #[derive(Debug, Clone, PartialEq)]
@@ -104,6 +105,9 @@ pub struct RecordingState {
     // Audio pipeline
     audio_sender: Mutex<Option<mpsc::UnboundedSender<AudioChunk>>>,
 
+    // Authoritative transcription work accounting for the current meeting.
+    queue_ledger: Mutex<Option<Arc<QueueLedger>>>,
+
     // Memory optimization
     buffer_pool: AudioBufferPool,
 
@@ -131,6 +135,7 @@ impl RecordingState {
             microphone_device: Mutex::new(None),
             system_device: Mutex::new(None),
             audio_sender: Mutex::new(None),
+            queue_ledger: Mutex::new(None),
             buffer_pool: AudioBufferPool::new(16, 48000), // Pool of 16 buffers with 48kHz samples capacity
             error_count: AtomicU32::new(0),
             recoverable_error_count: AtomicU32::new(0),
@@ -194,7 +199,10 @@ impl RecordingState {
         if let Some(pause_start) = self.pause_start.lock().unwrap().take() {
             let pause_duration = pause_start.elapsed();
             *self.total_pause_duration.lock().unwrap() += pause_duration;
-            log::info!("Recording resumed after pause of {:.2}s", pause_duration.as_secs_f64());
+            log::info!(
+                "Recording resumed after pause of {:.2}s",
+                pause_duration.as_secs_f64()
+            );
         }
 
         self.is_paused.store(false, Ordering::SeqCst);
@@ -242,7 +250,9 @@ impl RecordingState {
         }
 
         if let Some(sender) = self.audio_sender.lock().unwrap().as_ref() {
-            sender.send(chunk).map_err(|_| anyhow::anyhow!("Failed to send audio chunk"))?;
+            sender
+                .send(chunk)
+                .map_err(|_| anyhow::anyhow!("Failed to send audio chunk"))?;
 
             // Update statistics
             let mut stats = self.stats.lock().unwrap();
@@ -251,8 +261,44 @@ impl RecordingState {
             Ok(())
         } else {
             // Return an error when no sender is available (pipeline not ready)
-            Err(anyhow::anyhow!("Audio pipeline not ready - no sender available"))
+            Err(anyhow::anyhow!(
+                "Audio pipeline not ready - no sender available"
+            ))
         }
+    }
+
+    /// Install the one queue ledger owned by this recording session.
+    ///
+    /// A recording state is created per meeting. Returning the existing ledger
+    /// for the same meeting keeps repeated setup idempotent, while a conflicting
+    /// identity is rejected instead of remapping operational evidence.
+    pub fn initialize_queue_ledger(
+        &self,
+        meeting_id: impl Into<String>,
+        capacity: usize,
+    ) -> Result<Arc<QueueLedger>, QueueTransitionError> {
+        let meeting_id = meeting_id.into();
+        let mut slot = self
+            .queue_ledger
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(existing) = slot.as_ref() {
+            if existing.meeting_id() == meeting_id {
+                return Ok(existing.clone());
+            }
+            return Err(QueueTransitionError::MeetingIdConflict(meeting_id));
+        }
+
+        let ledger = Arc::new(QueueLedger::new(meeting_id, capacity)?);
+        *slot = Some(ledger.clone());
+        Ok(ledger)
+    }
+
+    pub fn queue_ledger(&self) -> Option<Arc<QueueLedger>> {
+        self.queue_ledger
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
     }
 
     // Error handling
@@ -269,11 +315,18 @@ impl RecordingState {
         // Track recoverable vs non-recoverable errors separately
         if error.is_recoverable() {
             let recoverable_count = self.recoverable_error_count.fetch_add(1, Ordering::SeqCst) + 1;
-            log::warn!("Recoverable audio error ({}): {:?}", recoverable_count, error);
+            log::warn!(
+                "Recoverable audio error ({}): {:?}",
+                recoverable_count,
+                error
+            );
 
             // Allow more recoverable errors before stopping
             if recoverable_count >= 10 {
-                log::error!("Too many recoverable errors ({}), stopping recording", recoverable_count);
+                log::error!(
+                    "Too many recoverable errors ({}), stopping recording",
+                    recoverable_count
+                );
                 self.stop_recording();
             }
         } else {
@@ -291,7 +344,10 @@ impl RecordingState {
 
         // Fallback: stop recording after too many total errors
         if count >= 15 {
-            log::error!("Too many total audio errors ({}), stopping recording", count);
+            log::error!(
+                "Too many total audio errors ({}), stopping recording",
+                count
+            );
             self.stop_recording();
         }
     }
@@ -393,6 +449,7 @@ impl Default for RecordingState {
             microphone_device: Mutex::new(None),
             system_device: Mutex::new(None),
             audio_sender: Mutex::new(None),
+            queue_ledger: Mutex::new(None),
             buffer_pool: AudioBufferPool::new(16, 48000), // Pool of 16 buffers with 48kHz samples capacity
             error_count: AtomicU32::new(0),
             recoverable_error_count: AtomicU32::new(0),
