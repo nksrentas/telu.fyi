@@ -1,0 +1,8 @@
+{
+  "command": "node --test .github/verify-phase1-completeness-ui.test.cjs",
+  "exitCode": 1,
+  "output": "TAP version 13\nnot ok 1 - recovery submits only canonical meeting and final evidence identity to Rust\nnot ok 2 - authoritative recovery updates the existing cache candidate without removal or duplication\nnot ok 3 - recovery remains in the dialog and renders authoritative result actions\nnot ok 4 - recovery loading, empty, selection, and delete controls stay explicit\n1..4\n# tests 4\n# pass 0\n# fail 4\n# cancelled 0",
+  "targetTest": "recovery submits only canonical meeting and final evidence identity to Rust",
+  "expected": "Recovery invokes reconcile_meeting with the existing Rust meeting ID and canonical final evidence IDs, updates the same cache candidate, remains in the dialog with authoritative result actions, and preserves records when delete is cancelled",
+  "actual": "Four named behavior assertions failed because the hook still minted fallback display IDs and called saveMeeting, removed the recovered candidate, while the dialog closed optimistically and lacked the approved result, empty, progress, and delete-confirmation states"
+}
