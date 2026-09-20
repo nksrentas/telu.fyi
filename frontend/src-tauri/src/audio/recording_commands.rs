@@ -1220,6 +1220,42 @@ fn emit_finalization_progress<R: Runtime>(
     );
 }
 
+async fn unload_transcription_model<R: Runtime>(app: AppHandle<R>) {
+    let provider = crate::api::api::api_get_transcript_config(
+        app.clone(),
+        app.clone().state(),
+        None,
+    )
+    .await
+    .ok()
+    .flatten()
+    .map(|config| config.provider);
+
+    if provider.as_deref() == Some("parakeet") {
+        let engine = crate::parakeet_engine::commands::PARAKEET_ENGINE
+            .lock()
+            .unwrap()
+            .as_ref()
+            .cloned();
+        if let Some(engine) = engine {
+            if !engine.unload_model().await {
+                warn!("Parakeet model did not unload during finalization");
+            }
+        }
+    } else {
+        let engine = crate::whisper_engine::commands::WHISPER_ENGINE
+            .lock()
+            .unwrap()
+            .as_ref()
+            .cloned();
+        if let Some(engine) = engine {
+            if !engine.unload_model().await {
+                warn!("Whisper model did not unload during finalization");
+            }
+        }
+    }
+}
+
 /// Stop one Rust-owned meeting through a finite close/drain/persist protocol.
 pub async fn stop_recording<R: Runtime>(
     app: AppHandle<R>,
@@ -1334,6 +1370,16 @@ pub async fn stop_recording<R: Runtime>(
         &deadline_at_utc,
         deadline_ms,
     );
+
+    if tokio::time::timeout(
+        remaining_until(deadline),
+        unload_transcription_model(app.clone()),
+    )
+    .await
+    .is_err()
+    {
+        warn!("Finalization deadline elapsed while unloading transcription model");
+    }
 
     let meeting_folder = manager.get_meeting_folder();
     let meeting_name = manager.get_meeting_name();
