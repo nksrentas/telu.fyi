@@ -635,4 +635,76 @@ mod meeting_identity_propagation_tests {
             "the v3 upgrade must add stable evidence IDs without replacing the legacy transcript store"
         );
     }
+
+    #[test]
+    fn recording_lifecycle_mirror_projects_every_authoritative_snapshot_field() {
+        let service_source = include_str!("../../../src/services/transcriptService.ts");
+
+        for field in [
+            "meeting_id",
+            "lifecycle",
+            "queue",
+            "deadline_at_utc",
+            "deadline_ms",
+            "remaining_work_ids",
+            "gap_count",
+            "reason_codes",
+        ] {
+            assert!(
+                service_source.contains(field),
+                "transcriptService must project authoritative finalization field {field}"
+            );
+        }
+        assert!(
+            service_source.contains("export interface FinalizationSnapshot")
+                && service_source.contains("invoke<FinalizationSnapshot | null>('get_transcription_status')")
+                && service_source.contains("listen<FinalizationProgressSnapshot>('recording-finalization-progress'")
+                && service_source.contains("listen<RecordingStoppedPayload>('recording-stopped'"),
+            "transcriptService must expose typed snapshot reads and lifecycle event listeners"
+        );
+    }
+
+    #[test]
+    fn recording_lifecycle_mirror_updates_metadata_only_from_committed_snapshot() {
+        let saver_source = include_str!("recording_saver.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("recording saver production source");
+        let commands_source = include_str!("recording_commands.rs");
+
+        assert!(
+            saver_source.contains(
+                "pub fn mirror_committed_finalization(\n        &mut self,\n        finalization: &FinalizationSnapshot,"
+            )
+                && saver_source.contains("metadata.lifecycle = finalization.lifecycle.as_str().to_string()")
+                && saver_source.contains("metadata.gap_count = finalization.gap_count")
+                && saver_source.contains("metadata.reason_codes = finalization.reason_codes.clone()"),
+            "recording metadata must copy lifecycle and gap summary from the committed snapshot"
+        );
+        assert!(
+            commands_source.contains("MeetingsRepository::finalize_session")
+                && commands_source.contains("manager.mirror_committed_finalization(&finalization)"),
+            "the file mirror must run only after SQLite returns the committed terminal snapshot"
+        );
+    }
+
+    #[test]
+    fn recording_lifecycle_mirror_cannot_promote_incomplete_independently() {
+        let saver_source = include_str!("recording_saver.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("recording saver production source");
+
+        assert!(
+            saver_source.contains("MeetingLifecycle::Incomplete => MeetingCompleteness::Incomplete")
+                && saver_source.contains("MeetingLifecycle::Complete => MeetingCompleteness::Complete")
+                && saver_source.contains("terminal finalization snapshot is required"),
+            "metadata completeness must be derived from the committed terminal lifecycle"
+        );
+        assert!(
+            !saver_source.contains("metadata.lifecycle = \"complete\"")
+                && !saver_source.contains("metadata.completeness = \"complete\""),
+            "the saver cannot invent a complete lifecycle or completeness value"
+        );
+    }
 }

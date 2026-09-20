@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml recording_lifecycle_mirror --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::recording_saver::meeting_identity_propagation_tests::recording_lifecycle_mirror_projects_every_authoritative_snapshot_field\nnot ok 2 - audio::recording_saver::meeting_identity_propagation_tests::recording_lifecycle_mirror_updates_metadata_only_from_committed_snapshot\nnot ok 3 - audio::recording_saver::meeting_identity_propagation_tests::recording_lifecycle_mirror_cannot_promote_incomplete_independently\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "audio::recording_saver::meeting_identity_propagation_tests::recording_lifecycle_mirror_updates_metadata_only_from_committed_snapshot",
+  "expected": "The frontend service projects every authoritative finalization field, and recording metadata copies terminal lifecycle plus gap/reason summary only after SQLite returns the committed snapshot without independently promoting incomplete state",
+  "actual": "Three named assertions failed because transcriptService had no finalization DTO/listeners, RecordingSaver had no committed-snapshot mirror, and the saver did not derive terminal completeness from the committed lifecycle"
+}
