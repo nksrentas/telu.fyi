@@ -10,6 +10,7 @@ use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolat
 
 use super::devices::AudioDevice;
 use super::recording_state::{AudioChunk, AudioError, RecordingState, DeviceType};
+use super::transcription::queue_ledger::{QueueLedger, RejectionReason};
 use super::audio_processing::{audio_to_mono, LoudnessNormalizer, NoiseSuppressionProcessor, HighPassFilter};
 use super::vad::{ContinuousVadProcessor};
 
@@ -25,6 +26,20 @@ use super::vad::{ContinuousVadProcessor};
 /// accumulated-speech-buffer warning threshold. Bounded live segmentation
 /// during continuous speech is tracked separately in #756.
 const VAD_REDEMPTION_TIME_MS: u32 = 500;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TranscriptionAdmission {
+    Accepted,
+    Rejected(RejectionReason),
+}
+
+fn try_admit_transcription(
+    _sender: &mpsc::Sender<AudioChunk>,
+    _ledger: &QueueLedger,
+    _chunk: AudioChunk,
+) -> TranscriptionAdmission {
+    TranscriptionAdmission::Accepted
+}
 
 /// Ring buffer for synchronized audio mixing
 /// Accumulates samples from mic and system streams until we have aligned windows
@@ -1105,6 +1120,17 @@ impl Default for AudioPipelineManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{Duration, Instant};
+
+    fn chunk(chunk_id: u64) -> AudioChunk {
+        AudioChunk {
+            data: vec![0.0; 800],
+            sample_rate: 16_000,
+            timestamp: chunk_id as f64,
+            chunk_id,
+            device_type: DeviceType::Microphone,
+        }
+    }
 
     #[test]
     fn test_live_vad_redemption_matches_pro_policy() {
@@ -1112,5 +1138,30 @@ mod tests {
         // uninterrupted speech. Batch import/retranscription use 2000ms.
         // See #679 and #756.
         assert_eq!(VAD_REDEMPTION_TIME_MS, 500);
+    }
+
+    #[test]
+    fn bounded_transcription_full_and_closed_admission_is_immediate_and_attributable() {
+        let full_ledger = QueueLedger::new("meeting-full", 1).expect("full ledger");
+        let (full_sender, _full_receiver) = mpsc::channel(1);
+        full_sender.try_send(chunk(0)).expect("fill bounded queue");
+
+        let started = Instant::now();
+        let full = try_admit_transcription(&full_sender, &full_ledger, chunk(1));
+        assert!(started.elapsed() < Duration::from_millis(50));
+        assert_eq!(full, TranscriptionAdmission::Rejected(RejectionReason::Capacity));
+        let full_snapshot = full_ledger.snapshot(Instant::now());
+        assert_eq!(full_snapshot.accepted, 0);
+        assert_eq!(full_snapshot.rejected, 1);
+        assert_eq!(full_ledger.gaps().len(), 1);
+        assert_eq!(full_ledger.gaps()[0].reason, RejectionReason::Capacity);
+
+        let closed_ledger = QueueLedger::new("meeting-closed", 1).expect("closed ledger");
+        let (closed_sender, closed_receiver) = mpsc::channel(1);
+        drop(closed_receiver);
+        let closed = try_admit_transcription(&closed_sender, &closed_ledger, chunk(2));
+        assert_eq!(closed, TranscriptionAdmission::Rejected(RejectionReason::Closed));
+        assert_eq!(closed_ledger.snapshot(Instant::now()).rejected, 1);
+        assert_eq!(closed_ledger.gaps()[0].reason, RejectionReason::Closed);
     }
 }

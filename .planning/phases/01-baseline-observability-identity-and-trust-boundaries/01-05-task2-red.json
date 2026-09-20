@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml bounded_transcription --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::pipeline::tests::bounded_transcription_full_and_closed_admission_is_immediate_and_attributable\nnot ok 2 - audio::transcription::worker::tests::bounded_transcription_model_unavailable_is_failed_not_completed\nnot ok 3 - audio::transcription::worker::tests::bounded_transcription_worker_join_precedes_any_queue_complete_signal\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "audio::pipeline::tests::bounded_transcription_full_and_closed_admission_is_immediate_and_attributable",
+  "expected": "Finite transcription admission rejects full or closed queues immediately with an attributable gap, model-unavailable work terminates as failed, and any completion signal follows worker joins",
+  "actual": "Three named behavior assertions failed because admission always reported accepted, model-unavailable work mapped to completed, and the queue-complete signal preceded worker joins"
+}

@@ -7,6 +7,7 @@ use super::provider::TranscriptionError;
 use crate::audio::AudioChunk;
 use crate::database::models::{CaptureCompleteness, TranscriptEvidence, TranscriptEvidenceInput};
 use crate::database::repositories::transcript::TranscriptsRepository;
+use super::queue_ledger::{WorkFailureReason, WorkOutcome};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -37,6 +38,10 @@ pub fn reset_speech_detected_flag() {
 /// Filters empty/whitespace-only text; no confidence gating is applied.
 fn should_emit_transcript(text: &str) -> bool {
     !text.trim().is_empty()
+}
+
+fn terminal_outcome_for_transcription_error(_error: &TranscriptionError) -> WorkOutcome {
+    WorkOutcome::Completed
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -904,6 +909,28 @@ mod tests {
     fn drops_empty_and_whitespace_only() {
         assert!(!should_emit_transcript(""));
         assert!(!should_emit_transcript("   "));
+    }
+
+    #[test]
+    fn bounded_transcription_model_unavailable_is_failed_not_completed() {
+        assert_eq!(
+            terminal_outcome_for_transcription_error(&TranscriptionError::ModelNotLoaded),
+            WorkOutcome::Failed(WorkFailureReason::ModelUnavailable)
+        );
+    }
+
+    #[test]
+    fn bounded_transcription_worker_join_precedes_any_queue_complete_signal() {
+        let source = include_str!("worker.rs");
+        let join_position = source
+            .find("handle.await")
+            .expect("worker task must be joined before completion can be claimed");
+        if let Some(complete_position) = source.find("transcription-queue-complete") {
+            assert!(
+                complete_position > join_position,
+                "queue completion must not be emitted before every worker join returns"
+            );
+        }
     }
 
     #[tokio::test]
