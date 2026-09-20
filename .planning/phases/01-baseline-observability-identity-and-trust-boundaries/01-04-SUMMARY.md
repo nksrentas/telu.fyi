@@ -14,9 +14,9 @@ provides:
 affects: [transcription, recovery, live-assistance, evidence-attribution, latency-evaluation]
 
 actuals:
-  tokens: 13062
+  tokens: 13441
   tasks: 2
-  commits: 4
+  commits: 6
 plan_head_before: 3de653f3a66e2b0b83b853efe691643074fad767
 
 tech-stack:
@@ -36,6 +36,7 @@ key-files:
     - frontend/src/contexts/TranscriptContext.tsx
     - frontend/src/services/indexedDBService.ts
     - frontend/src-tauri/src/audio/recording_commands.rs
+    - frontend/src-tauri/src/audio/recording_saver.rs
     - frontend/src-tauri/src/audio/transcription/worker.rs
     - frontend/src-tauri/src/lib.rs
 
@@ -61,6 +62,9 @@ coverage:
         status: pass
       - kind: other
         ref: "pnpm --dir frontend build"
+        status: pass
+      - kind: unit
+        ref: "cargo test --manifest-path frontend/src-tauri/Cargo.toml meeting_identity_propagation_indexeddb_upgrade_preserves_legacy_records --lib -- --nocapture"
         status: pass
     human_judgment: false
   - id: D2
@@ -93,12 +97,13 @@ status: complete
 - **Started:** 2026-09-20T19:25:19Z
 - **Completed:** 2026-09-20T19:47:48Z
 - **Tasks:** 2
-- **Files modified:** 9
+- **Files modified:** 10
 
 ## Accomplishments
 
 - Introduced discriminated provisional/final frontend DTOs and used the Rust evidence UUID as the canonical React and recovery identity.
 - Added an IndexedDB v3 final-evidence store with a stable evidence key, unique meeting/source/segment index, and idempotent `put`, leaving legacy display cache data isolated.
+- Made the v3 evidence-store migration explicit while retaining the v2 in-place lifecycle/completeness upgrade and all legacy transcript rows.
 - Added a Rust-owned delivery tracker whose unguessable tokens are bound to meeting/evidence identity, expire, and are consumed by the first valid acknowledgement.
 - Acknowledged only after React commits a canonical final and schedules the next animation frame, measuring the interval exclusively with Rust `Instant` and labeling it `ui_acknowledged`.
 - Preserved the prior persistence-before-publication boundary by minting and attaching delivery tokens only inside the successful canonical emit closure.
@@ -111,6 +116,8 @@ Each TDD phase was committed atomically:
 2. **Task 1 GREEN: canonical renderer and IndexedDB recovery semantics** - `880d302` (feat)
 3. **Task 2 RED: renderer acknowledgement contract tests** - `3dd2c38` (test)
 4. **Task 2 GREEN: Rust-clock delivery acknowledgement integration** - `bf4146b` (feat)
+5. **Original plan metadata** - `75dc2eb` (docs)
+6. **Post-wave regression fix: explicit compatible IndexedDB v3 upgrade** - `d964ff1` (fix)
 
 ## Files Created/Modified
 
@@ -119,6 +126,7 @@ Each TDD phase was committed atomically:
 - `frontend/src/contexts/TranscriptContext.tsx` - Projects Rust identities into React state, persists finals only, reloads stable metadata, and acknowledges from a post-commit animation-frame callback.
 - `frontend/src/services/indexedDBService.ts` - Adds the stable final-evidence object store and idempotent save/read API without promoting legacy cache rows.
 - `frontend/src-tauri/src/audio/recording_commands.rs` - Owns delivery tokens, correlations, monotonic timing, validation, rejection, and the Tauri acknowledgement command.
+- `frontend/src-tauri/src/audio/recording_saver.rs` - Guards the cross-plan IndexedDB contract for both preserved legacy rows and stable v3 evidence identity.
 - `frontend/src-tauri/src/audio/transcription/worker.rs` - Carries the optional token field and routes only committed canonical finals through the tokenizing emitter.
 - `frontend/src-tauri/src/lib.rs` - Registers `acknowledge_transcript_visible` with the Tauri invoke handler.
 - `.planning/phases/01-baseline-observability-identity-and-trust-boundaries/01-04-task1-red.json` - Records validated intentional RED evidence for frontend finality and recovery behavior.
@@ -138,6 +146,7 @@ Each TDD phase was committed atomically:
 - **Task 2 RED:** Three focused Rust contract tests failed intentionally because no delivery tracker, rejection contract, or post-commit renderer acknowledgement existed. The RED artifact passed `tdd-red-evidence`.
 - **Task 2 GREEN:** The focused acknowledgement suite passed 3/3, including correlation, one-shot consumption, stale/unknown/mismatch rejection, and reserved-stage rejection.
 - **Final:** The prior transcript evidence suite passed 6/6, the frontend production build succeeded, and `git diff --check` reported no whitespace errors.
+- **Post-wave regression:** The Plan 02 legacy-upgrade contract passes with the explicit v2/v3 migration checks, the Plan 04 Node guard passes 3/3, the acknowledgement suite passes 3/3, the evidence suite passes 6/6, the frontend production build succeeds, and the full Rust suite passes when granted its required loopback/temp-file permissions (270 passed, 3 ignored, plus all integration targets).
 
 ## Deviations from Plan
 
@@ -151,10 +160,18 @@ Each TDD phase was committed atomically:
 - **Verification:** The acknowledgement suite passes 3/3 and the prior persistence-ordering evidence suite passes 6/6.
 - **Committed in:** `bf4146b`
 
+**2. [Rule 1 - Bug] Restored the cross-plan IndexedDB upgrade contract**
+- **Found during:** Post-wave full Rust test suite
+- **Issue:** Plan 04 correctly advanced the recovery database to v3, but Plan 02's static regression guard still required the exact v2 version string, and the v3 evidence-store creation was not explicitly scoped to `oldVersion < 3`.
+- **Fix:** Made v3 evidence-store creation an explicit versioned migration beside the retained v2 metadata cursor upgrade, and updated the cross-plan test to require preserved legacy uncertainty plus stable evidence-ID storage.
+- **Files modified:** `frontend/src/services/indexedDBService.ts`, `frontend/src-tauri/src/audio/recording_saver.rs`
+- **Verification:** The previously failing focused test passes, along with the Node evidence guard, frontend build, acknowledgement tests, and transcript evidence tests.
+- **Committed in:** `d964ff1`
+
 ---
 
-**Total deviations:** 1 auto-fixed (1 blocking integration issue)
-**Impact on plan:** The worker change is the minimum integration needed to place token creation on the correct side of the existing durability boundary; it adds no new dependency or architecture.
+**Total deviations:** 2 auto-fixed (1 blocking integration issue, 1 regression bug)
+**Impact on plan:** Both fixes preserve established durability and compatibility contracts without adding a dependency or architectural layer.
 
 ## Issues Encountered
 
@@ -178,7 +195,7 @@ None - no external service configuration required.
 
 ## Self-Check: PASSED
 
-All nine declared implementation/test artifacts and the summary exist, all four TDD task commit hashes resolve, the persisted plan ledger measures four commits, and the working diff passes `git diff --check`.
+All ten declared implementation/test artifacts and the summary exist, all task, metadata, and regression-fix commit hashes resolve, the persisted plan ledger measured six commits before this follow-up metadata update, and the working diff passes `git diff --check`.
 
 ---
 *Phase: 01-baseline-observability-identity-and-trust-boundaries*

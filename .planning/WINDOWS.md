@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 5
+open_count: 6
 waived_count: 0
 fixed_count: 0
-total_count: 5
-last_updated: 2026-09-20T19:47:25.718Z
+total_count: 6
+last_updated: 2026-09-20T19:54:41.899Z
 ---
 
 # Broken Windows Ledger
@@ -20,6 +20,7 @@ last_updated: 2026-09-20T19:47:25.718Z
 | 3 | 01 | deviation | frontend/src-tauri/src/database/repositories/meeting.rs |  | Updated active MeetingModel query projections to include required typed lifecycle and completeness fields. | open |  | 2026-09-20T18:57:45.987Z |  |
 | 4 | 01 | deviation | frontend/src-tauri/src/audio/recording_commands.rs |  | Threaded the canonical meeting ID and shared SQLite pool through both recording start call sites so the planned worker durability boundary is reachable | open |  | 2026-09-20T19:20:21.732Z |  |
 | 5 | 01 | deviation | frontend/src-tauri/src/audio/transcription/worker.rs |  | Routed post-persistence canonical transcript publication through the delivery-token emitter so acknowledgements cannot weaken the persistence-before-publish invariant. | open |  | 2026-09-20T19:47:25.718Z |  |
+| 6 | 01 | deviation | frontend/src/services/indexedDBService.ts |  | Made the v3 canonical evidence store an explicit IndexedDB upgrade while retaining the v2 legacy metadata cursor and legacy transcript rows. | open |  | 2026-09-20T19:54:41.899Z |  |
 
 ````json
 [
@@ -81,6 +82,18 @@ last_updated: 2026-09-20T19:47:25.718Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-20T19:47:25.718Z",
+    "resolved_at": null
+  },
+  {
+    "id": 6,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src/services/indexedDBService.ts",
+    "line": null,
+    "description": "Made the v3 canonical evidence store an explicit IndexedDB upgrade while retaining the v2 legacy metadata cursor and legacy transcript rows.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-20T19:54:41.899Z",
     "resolved_at": null
   }
 ]
