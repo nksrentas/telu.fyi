@@ -1,7 +1,7 @@
 ---
 phase: "1"
 slug: "baseline-observability-identity-and-trust-boundaries"
-status: draft
+status: approved
 shadcn_initialized: true
 preset: "new-york / neutral / CSS variables / Lucide"
 created: "2026-09-20"
@@ -37,7 +37,7 @@ The shadcn CLI could not provide metadata because frontend dependencies are not 
 | Component | Import path | Phase 1 use |
 |-----------|-------------|-------------|
 | Alert | `@/components/ui/alert` | Persistent provider failures, incomplete-state notices, export privacy notice |
-| Button | `@/components/ui/button` | Retry, Change provider, Cancel, Review gaps, Recover meeting, Export local copy |
+| Button | `@/components/ui/button` | Capability-specific retry/change/cancel actions, Review gaps, Recover meeting, Close recovery, Export local copy |
 | Dialog | `@/components/ui/dialog` | Recovery reconciliation, diagnostics detail, export review, destructive confirmation |
 | Tabs | `@/components/ui/tabs` | Preserve Settings navigation; add the Diagnostics tab |
 | Select | `@/components/ui/select` | Provider/model choice with adjacent resolved route disclosure |
@@ -118,7 +118,7 @@ Soft Coral remains the recording color even though it is also the attention colo
 | Primary CTA | `Start recording` |
 | Empty state heading | `No diagnostic runs yet` |
 | Empty state body | `Run a baseline scenario, then return here to inspect its local results.` |
-| Error state | `Telu couldn’t reach {destination}. {provider} is still selected, and no data was sent to another provider.` Actions: `Retry`, `Change provider`, `Cancel` |
+| Error state | `Telu couldn’t reach {destination}. {provider} is still selected, and no data was sent to another provider.` Transcription actions: `Retry transcription`, `Change transcription provider`, `Cancel transcription`. Summary actions: `Retry summary`, `Change summary provider`, `Cancel summary`. |
 | Destructive confirmation | `Delete interrupted meeting`: `Delete “{meeting title}”? Its local recovery data will be removed. This cannot be undone.` Actions: `Keep meeting`, `Delete meeting` |
 
 ### Required phase copy
@@ -139,6 +139,10 @@ Soft Coral remains the recording color even though it is also the attention colo
 | Recovered detail | `Recovery preserved the available content, but some audio or transcript content is still missing.` |
 | Recovery success without gaps | `Meeting recovered. No recorded gaps remain.` |
 | Recovery result with gaps | `Meeting recovered with {gap count} {gap/gaps}.` |
+| Recovery list empty heading | `No interrupted meetings` |
+| Recovery list empty body | `There are no interrupted recordings available to recover on this device.` |
+| Gap list empty heading | `No recorded gaps` |
+| Gap list empty body | `Telu has no recorded audio or transcript gaps for this meeting. The meeting status above remains authoritative.` |
 | Diagnostics privacy note | `Diagnostic data stays on this device unless you export a local copy.` |
 | Export review title | `Review diagnostic export` |
 | Export review body | `Transcript text and audio are excluded unless you include them below.` |
@@ -168,6 +172,8 @@ Copy rules:
 | Recovery | Existing interrupted-meeting dialog | Reconcile one canonical meeting, preview available data, and show exact recovered/gap result | Dialog, ScrollArea, Alert, Button |
 | Diagnostics | New final Settings tab named `Diagnostics` | Recent local run summaries and an opt-in route to technical detail/export | Tabs, ScrollArea, Dialog, Alert, Button, Separator |
 
+On the main recording screen, the centered live transcript panel is the primary visual anchor. The newest transcript content in Ink draws the eye first; the fixed-bottom route and recording-control card is a secondary status/action surface, and its Soft Coral recording cue must not visually overpower the transcript.
+
 Do not add Phase 2 knowledge, Phase 3 document ingestion, Phase 4 live suggestions, or Phase 5 series-memory controls to any of these surfaces. A future capability may reuse the route-disclosure component, but Phase 1 renders only paths that actually exist.
 
 ---
@@ -187,14 +193,14 @@ Do not add Phase 2 knowledge, Phase 3 document ingestion, Phase 4 live suggestio
 ### Unavailable provider
 
 1. Render an inline destructive Alert at the point of action with title `{Capability} provider unavailable` and the required error copy.
-2. Present actions in this order: `Retry` (primary), `Change provider` (outline), `Cancel` (ghost). `Change provider` focuses the existing provider control; `Cancel` closes only the attempted operation.
-3. Disable the data-bearing CTA while retry is in flight and label it `Retrying…`; do not mutate the selected provider.
+2. Present actions in this order. For transcription: `Retry transcription` (primary), `Change transcription provider` (outline), `Cancel transcription` (ghost). For summary: `Retry summary` (primary), `Change summary provider` (outline), `Cancel summary` (ghost). The change-provider action focuses the corresponding existing provider control; the cancel action closes only that capability’s attempted operation. These labels preserve D-19’s retry, reconfigure, and cancel semantics without using generic verbs.
+3. Disable the data-bearing CTA while retry is in flight and label it `Retrying transcription…` or `Retrying summary…`, matching the failed capability; do not mutate the selected provider.
 4. During an active meeting, the alert must separately state the authoritative capture outcome. Use `Recording continues locally` only when Rust confirms capture is still durable; otherwise state `Recording stopped` and surface the resulting incomplete state.
 5. Error detail may expose a redacted technical code under `Show technical details`; the default alert does not show stack traces or raw payloads.
 
 ### Recording finalization
 
-1. Clicking Stop immediately disables pause/stop controls, ends the coral recording pulse, and swaps the fixed-bottom control card for the finalization card in the same location. Do not blank the main transcript.
+1. Clicking `Stop recording` immediately disables `Pause recording` and `Stop recording`, ends the coral recording pulse, and swaps the fixed-bottom control card for the finalization card in the same location. Do not blank the main transcript.
 2. The card shows a 16px activity indicator, `Finalizing recording`, and the real `{depth} items remaining · oldest waiting {age}` line from Rust. Format age as `<1s`, `12s`, or `2m 04s`.
 3. Update visible values whenever the authoritative snapshot changes. Use `aria-live="polite"` for lifecycle text; throttle spoken queue updates so screen readers are not notified more than once every five seconds.
 4. Do not render a progress bar or percentage unless the backend provides a true finite total. Queue depth may rise only if the authoritative ledger permits it; the UI never smooths, predicts, or clamps the value.
@@ -208,14 +214,14 @@ Do not add Phase 2 knowledge, Phase 3 document ingestion, Phase 4 live suggestio
 2. In meeting-history rows, put the status beneath the title as 12px metadata so it remains visible when row actions are hidden. The meeting title wraps to two lines, then truncates; the status never truncates.
 3. In meeting detail, show the status beside the title. Complete meetings need no banner. Incomplete, recovered-with-gaps, and legacy-unverified meetings show a persistent Alert above transcript content.
 4. `Review gaps` opens a list ordered by recording-relative time. Each row includes gap type, microphone/system-audio source when known, time range, and plain-language reason. Unknown values display `Unknown`; they are never omitted.
-5. Zero gaps after reconciliation changes the outcome to recovered without gaps only when Rust confirms the gap ledger and accepted work are fully reconciled. UI state alone cannot promote completeness.
+5. When the gap list is empty, render heading `No recorded gaps` and body `Telu has no recorded audio or transcript gaps for this meeting. The meeting status above remains authoritative.` Zero gaps after reconciliation changes the outcome to recovered without gaps only when Rust confirms the gap ledger and accepted work are fully reconciled. UI state alone cannot promote completeness.
 
 ### Recovery
 
 1. Keep the existing two-pane recovery dialog: candidate meetings on the left, preview and completeness detail on the right. The canonical meeting ID remains stable but is not shown by default.
-2. The candidate row shows meeting title, last activity, available final-segment count, audio availability, and current completeness label. Never describe provisional text as durable transcript evidence.
+2. The candidate row shows meeting title, last activity, available final-segment count, audio availability, and current completeness label. Never describe provisional text as durable transcript evidence. When no candidates exist, replace both panes with heading `No interrupted meetings` and body `There are no interrupted recordings available to recover on this device.`
 3. `Recover meeting` is the primary action. While reconciliation runs, disable selection and delete controls and show `Recovering meeting…` without optimistic success copy.
-4. After reconciliation, do not automatically close or navigate. Replace the preview footer with the authoritative result and actions `View meeting` and `Done`. If gaps remain, use the required recovered-with-gaps copy and expose `Review gaps`.
+4. After reconciliation, do not automatically close or navigate. Replace the preview footer with the authoritative result and actions `View meeting` and `Close recovery`. If gaps remain, use the required recovered-with-gaps copy and expose `Review gaps`.
 5. Repeating recovery for the same meeting displays the same canonical meeting and updated reconciliation result. It never adds a duplicate candidate row.
 6. `Delete meeting` retains a destructive confirmation. Closing the dialog or choosing `Keep meeting` preserves the recovery record.
 
@@ -226,7 +232,7 @@ Do not add Phase 2 knowledge, Phase 3 document ingestion, Phase 4 live suggestio
 3. Run details group information in this order: Result and limitations; environment; stage timing; queue and terminal outcomes; resources; provider route and outbound attempts; redacted errors. Preserve outliers and unknown values.
 4. Technical tables scroll within their panel. Freeze the first column where practical, use tabular numerals, and allow IDs to be copied. Do not graph a metric when a compact value/distribution table is clearer.
 5. `Export diagnostics` opens `Review diagnostic export`. List included categories, destination folder, and redaction policy. Transcript text and audio switches are off by default and require separate explicit changes each export.
-6. Export creates a sanitized local copy. It does not upload or share. Success copy is `Diagnostic copy exported locally`; include `Show in folder`. Failure copy states the filesystem reason and offers `Try again` or `Choose another folder`.
+6. Export creates a sanitized local copy. It does not upload or share. Success copy is `Diagnostic copy exported locally`; include `Show in folder`. Failure copy states the filesystem reason and offers `Retry export` or `Choose another folder`.
 
 ---
 
@@ -249,7 +255,7 @@ Do not add Phase 2 knowledge, Phase 3 document ingestion, Phase 4 live suggestio
 - Status chips pair Lucide icon and text: Laptop/`Local`, Network/`LAN`, Cloud/`Remote`, CheckCircle/`Complete`, AlertTriangle/`Incomplete`, RotateCcw/`Recovered with gaps`, CircleHelp/`Completion not verified`.
 - The existing recording pulse may continue for active recording. Under `prefers-reduced-motion`, use a static Soft Coral dot. Finalization uses opacity-only entrance up to 200ms; no bouncing, vibrating, or decorative telemetry animation.
 - Never rely on coral, indigo, or icon shape alone. The visible state word is mandatory.
-- Keyboard order follows the visible layout. `Retry`, `Change provider`, and `Cancel` are reachable without entering technical details.
+- Keyboard order follows the visible layout. The applicable `Retry transcription` / `Retry summary`, `Change transcription provider` / `Change summary provider`, and `Cancel transcription` / `Cancel summary` actions are reachable without entering technical details.
 
 ---
 
@@ -259,9 +265,9 @@ Applicable state considerations resolved: 8 covered, 0 backstop, 0 unresolved.
 
 | Category | Element(s) | Status | Resolution / Reason |
 |----------|------------|--------|---------------------|
-| empty | Diagnostics run list, recovery list, gap list | ✅ covered | Diagnostics uses the documented empty-state copy; recovery and gaps render a factual zero state and never an empty panel. |
+| empty | Diagnostics run list, recovery list, gap list | ✅ covered | Diagnostics uses `No diagnostic runs yet`; recovery uses `No interrupted meetings`; gaps use `No recorded gaps`. Each has the exact body copy defined in the Copywriting Contract and never renders an empty panel. |
 | loading | Provider resolution, finalization card, recovery preview, diagnostics detail | ✅ covered | Each in-flight state retains its surrounding content, disables only conflicting actions, and shows a named activity state without fabricated progress. |
-| error | Provider action, recovery, diagnostics load/export | ✅ covered | Errors remain inline with Retry/reconfigure/cancel or file-location recovery actions; a toast is supplementary only. |
+| error | Provider action, recovery, diagnostics load/export | ✅ covered | Errors remain inline with capability-specific retry/change-provider/cancel actions or noun-bearing export/file-location recovery actions; a toast is supplementary only. |
 | populated | Meeting history, diagnostic runs, recovery candidates, gap rows | ✅ covered | Typical lists use compact rows with status metadata, contained scrolling, and deterministic ordering. |
 | partial | Incomplete and recovered meetings | ✅ covered | Missing intervals and unknown fields remain visible through lifecycle labels, persistent alerts, and gap rows. |
 | overflow | Meeting history, diagnostics tables, recovery preview | ✅ covered | Lists scroll vertically, technical tables scroll within their panel, titles wrap to two lines, and the page does not scroll horizontally. |
@@ -296,12 +302,12 @@ No third-party registry or block is approved for Phase 1.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
-- [ ] Dimension 7 Inventory Provenance: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
+- [x] Dimension 7 Inventory Provenance: PASS
 
-**Approval:** pending
+**Approval:** verified 2026-09-20
