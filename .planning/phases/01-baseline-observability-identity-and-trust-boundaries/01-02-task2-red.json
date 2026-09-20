@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml --test meeting_identity_migration -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - meeting_identity_migration_fresh_database_projects_typed_state\nnot ok 2 - meeting_identity_migration_legacy_database_preserves_identity_and_uncertainty\nnot ok 3 - meeting_identity_migration_build_tracks_migration_directory\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "meeting_identity_migration_fresh_database_projects_typed_state",
+  "expected": "Fresh and legacy databases deserialize lifecycle and completeness through MeetingModel, preserve legacy identity and fields, and rebuild when migrations change",
+  "actual": "Three named behavior assertions failed because MeetingModel omits the lifecycle projection and build.rs does not track the migration directory"
+}
