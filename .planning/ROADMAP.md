@@ -42,17 +42,27 @@ Telu extends the active Tauri/Rust and Next.js/React Community Edition applicati
 **Verification approach:** Run short, continuous, overlapping, sustained-system-audio, overload, stop, restart, crash, and repeated-recovery scenarios on the declared target matrix; inspect stage telemetry and resource samples; verify idempotent database state and stable evidence IDs; block network access in local mode; snapshot provider-boundary disclosures and failure behavior.
 **Exit gate:** Phase 2 may proceed only when canonical meeting identity, stable final-transcript semantics, recovery reconciliation, capture-completeness reporting, and privacy-boundary checks pass. Phase 4 remains blocked unless continuous-speech freshness, backlog age, memory/resource behavior, and stop behavior are observable, bounded against the predeclared experiment thresholds, and passing. Unknown results count as failure.
 **Principal risks / stop conditions:** Split or late identity, partial transcripts treated as durable evidence, placeholder queue metrics, unbounded freshness or memory, silent transcript loss, fabricated confidence, ambiguous provider destinations, undisclosed egress, or silent local-to-hosted fallback. Stop dependent work when any required measurement or trust boundary is unknown or failing.
-**Plans:** 9 plans
+**Plans:** 19 plans
 Plans:
-- [ ] 01-01-PLAN.md — Prove one Rust-owned meeting identity through SQLite, Tauri IPC, React state, recording metadata, and recovery cache.
-- [ ] 01-02-PLAN.md — Persist stable final-only transcript evidence incrementally and close the renderer acknowledgement path.
-- [ ] 01-03-PLAN.md — Replace placeholder/unbounded queue and stop behavior with bounded accounting and truthful finalization.
-- [ ] 01-04-PLAN.md — Reconcile interrupted meetings idempotently and expose completeness/gaps across recovery, history, and detail.
-- [ ] 01-05-PLAN.md — Resolve effective provider routes and disclose/fail them consistently without fallback.
-- [ ] 01-06-PLAN.md — Attribute outbound attempts, control canary traffic, and narrow local capability scopes.
-- [ ] 01-07-PLAN.md — Record monotonic stage/resource evidence and atomic redacted local run bundles.
-- [ ] 01-08-PLAN.md — Add local Diagnostics inspection and review-before-export trust UX.
-- [ ] 01-09-PLAN.md — Run the target-hardware matrix and declare evidence-backed thresholds and downstream gates.
+- [ ] 01-01-PLAN.md — Prove one Rust-owned meeting identity through SQLite, Tauri IPC, and React before capture.
+- [ ] 01-02-PLAN.md — Propagate the same identity into recording metadata, IndexedDB, and legacy migration projection.
+- [ ] 01-03-PLAN.md — Persist stable final-only transcript evidence before canonical publication.
+- [ ] 01-04-PLAN.md — Preserve final evidence in React/IndexedDB and close renderer acknowledgement timing.
+- [ ] 01-05-PLAN.md — Bound transcription admission and expose the real queue conservation ledger.
+- [ ] 01-06-PLAN.md — Make stop a durable idempotent close/drain/deadline transition.
+- [ ] 01-07-PLAN.md — Render truthful finalization and mirror the committed lifecycle.
+- [ ] 01-08-PLAN.md — Reconcile interrupted meetings transactionally under the same IDs.
+- [ ] 01-09-PLAN.md — Expose authoritative recovery, completeness, and time-ordered gaps in the UI.
+- [ ] 01-10-PLAN.md — Resolve and enforce effective Local/LAN/Remote routes in Rust.
+- [ ] 01-11-PLAN.md — Disclose routes in settings/actions and surface explicit no-fallback failures.
+- [ ] 01-12-PLAN.md — Attribute every outbound attempt to its effective route.
+- [ ] 01-13-PLAN.md — Control updater and analytics behavior during local canary runs.
+- [ ] 01-14-PLAN.md — Narrow renderer capabilities and automate the application-side local canary.
+- [ ] 01-15-PLAN.md — Capture monotonic stage and defensible resource/power evidence.
+- [ ] 01-16-PLAN.md — Persist versioned local evaluation evidence with commit-ordered wiring.
+- [ ] 01-17-PLAN.md — Write and validate atomic self-contained redacted run bundles.
+- [ ] 01-18-PLAN.md — Add local Diagnostics inspection and review-before-export UX.
+- [ ] 01-19-PLAN.md — Run the approved physical matrix and declare evidence-derived downstream gates.
 **UI hint:** yes
 
 ### Phase 2: Evidence-Linked Post-Meeting Knowledge
@@ -152,7 +162,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6. Each phase's e
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Baseline Observability, Identity, and Trust Boundaries | 0/TBD | Not started | - |
+| 1. Baseline Observability, Identity, and Trust Boundaries | 0/19 | Not started | - |
 | 2. Evidence-Linked Post-Meeting Knowledge | 0/TBD | Not started | - |
 | 3. Bounded Sourced Preparation | 0/TBD | Not started | - |
 | 4. Cancellable Live-Loop Validation | 0/TBD | Not started | - |

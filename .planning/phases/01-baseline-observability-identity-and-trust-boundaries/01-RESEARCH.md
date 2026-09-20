@@ -630,28 +630,18 @@ The current main capability includes exact permissions `"fs:read-all"`, `"fs:wri
 | A8 | Network canary uses OS firewall/proxy capture plus app attribution and a canary mode for unrelated background traffic. | Verification, Security | Platform tooling may require separate implementation/manual steps. |
 | A9 | Proposed queue capacity/rejection reasons and non-blocking admission design. | Architecture, Code Examples | Capacity must be determined empirically; callback/channel topology may require a ring-buffer-specific seam. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **What is the declared primary reference machine?**
-   - What we know: D-05 requires one and current research host is macOS `26.6.2`, with Rust/Cargo/Node/pnpm/ffmpeg/sqlite available. [VERIFIED: local command probe]
-   - What is unclear: exact hardware, approved model/language/audio devices, AC versus battery protocol, and whether this host is the project’s reference machine. [ASSUMED]
-   - Recommendation: make the first plan checkpoint record and approve the complete reference fingerprint before matrix execution. [ASSUMED]
-2. **How should pre-Phase-1 historical meetings be labeled?**
-   - What we know: existing schema lacks lifecycle/completeness/gap fields. [VERIFIED: frontend/src-tauri/migrations/20250916100000_initial_schema.sql:1-19]
-   - What is unclear: whether to use `incomplete` + legacy reason or add a separate legacy/unknown state while preserving the locked minimum lifecycle. [ASSUMED]
-   - Recommendation: never backfill `complete` solely from absence of errors; choose the explicit representation before the migration is finalized. [ASSUMED]
-3. **What battery evidence is strong enough for BASE-04?**
-   - What we know: current integration reports CPU/memory but not battery; `pmset` exists on the current host. [VERIFIED: frontend/src-tauri/src/whisper_engine/system_monitor.rs:8-16] [VERIFIED: local command probe]
-   - What is unclear: precision, minimum scenario duration, AC/battery protocol, and Windows/Linux collectors. [ASSUMED]
-   - Recommendation: define measurement uncertainty and allow `unknown` (which fails a claimed gate) instead of deriving energy from CPU percentage. [ASSUMED]
-4. **What finalization deadline and queue capacity should be used?**
-   - What we know: current exact timeouts are 600 seconds in Rust and 60 seconds in React, neither derived from real backlog evidence. [VERIFIED: frontend/src-tauri/src/audio/recording_commands.rs:789-804] [VERIFIED: frontend/src/hooks/useRecordingStop.ts:152-155]
-   - What is unclear: acceptable stop UX and target-hardware throughput. [ASSUMED]
-   - Recommendation: implement configurable recorded values, choose initial conservative experimental settings, then lock thresholds from repeated baseline evidence rather than calling the current values standards. [ASSUMED]
-5. **How will the network-blocked canary observe attempts on each OS?**
-   - What we know: updater and optional analytics are current egress sources beyond provider calls. [VERIFIED: frontend/src/hooks/useUpdateCheck.ts:49-58] [VERIFIED: frontend/src-tauri/src/analytics/analytics.rs:44-50]
-   - What is unclear: approved firewall/proxy tooling and whether CI can exercise it. [ASSUMED]
-   - Recommendation: define one authoritative method on the reference machine and smaller manual smoke procedures on other claimed platforms. [ASSUMED]
+1. **Primary reference machine — RESOLVED by blocking approval checkpoint.**
+   - Disposition: the baseline runner may capture a proposed fingerprint, but Plan 19 contains a blocking human decision checkpoint that must approve the exact hardware, OS, model, language, audio devices, power protocol, and authoritative OS network-block/capture method before measured matrix execution. An unknown or incomplete fingerprint does not pass D-05. [VERIFIED: D-05; planning resolution]
+2. **Pre-Phase-1 historical meeting label — RESOLVED as `Completion not verified`.**
+   - Disposition: the forward migration preserves existing IDs and projects historical meetings with the user-visible label `Completion not verified` plus an explicit legacy reason. It never backfills `complete` from absence of recorded errors. [VERIFIED: 01-UI-SPEC.md; planning resolution]
+3. **Battery evidence — RESOLVED as honest unavailable/unknown until the approved reference method supplies defensible observations.**
+   - Disposition: CPU and memory remain separate resource measurements and are never relabeled as energy impact. Power source, battery observation, uncertainty, and collector availability are recorded; unavailable or inadequate evidence is `unknown` and fails BASE-04 for any claimed configuration. The blocking reference-machine checkpoint selects and records the evidence method before the battery gate runs. [VERIFIED: D-04/D-06; planning resolution]
+4. **Finalization deadline and queue capacity — RESOLVED as configurable, recorded experiment inputs derived and approved from baseline evidence.**
+   - Disposition: Phase 1 implements finite configurable values and records them in every run. Initial experiment inputs are explicitly identified as inputs, not release thresholds; reviewed repeated-run backlog/stop evidence determines the approved declaration before the separate validation run. Existing 60/300/600-second values are not promoted to standards. [VERIFIED: D-03/D-06/D-13/D-17; planning resolution]
+5. **OS network-canary observation — RESOLVED with two-source evidence and a physical checkpoint.**
+   - Disposition: the automated bounded outbound-attribution ledger proves application intent and fails on missing/unattributed records. The baseline checkpoint separately approves an authoritative firewall/proxy capture method on the reference machine, and the physical canary reconciles that independent OS observation against the ledger. Other claimed platforms remain explicitly unverified until their documented physical/OS smoke procedure runs. [VERIFIED: D-21; planning resolution]
 
 ## Sources
 

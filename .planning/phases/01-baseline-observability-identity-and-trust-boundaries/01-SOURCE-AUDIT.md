@@ -2,60 +2,60 @@
 
 ## Coverage Summary
 
-All ROADMAP goal clauses, all 12 phase requirements, all 21 locked decisions, the in-scope research constraints, and all approved UI considerations are covered by Plans 01-09. CONTEXT has no deferred ideas. The phase introduces no package install and no external API capability.
+All ROADMAP goal clauses, all 12 phase requirements, all 21 locked decisions, the in-scope research constraints, and all approved UI considerations are covered by Plans 01-19. CONTEXT has no deferred ideas. The phase introduces no package install and no external API capability.
 
 | Source | ID | Feature / constraint | Plan | Status | Notes |
 |---|---|---|---|---|---|
-| GOAL | — | Measured, recoverable desktop foundation | 01-09 | COVERED | Identity, evidence, finalization, recovery, observability, and matrix evidence form the dependency chain. |
-| GOAL | — | One meeting identity | 01-04 | COVERED | Rust-owned before capture; reused by evidence and recovery. |
-| GOAL | — | Explicit Local/LAN/Remote boundaries | 05-06 | COVERED | Effective destination is authoritative. |
-| REQ | BASE-01 | Reproducible target-hardware matrix | 09 | COVERED | Includes every roadmap scenario and explicit unverified combinations. |
-| REQ | BASE-02 | Monotonic end-to-end stage timing | 02, 07 | COVERED | Includes visible UI acknowledgement; Phase 4-only stages remain reserved. |
-| REQ | BASE-03 | Real queue depth/age/outcomes | 03, 07 | COVERED | Shared conservation ledger replaces placeholder status. |
-| REQ | BASE-04 | CPU, memory, battery, provider, errors; local by default | 07-09 | COVERED | Unknown power evidence cannot pass a claimed gate. |
-| REQ | BASE-05 | Stop, restart, recovery without duplicates/loss/ambiguity | 01, 03-04 | COVERED | Durable lifecycle and gap ledger govern completion. |
-| REQ | BASE-06 | Evidence-derived threshold declaration | 09 | COVERED | Thresholds are recorded only after repeated baseline runs. |
-| REQ | IDENT-01 | One durable Rust-owned ID | 01 | COVERED | Walking-skeleton tracer proves SQLite → IPC → React/recovery continuity. |
-| REQ | IDENT-02 | Incremental idempotent final evidence | 02 | COVERED | Stable evidence IDs and final-only canonical persistence. |
-| REQ | IDENT-03 | Repeat recovery reconciles | 04 | COVERED | Transactional same-ID reconciliation and count-invariance tests. |
-| REQ | PRIV-01 | Visible route class and destination | 05 | COVERED | Settings and action-boundary disclosures use Rust DTOs. |
-| REQ | PRIV-02 | No silent fallback | 05 | COVERED | Route failure preserves choice and exposes retry/reconfigure/cancel. |
-| REQ | PRIV-03 | Local workflow without undisclosed egress | 06, 09 | COVERED | Attempt attribution plus network-blocked canary. |
-| CONTEXT | D-01 | Versioned self-contained local bundle | 07 | COVERED | Manifest, environment, stages, queues, resources, routes, errors, result, summary. |
-| CONTEXT | D-02 | Existing full stage path plus reserved future vocabulary | 02, 07 | COVERED | Reserved stages cannot be emitted in Phase 1. |
-| CONTEXT | D-03 | Authoritative queue counters/depth/age | 03 | COVERED | Conservation and terminal-outcome tests. |
-| CONTEXT | D-04 | Monotonic duration and complete environment metadata | 07 | COVERED | UTC only correlates records. |
-| CONTEXT | D-05 | Required matrix and explicit unverified combinations | 09 | COVERED | Primary machine decision is a blocking-human gate. |
-| CONTEXT | D-06 | Repeated evidence before threshold declaration | 09 | COVERED | Distributions/outliers retained; unknown fails. |
-| CONTEXT | D-07 | Local raw artifacts and reviewable explicit export | 07-08 | COVERED | Transcript/audio opt-in separately for each export. |
-| CONTEXT | D-08 | ID reused across all stores and consumers | 01-04 | COVERED | Recording metadata and IndexedDB are mirrors, not authorities. |
-| CONTEXT | D-09 | Frontend never mints/remaps canonical ID | 01 | COVERED | Static and behavior checks remove timestamp identity. |
-| CONTEXT | D-10 | Only finals are canonical evidence | 02 | COVERED | Partial UI text remains provisional. |
-| CONTEXT | D-11 | Incremental idempotent stable evidence | 02 | COVERED | Upsert and redelivery tests. |
-| CONTEXT | D-12 | Explicit durable lifecycle and strict complete predicate | 01, 03-04 | COVERED | Legacy status remains unverified. |
-| CONTEXT | D-13 | Stop capture, close producers, bounded drain | 03 | COVERED | UI uses real depth/age. |
-| CONTEXT | D-14 | Deadline/failure persists incomplete facts | 03 | COVERED | No quiet/fixed-delay completion. |
-| CONTEXT | D-15 | Recovery reconciles rather than copies | 04 | COVERED | Repeat/concurrent recovery converges. |
-| CONTEXT | D-16 | Missing/uncertain content remains visible | 04 | COVERED | History/detail/recovery expose gaps and unknowns. |
-| CONTEXT | D-17 | Bounded overload with explicit outcomes | 03, 09 | COVERED | No audio-callback blocking or silent loss. |
-| CONTEXT | D-18 | Route class + concrete destination at choice/action | 05 | COVERED | Effective route snapshot retained per meeting/run. |
-| CONTEXT | D-19 | Visible failure and explicit recovery actions | 05 | COVERED | Provider choice/local data preserved. |
-| CONTEXT | D-20 | Calm compact trust UI and deeper diagnostics | 05, 08 | COVERED | Approved UI contract is implemented without navigation redesign. |
-| CONTEXT | D-21 | Network-blocked local canary | 06, 09 | COVERED | Every observed attempt reconciles with attribution. |
-| RESEARCH | — | Five dependency boundaries | 01-09 | COVERED | Identity/evidence → queue/stop/recovery → trust/observability → evidence gate. |
-| RESEARCH | — | Existing stack and lockfiles; no package install | 01-09 | COVERED | Package-legitimacy gate is not triggered. |
-| RESEARCH | — | Forward-only SQLx migrations and legacy upgrade fixtures | 01-04, 07 | COVERED | Historical migrations remain immutable. |
-| RESEARCH | — | Bounded Tokio admission without callback blocking | 03 | COVERED | VAD/ASR algorithms are not redesigned. |
-| RESEARCH | — | Runtime route resolution and least-privilege capability scope | 05-06 | COVERED | Provider names do not determine locality. |
-| RESEARCH | — | Redacted local observability and explicit export | 07-08 | COVERED | Raw content and secrets are excluded by default. |
-| UI | empty | Diagnostics, recovery, and gap empty states | 04, 08 | COVERED | Exact approved copy; no blank panel. |
-| UI | loading | Provider, finalization, recovery, diagnostic loading | 03-05, 08 | COVERED | Named state; surrounding content retained; no fabricated progress. |
-| UI | error | Provider, recovery, diagnostic load/export errors | 04-05, 08 | COVERED | Inline noun/capability-specific recovery actions. |
-| UI | populated | History, runs, recovery candidates, gaps | 04, 08 | COVERED | Compact ordered rows and contained scrolling. |
-| UI | partial | Incomplete and recovered meetings | 04 | COVERED | Gaps and unknowns remain visible. |
-| UI | overflow | History, diagnostics, recovery preview | 04, 08 | COVERED | Contained scroll; technical tables only scroll horizontally. |
-| UI | zero-one-many | Queues, gaps, meetings, runs | 03-04, 08 | COVERED | Singular/plural and dedicated zero-state copy. |
-| UI | long-text | Titles, destinations, errors, IDs | 04-05, 08 | COVERED | Compact truncation plus selectable sanitized detail. |
+| GOAL | — | Measured, recoverable desktop foundation | 01-19 | COVERED | Identity, evidence, finalization, recovery, trust, observability, and physical matrix form the dependency chain. |
+| GOAL | — | One meeting identity | 01-09 | COVERED | Rust-owned before capture; reused by evidence and recovery. |
+| GOAL | — | Explicit Local/LAN/Remote boundaries | 10-14 | COVERED | Effective destination is authoritative and outbound intent is attributable. |
+| REQ | BASE-01 | Reproducible target-hardware matrix | 19 | COVERED | Includes every roadmap scenario and explicit unverified combinations. |
+| REQ | BASE-02 | Monotonic end-to-end stage timing | 03-04, 15-17 | COVERED | Includes renderer acknowledgement; Phase 4-only stages remain reserved. |
+| REQ | BASE-03 | Real queue depth/age/outcomes | 05-07, 15-17 | COVERED | Shared conservation ledger replaces placeholder status and feeds run evidence. |
+| REQ | BASE-04 | CPU, memory, battery, provider, errors; local by default | 15-19 | COVERED | Approved battery method or explicit unknown; unknown cannot pass. |
+| REQ | BASE-05 | Stop, restart, recovery without duplicates/loss/ambiguity | 01-02, 05-09 | COVERED | Durable lifecycle and gap ledger govern completion/recovery. |
+| REQ | BASE-06 | Evidence-derived threshold declaration | 19 | COVERED | Thresholds follow reviewed repeated baseline runs. |
+| REQ | IDENT-01 | One durable Rust-owned ID | 01-02 | COVERED | Tracer plus recording/cache propagation. |
+| REQ | IDENT-02 | Incremental idempotent final evidence | 03-04 | COVERED | Stable final evidence plus renderer/cache semantics. |
+| REQ | IDENT-03 | Repeat recovery reconciles | 08-09 | COVERED | Transactional backend and same-ID UI. |
+| REQ | PRIV-01 | Visible route class and destination | 10-11 | COVERED | Rust contract plus settings/action disclosure. |
+| REQ | PRIV-02 | No silent fallback | 10-11 | COVERED | Dispatch enforcement plus explicit actions. |
+| REQ | PRIV-03 | Local workflow without undisclosed egress | 12-14, 19 | COVERED | Ledger, canary control, least privilege, and physical OS reconciliation. |
+| CONTEXT | D-01 | Versioned self-contained local bundle | 17 | COVERED | Required files, atomic writer, and validator. |
+| CONTEXT | D-02 | Existing full stage path plus reserved future vocabulary | 03-04, 15-17 | COVERED | Reserved stages cannot be emitted in Phase 1. |
+| CONTEXT | D-03 | Authoritative queue counters/depth/age | 05 | COVERED | Conservation and terminal outcomes. |
+| CONTEXT | D-04 | Monotonic duration and complete environment metadata | 15-17 | COVERED | UTC only correlates records. |
+| CONTEXT | D-05 | Required matrix and explicit unverified combinations | 19 | COVERED | Reference machine is a blocking-human gate. |
+| CONTEXT | D-06 | Repeated evidence before threshold declaration | 19 | COVERED | Inputs are recorded/configurable; thresholds follow reviewed distributions. |
+| CONTEXT | D-07 | Local raw artifacts and reviewable explicit export | 17-18 | COVERED | Transcript/audio opt-in resets per export. |
+| CONTEXT | D-08 | ID reused across all stores and consumers | 01-04, 08-09 | COVERED | Recording/cache/evidence/recovery reuse one ID. |
+| CONTEXT | D-09 | Frontend never mints/remaps canonical ID | 01 | COVERED | Start tracer removes frontend minting. |
+| CONTEXT | D-10 | Only finals are canonical evidence | 03-04 | COVERED | Partial UI remains provisional. |
+| CONTEXT | D-11 | Incremental idempotent stable evidence | 03-04 | COVERED | Repository, worker, cache, and redelivery tests. |
+| CONTEXT | D-12 | Explicit durable lifecycle and strict complete predicate | 01-02, 06-09 | COVERED | Legacy is unverified; strict finalization/recovery projection. |
+| CONTEXT | D-13 | Stop capture, close producers, bounded drain | 06-07 | COVERED | Durable stop then truthful UI. |
+| CONTEXT | D-14 | Deadline/failure persists incomplete facts | 06-07 | COVERED | No quiet/fixed-delay completion. |
+| CONTEXT | D-15 | Recovery reconciles rather than copies | 08-09 | COVERED | Backend convergence and UI same-ID calls. |
+| CONTEXT | D-16 | Missing/uncertain content remains visible | 08-09 | COVERED | Durable facts plus recovery/history/detail UI. |
+| CONTEXT | D-17 | Bounded overload with explicit outcomes | 05-06, 19 | COVERED | Admission/rejection, finalization, and overload matrix. |
+| CONTEXT | D-18 | Route class + concrete destination at choice/action | 10-11 | COVERED | Effective route retained per meeting/run. |
+| CONTEXT | D-19 | Visible failure and explicit recovery actions | 10-11 | COVERED | Provider choice/local data preserved. |
+| CONTEXT | D-20 | Calm compact trust UI and deeper diagnostics | 11, 18 | COVERED | Approved UI without navigation redesign. |
+| CONTEXT | D-21 | Network-blocked local canary | 12-14, 19 | COVERED | App ledger plus independent OS observation. |
+| RESEARCH | — | Five dependency boundaries | 01-19 | COVERED | Identity/evidence → queue/stop/recovery → trust → observability → evidence gate. |
+| RESEARCH | — | Existing stack and lockfiles; no package install | 01-19 | COVERED | Package-legitimacy gate is not triggered. |
+| RESEARCH | — | Forward-only SQLx migrations and legacy fixtures | 01-03, 06, 16 | COVERED | Historical migrations remain immutable. |
+| RESEARCH | — | Bounded Tokio admission without callback blocking | 05, 15 | COVERED | VAD/ASR algorithms are not redesigned. |
+| RESEARCH | — | Runtime route resolution and least-privilege capability scope | 10-14 | COVERED | Provider names do not determine locality. |
+| RESEARCH | — | Redacted local observability and explicit export | 15-18 | COVERED | Raw content and secrets excluded by default. |
+| UI | empty | Diagnostics, recovery, and gap empty states | 09, 18 | COVERED | Exact approved copy; no blank panel. |
+| UI | loading | Provider, finalization, recovery, diagnostic loading | 07, 09, 11, 18 | COVERED | Named state; surrounding content retained. |
+| UI | error | Provider, recovery, diagnostic load/export errors | 09, 11, 18 | COVERED | Inline capability/noun-specific actions. |
+| UI | populated | History, runs, recovery candidates, gaps | 09, 18 | COVERED | Ordered compact rows and contained scrolling. |
+| UI | partial | Incomplete and recovered meetings | 09 | COVERED | Gaps and unknowns remain visible. |
+| UI | overflow | History, diagnostics, recovery preview | 09, 18 | COVERED | Contained scroll; technical tables only horizontal. |
+| UI | zero-one-many | Queues, gaps, meetings, runs | 07, 09, 18 | COVERED | Singular/plural and dedicated zero copy. |
+| UI | long-text | Titles, destinations, errors, IDs | 09, 11, 18 | COVERED | Truncation plus selectable sanitized detail. |
 
 ## Specless Edge Probe Accounting
 

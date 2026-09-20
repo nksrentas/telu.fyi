@@ -30,6 +30,16 @@ This is a brownfield walking skeleton. It extends the retained Meetily Community
 - [x] UI — consume the Rust-owned identity and lifecycle through typed services/context and render the authoritative state.
 - [x] Runtime — exercise the full stack with `pnpm --dir frontend run tauri:dev` and focused Rust/frontend verification.
 
+## Phase 1 Execution Map
+
+- Plans 01-02: pre-capture Rust identity and same-ID recording/cache propagation.
+- Plans 03-04: incremental final evidence and correlated renderer acknowledgement.
+- Plans 05-07: bounded queue ledger, durable finalization, and truthful renderer status.
+- Plans 08-09: transactional recovery and completeness/gap UI.
+- Plans 10-14: effective routes, no-fallback UX, outbound attribution, canary control, and least privilege.
+- Plans 15-17: monotonic/resource capture, evaluation persistence, and validated local bundles.
+- Plans 18-19: Diagnostics/export UX and the approved physical baseline gate.
+
 ## Out of Scope (Deferred to Later Slices)
 
 - Structured knowledge extraction, review, and evidence navigation (Phase 2).
