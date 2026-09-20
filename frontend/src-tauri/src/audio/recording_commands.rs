@@ -1927,3 +1927,45 @@ mod meeting_identity_contract_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod ui_acknowledgement_contract_tests {
+    #[test]
+    fn ui_acknowledgement_registers_one_correlated_delivery() {
+        let commands = include_str!("recording_commands.rs");
+        let worker = include_str!("transcription/worker.rs");
+
+        assert!(
+            commands.contains(concat!("struct Delivery", "Tracker"))
+                && commands.contains(concat!("ui_", "acknowledged"))
+                && worker.contains(concat!("delivery_", "token")),
+            "a committed final must receive one Rust-owned token correlated to meeting and evidence identity before event emission"
+        );
+    }
+
+    #[test]
+    fn ui_acknowledgement_rejects_unknown_duplicate_and_future_stage_names() {
+        let commands = include_str!("recording_commands.rs");
+
+        assert!(
+            commands.contains(concat!("Unknown", "Token"))
+                && commands.contains(concat!("Identity", "Mismatch"))
+                && commands.contains(concat!("RESERVED_FUTURE", "_STAGES")),
+            "unknown, duplicate, mismatched, and Phase-4-only acknowledgements must not fabricate a duration"
+        );
+    }
+
+    #[test]
+    fn ui_acknowledgement_occurs_after_react_commits_final_state() {
+        let context = include_str!("../../../src/contexts/TranscriptContext.tsx");
+        let service = include_str!("../../../src/services/transcriptService.ts");
+
+        assert!(
+            context.contains("pendingAcknowledgementsRef")
+                && context.contains("useLayoutEffect")
+                && context.contains("requestAnimationFrame")
+                && service.contains("acknowledgeTranscriptVisible"),
+            "React must acknowledge the final delivery only from a post-commit animation-frame callback"
+        );
+    }
+}

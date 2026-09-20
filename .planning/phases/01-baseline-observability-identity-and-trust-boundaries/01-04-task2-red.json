@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml ui_acknowledgement --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::recording_commands::ui_acknowledgement_contract_tests::ui_acknowledgement_registers_one_correlated_delivery\nnot ok 2 - audio::recording_commands::ui_acknowledgement_contract_tests::ui_acknowledgement_rejects_unknown_duplicate_and_future_stage_names\nnot ok 3 - audio::recording_commands::ui_acknowledgement_contract_tests::ui_acknowledgement_occurs_after_react_commits_final_state\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "audio::recording_commands::ui_acknowledgement_contract_tests::ui_acknowledgement_registers_one_correlated_delivery",
+  "expected": "Every committed final receives one Rust-owned delivery token, unknown or duplicate acknowledgements cannot record durations, future stages are rejected, and React acknowledges only after commit",
+  "actual": "Three named contract assertions failed because no delivery tracker, acknowledgement command, reserved-stage boundary, or post-commit renderer callback exists"
+}
