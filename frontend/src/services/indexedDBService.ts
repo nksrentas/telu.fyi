@@ -117,10 +117,11 @@ class IndexedDBService {
             transcriptsStore.createIndex('storedAt', 'storedAt', { unique: false });
           }
 
-          // Canonical final evidence is separate from the legacy auto-increment
-          // transcript cache. Legacy rows cannot be promoted because they do not
-          // carry a Rust evidence identity or a verified finality contract.
-          if (!db.objectStoreNames.contains('transcriptEvidence')) {
+          // Version 3 adds canonical final evidence beside the legacy
+          // auto-increment transcript cache. The old store is intentionally
+          // retained: its rows cannot be promoted because they do not carry a
+          // Rust evidence identity or a verified finality contract.
+          if (event.oldVersion < 3 && !db.objectStoreNames.contains('transcriptEvidence')) {
             const transcriptEvidenceStore = db.createObjectStore('transcriptEvidence', { keyPath: 'evidenceId' });
             transcriptEvidenceStore.createIndex('meetingId', 'meetingId', { unique: false });
             transcriptEvidenceStore.createIndex('meetingSourceSegment', ['meetingId', 'source', 'sourceSegmentKey'], { unique: true });

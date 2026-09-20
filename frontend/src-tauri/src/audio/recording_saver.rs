@@ -612,8 +612,10 @@ mod meeting_identity_propagation_tests {
         let source = include_str!("../../../src/services/indexedDBService.ts");
 
         assert!(
-            source.contains("DB_VERSION = 2"),
-            "the recovery cache needs a versioned upgrade"
+            source.contains("DB_VERSION = 3")
+                && source.contains("event.oldVersion < 2")
+                && source.contains("event.oldVersion < 3"),
+            "the recovery cache needs explicit versioned upgrades for legacy state and canonical evidence"
         );
         assert!(
             source.contains("lifecycle: MeetingLifecycle")
@@ -626,6 +628,11 @@ mod meeting_identity_propagation_tests {
                 && source.contains("completion_not_verified")
                 && source.contains("openCursor()"),
             "the upgrade must preserve existing keys while marking historical uncertainty"
+        );
+        assert!(
+            source.contains("createObjectStore('transcriptEvidence', { keyPath: 'evidenceId' })")
+                && source.contains("transcriptEvidenceStore.put(storedTranscript)"),
+            "the v3 upgrade must add stable evidence IDs without replacing the legacy transcript store"
         );
     }
 }
