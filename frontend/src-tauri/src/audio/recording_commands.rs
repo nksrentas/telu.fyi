@@ -22,6 +22,7 @@ use uuid::Uuid;
 
 use crate::database::repositories::meeting::{MeetingCompleteness, MeetingsRepository};
 pub use crate::database::repositories::meeting::StartMeetingResult;
+pub use crate::database::repositories::meeting::FinalizationSnapshot;
 use crate::state::AppState;
 
 use super::{

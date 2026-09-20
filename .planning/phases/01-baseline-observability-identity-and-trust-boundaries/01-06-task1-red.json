@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml finalization_repository --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - database::repositories::meeting::finalization_repository_tests::finalization_repository_all_terminal_closed_capture_and_durable_writes_is_complete\nnot ok 2 - database::repositories::meeting::finalization_repository_tests::finalization_repository_failure_deadline_and_gap_are_durable_incomplete_facts\nnot ok 3 - database::repositories::meeting::finalization_repository_tests::finalization_repository_repeated_terminal_transition_returns_same_durable_result\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "database::repositories::meeting::finalization_repository_tests::finalization_repository_all_terminal_closed_capture_and_durable_writes_is_complete",
+  "expected": "Closed capture with every accepted work item completed, successful durable writes, and no unresolved gap persists complete; deadline/failure/gap persists incomplete facts; repeated terminal transition returns the first durable result",
+  "actual": "Three named behavior assertions failed because the RED scaffold always projected incomplete, wrote no terminal or gap facts, and returned a different projection on repeated finalization"
+}

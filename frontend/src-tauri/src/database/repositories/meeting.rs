@@ -1,4 +1,5 @@
 use crate::api::{MeetingDetails, MeetingTranscript};
+use crate::audio::transcription::QueueSnapshot;
 use crate::database::models::{MeetingModel, Transcript};
 pub use crate::database::models::{MeetingCompleteness, MeetingLifecycle};
 use chrono::Utc;
@@ -15,6 +16,40 @@ pub struct StartMeetingResult {
     pub lifecycle: MeetingLifecycle,
     pub title: String,
     pub started_at_utc: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FinalizationGapInput {
+    pub work_id: String,
+    pub gap_kind: String,
+    pub reason_code: String,
+    pub audio_start_ms: Option<u64>,
+    pub audio_end_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinalizeMeetingInput {
+    pub meeting_id: String,
+    pub capture_closed: bool,
+    pub durable_writes_succeeded: bool,
+    pub queue: QueueSnapshot,
+    pub deadline_at_utc: String,
+    pub deadline_ms: u64,
+    pub remaining_work_ids: Vec<String>,
+    pub reason_codes: Vec<String>,
+    pub gaps: Vec<FinalizationGapInput>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FinalizationSnapshot {
+    pub meeting_id: String,
+    pub lifecycle: MeetingLifecycle,
+    pub queue: QueueSnapshot,
+    pub deadline_at_utc: String,
+    pub deadline_ms: u64,
+    pub remaining_work_ids: Vec<String>,
+    pub gap_count: u64,
+    pub reason_codes: Vec<String>,
 }
 
 impl MeetingsRepository {
@@ -84,6 +119,27 @@ impl MeetingsRepository {
                 Err(error)
             }
         }
+    }
+
+    /// Persist the immutable terminal result for one Rust-owned meeting.
+    ///
+    /// The RED scaffold deliberately returns an incomplete projection without
+    /// writing it. The behavior tests below define the transactional predicate
+    /// and idempotency contract implemented in the GREEN phase.
+    pub async fn finalize_session(
+        _pool: &SqlitePool,
+        input: &FinalizeMeetingInput,
+    ) -> Result<FinalizationSnapshot, SqlxError> {
+        Ok(FinalizationSnapshot {
+            meeting_id: input.meeting_id.clone(),
+            lifecycle: MeetingLifecycle::Incomplete,
+            queue: input.queue.clone(),
+            deadline_at_utc: input.deadline_at_utc.clone(),
+            deadline_ms: input.deadline_ms,
+            remaining_work_ids: input.remaining_work_ids.clone(),
+            gap_count: input.gaps.len() as u64,
+            reason_codes: input.reason_codes.clone(),
+        })
     }
 
     pub async fn get_meetings(pool: &SqlitePool) -> Result<Vec<MeetingModel>, sqlx::Error> {
@@ -478,5 +534,189 @@ mod meeting_identity_tests {
             row.get::<String, _>("started_at_utc"),
             result.started_at_utc
         );
+    }
+}
+
+#[cfg(test)]
+mod finalization_repository_tests {
+    use super::{
+        FinalizationGapInput, FinalizeMeetingInput, MeetingLifecycle, MeetingsRepository,
+    };
+    use crate::audio::transcription::QueueSnapshot;
+    use sqlx::{Row, SqlitePool};
+
+    async fn finalization_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::raw_sql(include_str!("../../../migrations/20250916100000_initial_schema.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(include_str!("../../../migrations/20251006000000_add_audio_sync_fields.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(include_str!("../../../migrations/20260920000100_phase1_meeting_identity.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(include_str!("../../../migrations/20260920000300_phase1_finalization_gaps.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool
+    }
+
+    fn queue(
+        depth: u64,
+        accepted: u64,
+        completed: u64,
+        failed: u64,
+        rejected: u64,
+    ) -> QueueSnapshot {
+        QueueSnapshot {
+            capacity: 8,
+            depth,
+            active: depth,
+            oldest_age_ms: (depth > 0).then_some(125),
+            accepted,
+            started: accepted,
+            completed,
+            failed,
+            cancelled: 0,
+            superseded: 0,
+            rejected,
+        }
+    }
+
+    fn clean_input(meeting_id: String) -> FinalizeMeetingInput {
+        FinalizeMeetingInput {
+            meeting_id,
+            capture_closed: true,
+            durable_writes_succeeded: true,
+            queue: queue(0, 2, 2, 0, 0),
+            deadline_at_utc: "2026-09-20T21:00:00Z".to_string(),
+            deadline_ms: 30_000,
+            remaining_work_ids: Vec::new(),
+            reason_codes: Vec::new(),
+            gaps: Vec::new(),
+        }
+    }
+
+    fn incomplete_input(meeting_id: String) -> FinalizeMeetingInput {
+        FinalizeMeetingInput {
+            meeting_id,
+            capture_closed: true,
+            durable_writes_succeeded: false,
+            queue: queue(1, 3, 1, 1, 1),
+            deadline_at_utc: "2026-09-20T21:00:00Z".to_string(),
+            deadline_ms: 30_000,
+            remaining_work_ids: vec!["mixed:chunk-3".to_string()],
+            reason_codes: vec!["deadline_exceeded".to_string()],
+            gaps: vec![FinalizationGapInput {
+                work_id: "mixed:chunk-rejected".to_string(),
+                gap_kind: "transcript_work".to_string(),
+                reason_code: "capacity".to_string(),
+                audio_start_ms: Some(2_000),
+                audio_end_ms: Some(2_500),
+            }],
+        }
+    }
+
+    #[tokio::test]
+    async fn finalization_repository_all_terminal_closed_capture_and_durable_writes_is_complete() {
+        let pool = finalization_pool().await;
+        let meeting = MeetingsRepository::create_session(&pool, "Complete meeting")
+            .await
+            .unwrap();
+
+        let result = MeetingsRepository::finalize_session(
+            &pool,
+            &clean_input(meeting.meeting_id.clone()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.lifecycle, MeetingLifecycle::Complete);
+        let row = sqlx::query(
+            "SELECT lifecycle, completeness FROM meetings WHERE id = ?",
+        )
+        .bind(&meeting.meeting_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(row.get::<String, _>("lifecycle"), "complete");
+        assert_eq!(row.get::<String, _>("completeness"), "complete");
+    }
+
+    #[tokio::test]
+    async fn finalization_repository_failure_deadline_and_gap_are_durable_incomplete_facts() {
+        let pool = finalization_pool().await;
+        let meeting = MeetingsRepository::create_session(&pool, "Incomplete meeting")
+            .await
+            .unwrap();
+
+        let result = MeetingsRepository::finalize_session(
+            &pool,
+            &incomplete_input(meeting.meeting_id.clone()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.lifecycle, MeetingLifecycle::Incomplete);
+        assert_eq!(result.remaining_work_ids, vec!["mixed:chunk-3"]);
+        assert!(result.reason_codes.contains(&"deadline_exceeded".to_string()));
+        let finalization_count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM meeting_finalizations WHERE meeting_id = ?",
+        )
+        .bind(&meeting.meeting_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let gap_count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM meeting_finalization_gaps WHERE meeting_id = ?",
+        )
+        .bind(&meeting.meeting_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(finalization_count.0, 1);
+        assert_eq!(gap_count.0, 1);
+    }
+
+    #[tokio::test]
+    async fn finalization_repository_repeated_terminal_transition_returns_same_durable_result() {
+        let pool = finalization_pool().await;
+        let meeting = MeetingsRepository::create_session(&pool, "Repeated stop")
+            .await
+            .unwrap();
+        let incomplete = incomplete_input(meeting.meeting_id.clone());
+
+        let first = MeetingsRepository::finalize_session(&pool, &incomplete)
+            .await
+            .unwrap();
+        let repeated = MeetingsRepository::finalize_session(
+            &pool,
+            &clean_input(meeting.meeting_id.clone()),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(repeated, first);
+        let finalization_count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM meeting_finalizations WHERE meeting_id = ?",
+        )
+        .bind(&meeting.meeting_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let gap_count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM meeting_finalization_gaps WHERE meeting_id = ?",
+        )
+        .bind(&meeting.meeting_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(finalization_count.0, 1);
+        assert_eq!(gap_count.0, 1);
     }
 }
