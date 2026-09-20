@@ -272,3 +272,78 @@ async fn delete_meeting_with_transaction(
 
     Ok(result.rows_affected() > 0)
 }
+
+#[cfg(test)]
+mod meeting_identity_tests {
+    use sqlx::{Row, SqlitePool};
+
+    #[tokio::test]
+    async fn meeting_identity_schema_marks_legacy_rows_unverified() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query(
+            "CREATE TABLE meetings (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                folder_path TEXT
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO meetings (id, title, created_at, updated_at)
+             VALUES ('legacy-id', 'Legacy meeting', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let migration_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("migrations/20260920000100_phase1_meeting_identity.sql");
+        if let Ok(migration) = std::fs::read_to_string(migration_path) {
+            sqlx::raw_sql(&migration).execute(&pool).await.unwrap();
+        }
+
+        let row = sqlx::query(
+            "SELECT lifecycle, completeness, completeness_reason
+             FROM meetings WHERE id = 'legacy-id'",
+        )
+        .fetch_one(&pool)
+        .await;
+
+        assert!(
+            row.is_ok(),
+            "phase-one migration must add conservative lifecycle and completeness fields"
+        );
+        let row = row.unwrap();
+        assert_eq!(row.get::<String, _>("lifecycle"), "legacy");
+        assert_eq!(
+            row.get::<String, _>("completeness"),
+            "completion_not_verified"
+        );
+        assert_eq!(
+            row.get::<String, _>("completeness_reason"),
+            "legacy_pre_phase1"
+        );
+    }
+
+    #[test]
+    fn meeting_identity_repository_declares_transactional_session_creation() {
+        let source = include_str!("meeting.rs");
+
+        assert!(
+            source.contains(concat!("pub async fn create_", "session")),
+            "MeetingsRepository must expose create_session"
+        );
+        assert!(
+            source.contains(concat!("Uuid::new_", "v4")),
+            "the repository must mint the canonical ID in Rust"
+        );
+        assert!(
+            source.contains(concat!("transaction.", "commit().await")),
+            "session creation must commit through a SQLx transaction"
+        );
+    }
+}

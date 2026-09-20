@@ -1695,3 +1695,41 @@ async fn trigger_mic_fallback_to_default<R: Runtime>(
         }
     }
 }
+
+#[cfg(test)]
+mod meeting_identity_contract_tests {
+    #[test]
+    fn meeting_identity_is_persisted_before_capture_start() {
+        let source = include_str!("recording_commands.rs");
+        let persistence = source
+            .find(concat!("persist_session_", "before_capture"))
+            .expect("start path must persist a meeting session");
+        let capture = source
+            .find(concat!(".start_", "recording("))
+            .expect("start path must invoke native capture");
+
+        assert!(
+            persistence < capture,
+            "meeting identity persistence must precede native capture startup"
+        );
+    }
+
+    #[test]
+    fn meeting_identity_frontend_consumes_rust_payload_without_fallback() {
+        let service = include_str!("../../../src/services/recordingService.ts");
+        let context = include_str!("../../../src/contexts/TranscriptContext.tsx");
+
+        assert!(
+            service.contains(concat!("interface Start", "MeetingResult")),
+            "recording service must expose the typed Rust start payload"
+        );
+        assert!(
+            context.contains(concat!("payload.meeting_", "id")),
+            "TranscriptContext must set its identity from the Rust payload"
+        );
+        assert!(
+            !context.contains(concat!("meeting-${Date.", "now()}")),
+            "TranscriptContext must not mint a timestamp meeting identity"
+        );
+    }
+}

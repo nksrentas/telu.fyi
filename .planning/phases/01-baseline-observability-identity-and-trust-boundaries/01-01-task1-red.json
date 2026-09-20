@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml meeting_identity --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - database::repositories::meeting::meeting_identity_tests::meeting_identity_schema_marks_legacy_rows_unverified\nnot ok 2 - database::repositories::meeting::meeting_identity_tests::meeting_identity_repository_declares_transactional_session_creation\nnot ok 3 - audio::recording_commands::meeting_identity_contract_tests::meeting_identity_is_persisted_before_capture_start\nnot ok 4 - audio::recording_commands::meeting_identity_contract_tests::meeting_identity_frontend_consumes_rust_payload_without_fallback\n1..4\n# tests 4\n# pass 0\n# fail 4\n# cancelled 0\n",
+  "targetTest": "database::repositories::meeting::meeting_identity_tests::meeting_identity_schema_marks_legacy_rows_unverified",
+  "expected": "Phase 1 schema, repository, pre-capture ordering, and frontend transport contract are present",
+  "actual": "Four named behavior assertions failed because the Phase 1 identity contract is not implemented"
+}
