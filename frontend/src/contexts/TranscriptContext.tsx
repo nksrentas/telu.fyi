@@ -23,6 +23,7 @@ interface TranscriptContextType {
 }
 
 const TranscriptContext = createContext<TranscriptContextType | undefined>(undefined);
+const MEETING_IDENTITY_CONFLICT = 'MEETING_IDENTITY_CONFLICT';
 
 export function TranscriptProvider({ children }: { children: ReactNode }) {
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
@@ -37,6 +38,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   const isUserAtBottomRef = useRef<boolean>(true);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
   const finalFlushRef = useRef<(() => void) | null>(null);
+  const currentMeetingIdRef = useRef<string | null>(null);
 
   // Keep ref updated with current transcripts
   useEffect(() => {
@@ -44,6 +46,23 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   }, [transcripts]);
 
   const projectStartMeeting = useCallback(async (payload: StartMeetingResult) => {
+    const projectedMeetingId = currentMeetingIdRef.current
+      ?? sessionStorage.getItem('indexeddb_current_meeting_id');
+
+    if (projectedMeetingId && projectedMeetingId !== payload.meeting_id) {
+      console.error(`[${MEETING_IDENTITY_CONFLICT}] Rejected conflicting recording identity`, {
+        projectedMeetingId,
+        receivedMeetingId: payload.meeting_id,
+      });
+      toast.error('Recording identity conflict', {
+        description: 'Meetily kept the active meeting unchanged. Reload the app before continuing.',
+      });
+      return false;
+    }
+
+    // Set the ref synchronously before persistence so duplicate command/event
+    // delivery and listener races observe the same canonical identity.
+    currentMeetingIdRef.current = payload.meeting_id;
     setCurrentMeetingId(payload.meeting_id);
 
     // This is a reload transport for the Rust-owned ID, never an identity source.
@@ -51,15 +70,25 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
 
     const parsedStartTime = Date.parse(payload.started_at_utc);
     const startTime = Number.isNaN(parsedStartTime) ? Date.now() : parsedStartTime;
-    await indexedDBService.saveMeetingMetadata({
-      meetingId: payload.meeting_id,
-      title: payload.title,
-      startTime,
-      lastUpdated: Date.now(),
-      transcriptCount: 0,
-      savedToSQLite: false,
-      folderPath: undefined,
-    });
+    const existingMetadata = await indexedDBService.getMeetingMetadata(payload.meeting_id);
+    if (existingMetadata) {
+      await indexedDBService.saveMeetingMetadata({
+        ...existingMetadata,
+        title: payload.title,
+        lastUpdated: Date.now(),
+        transcriptCount: existingMetadata.transcriptCount,
+      });
+    } else {
+      await indexedDBService.saveMeetingMetadata({
+        meetingId: payload.meeting_id,
+        title: payload.title,
+        startTime,
+        lastUpdated: Date.now(),
+        transcriptCount: 0,
+        savedToSQLite: false,
+        folderPath: undefined,
+      });
+    }
     setMeetingTitle(payload.title);
 
     // Fetch folder path from backend and update metadata. The canonical ID is
@@ -77,6 +106,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
     } catch (_error) {
       // Non-fatal: stop will update the recovery metadata if capture completes.
     }
+    return true;
   }, []);
 
   // Smart auto-scroll: Track user scroll position
@@ -139,9 +169,10 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         // Listen for recording-stopped event
         unlistenRecordingStopped = await recordingService.onRecordingStopped(async (payload) => {
           try {
-            if (currentMeetingId) {
+            const meetingId = currentMeetingIdRef.current;
+            if (meetingId) {
               // Update folder path in IndexedDB
-              const metadata = await indexedDBService.getMeetingMetadata(currentMeetingId);
+              const metadata = await indexedDBService.getMeetingMetadata(meetingId);
 
               if (metadata && payload.folder_path) {
                 metadata.folderPath = payload.folder_path;
@@ -169,7 +200,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         console.log('🧹 Recording stopped listener cleaned up');
       }
     };
-  }, [currentMeetingId, projectStartMeeting]);
+  }, [projectStartMeeting]);
 
   // Main transcript buffering logic with sequence_id ordering
   useEffect(() => {
@@ -517,6 +548,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
       await indexedDBService.markMeetingSaved(meetingId);
 
       // Clear both sources
+      currentMeetingIdRef.current = null;
       setCurrentMeetingId(null);
       sessionStorage.removeItem('indexeddb_current_meeting_id');
     } catch (error) {

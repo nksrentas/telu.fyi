@@ -2,7 +2,8 @@
  * Recording Service
  *
  * Handles all recording lifecycle Tauri backend calls and events.
- * Pure 1-to-1 wrapper - no error handling changes, exact same behavior as direct invoke/listen calls.
+ * Thin IPC wrapper with a typed start contract. Other operations preserve the
+ * direct invoke/listen behavior.
  */
 
 import { invoke } from '@tauri-apps/api/core';
@@ -42,6 +43,41 @@ export interface RecordingStoppedPayload {
   meeting_name?: string;
 }
 
+export const MEETING_IDENTITY_PERSISTENCE_FAILED = 'MEETING_IDENTITY_PERSISTENCE_FAILED' as const;
+
+export type RecordingStartErrorCode =
+  | typeof MEETING_IDENTITY_PERSISTENCE_FAILED
+  | 'RECORDING_START_TIMEOUT'
+  | 'RECORDING_START_FAILED';
+
+export class RecordingStartError extends Error {
+  constructor(
+    public readonly code: RecordingStartErrorCode,
+    message: string,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+    this.name = 'RecordingStartError';
+  }
+}
+
+function normalizeRecordingStartError(error: unknown): RecordingStartError {
+  if (error instanceof RecordingStartError) {
+    return error;
+  }
+
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : 'Recording could not start';
+  const code = message.includes(MEETING_IDENTITY_PERSISTENCE_FAILED)
+    ? MEETING_IDENTITY_PERSISTENCE_FAILED
+    : 'RECORDING_START_FAILED';
+
+  return new RecordingStartError(code, message, { cause: error });
+}
+
 // Bound the start invoke: > ~40s Bluetooth mic cold-start and ~90s worst-case
 // Windows device enumeration, but still finite so a hung native start settles
 // the UI into ERROR instead of an eternal STARTING spinner.
@@ -53,12 +89,18 @@ const START_TIMEOUT_MS = 120000;
 function withStartTimeout<T>(promise: Promise<T>): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(
-      () => reject(new Error('Recording start timed out after 120s')),
+      () => reject(new RecordingStartError(
+        'RECORDING_START_TIMEOUT',
+        'Recording start timed out after 120s'
+      )),
       START_TIMEOUT_MS
     );
     promise.then(
       (value) => { clearTimeout(timer); resolve(value); },
-      (err) => { clearTimeout(timer); reject(err); }
+      (error) => {
+        clearTimeout(timer);
+        reject(normalizeRecordingStartError(error));
+      }
     );
   });
 }

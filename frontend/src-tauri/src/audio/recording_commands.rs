@@ -1827,7 +1827,7 @@ mod meeting_identity_contract_tests {
     }
 
     #[tokio::test]
-    async fn meeting_identity_persistence_failure_blocks_capture() {
+    async fn meeting_identity_start_failure_persistence_failure_blocks_capture() {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         let capture_started = Arc::new(AtomicBool::new(false));
         let capture_probe = Arc::clone(&capture_started);
