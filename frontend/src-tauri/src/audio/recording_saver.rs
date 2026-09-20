@@ -710,10 +710,17 @@ mod meeting_identity_propagation_tests {
         }
         assert!(
             service_source.contains("export interface FinalizationSnapshot")
-                && service_source.contains("invoke<FinalizationSnapshot | null>('get_transcription_status')")
+                && service_source.contains("invoke<FinalizationSnapshot | null>('get_current_finalization')")
                 && service_source.contains("listen<FinalizationProgressSnapshot>('recording-finalization-progress'")
                 && service_source.contains("listen<RecordingStoppedPayload>('recording-stopped'"),
             "transcriptService must expose typed snapshot reads and lifecycle event listeners"
+        );
+        let app_source = include_str!("../lib.rs");
+        assert!(
+            app_source.contains("async fn get_current_finalization()")
+                && app_source.contains("audio::recording_commands::get_transcription_status().await")
+                && app_source.contains("get_current_finalization,"),
+            "the typed snapshot read must be wired to Rust's authoritative terminal state"
         );
     }
 

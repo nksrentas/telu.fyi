@@ -274,6 +274,11 @@ fn get_transcription_status() -> TranscriptionStatus {
 }
 
 #[tauri::command]
+async fn get_current_finalization() -> Option<audio::recording_commands::FinalizationSnapshot> {
+    audio::recording_commands::get_transcription_status().await
+}
+
+#[tauri::command]
 fn read_audio_file(file_path: String) -> Result<Vec<u8>, String> {
     match std::fs::read(&file_path) {
         Ok(data) => Ok(data),
@@ -611,6 +616,7 @@ pub fn run() {
             stop_recording,
             is_recording,
             get_transcription_status,
+            get_current_finalization,
             read_audio_file,
             save_transcript,
             analytics::commands::init_analytics,

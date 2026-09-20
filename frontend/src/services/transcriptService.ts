@@ -147,7 +147,7 @@ export class TranscriptService {
 
   /** Read the last Rust/SQLite-owned terminal state without deriving one. */
   async getCurrentFinalization(): Promise<FinalizationSnapshot | null> {
-    return invoke<FinalizationSnapshot | null>('get_transcription_status');
+    return invoke<FinalizationSnapshot | null>('get_current_finalization');
   }
 
   async acknowledgeTranscriptVisible(
