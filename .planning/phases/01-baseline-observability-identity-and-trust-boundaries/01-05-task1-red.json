@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml queue_ledger --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::transcription::queue_ledger::queue_ledger_tests::queue_ledger_conserves_accepted_work_and_rejects_conflicting_terminal_outcomes\nnot ok 2 - audio::transcription::queue_ledger::queue_ledger_tests::queue_ledger_depth_and_oldest_age_cover_only_nonterminal_work\nnot ok 3 - audio::transcription::queue_ledger::queue_ledger_tests::queue_ledger_equal_time_admissions_keep_distinct_ids_and_stable_order\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "audio::transcription::queue_ledger::queue_ledger_tests::queue_ledger_conserves_accepted_work_and_rejects_conflicting_terminal_outcomes",
+  "expected": "Every accepted work ID advances through at most one start and exactly one terminal outcome, snapshots conserve accepted work, empty snapshots make no lifecycle claim, and equal-time work retains stable event order",
+  "actual": "Three named behavior assertions failed because the queue ledger interface returned an empty snapshot and retained no accepted work or event ordering"
+}

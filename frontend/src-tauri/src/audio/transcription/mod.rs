@@ -6,6 +6,7 @@ pub mod provider;
 pub mod whisper_provider;
 pub mod parakeet_provider;
 pub mod engine;
+pub mod queue_ledger;
 pub mod worker;
 
 // Re-export commonly used types
@@ -17,6 +18,10 @@ pub use engine::{
     validate_transcription_model_ready,
     get_or_init_transcription_engine,
     get_or_init_whisper
+};
+pub use queue_ledger::{
+    QueueGap, QueueLedger, QueueSnapshot, QueueTransitionError, QueueWorkRecord,
+    RejectionReason, SupersessionReason, WorkCancellationReason, WorkFailureReason, WorkOutcome,
 };
 pub use worker::{
     start_transcription_task,
