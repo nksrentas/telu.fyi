@@ -9,7 +9,7 @@
 
 - [ ] **BASE-01**: A maintainer can run a reproducible target-hardware scenario matrix covering short utterances, continuous speech, overlapping speech, sustained system audio, stop, restart, and recovery.
 - [x] **BASE-02**: A maintainer can measure monotonic timestamps from captured audio through segmentation, transcription, context selection, generation, and visible UI acknowledgement.
-- [ ] **BASE-03**: A maintainer can observe real transcription and assistance queue depth, oldest-item age, throughput, cancellation, and dropped or superseded work rather than placeholder metrics.
+- [x] **BASE-03**: A maintainer can observe real transcription and assistance queue depth, oldest-item age, throughput, cancellation, and dropped or superseded work rather than placeholder metrics.
 - [ ] **BASE-04**: A maintainer can measure CPU, memory, battery impact, model/provider choice, and error rates per meeting scenario without sending evaluation data off-device by default.
 - [x] **BASE-05**: A user can stop, restart, and recover an interrupted meeting without duplicate meeting records, silent transcript loss, or ambiguous completion state.
 - [ ] **BASE-06**: A maintainer can declare explicit go/no-go thresholds for later live-assistance experiments using baseline evidence rather than assumed performance.
@@ -128,7 +128,7 @@
 |-------------|-------|--------|
 | BASE-01 | Phase 1 | Pending |
 | BASE-02 | Phase 1 | Complete |
-| BASE-03 | Phase 1 | Pending |
+| BASE-03 | Phase 1 | Complete |
 | BASE-04 | Phase 1 | Pending |
 | BASE-05 | Phase 1 | Complete |
 | BASE-06 | Phase 1 | Pending |

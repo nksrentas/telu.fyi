@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-09-20T20:21:33.081Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-09-20T20:51:42.315Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: c8cd7b45d0de04c9825fa95411dd10c777af6e8a
+state_head: 1474d1e9056a4763381a5593cdeef1a09ee18449
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 6 of 19
+Plan: 7 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 19min | 2 tasks | 8 files |
 | Phase 01 P04 | 23min | 2 tasks | 9 files |
 | Phase 01 P05 | 22min | 2 tasks | 9 files |
+| Phase 01 P06 | 26min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,9 @@ Recent decisions affecting current work:
 - [Phase 01]: Queue counts derive from one per-meeting work ledger; rejected work remains separate from accepted-work conservation.
 - [Phase 01]: Admission reserves finite Tokio capacity before ledger acceptance, keeping the capture-facing seam non-blocking without a channel/accounting race.
 - [Phase 01]: TELU_TRANSCRIPTION_QUEUE_CAPACITY is a recorded experiment input, not a release threshold.
+- [Phase 01]: The first committed terminal finalization snapshot is immutable and returned unchanged by repeated stop calls.
+- [Phase 01]: Finalization deadline is a validated recorded experiment input; pending-at-deadline IDs remain durable after ledger cancellation.
+- [Phase 01]: React projects Rust/SQLite lifecycle and cannot infer completion from waits, quiet time, queue depth, or buffered transcripts.
 
 ### Pending Todos
 
@@ -113,6 +117,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-20T20:21:33.068Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-09-20T20:51:42.302Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
