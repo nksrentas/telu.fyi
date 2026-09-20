@@ -477,3 +477,73 @@ impl Default for RecordingSaver {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod meeting_identity_propagation_tests {
+    #[test]
+    fn meeting_identity_propagation_metadata_starts_with_canonical_identity() {
+        let source = include_str!("recording_saver.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .expect("recording saver production source");
+
+        assert!(
+            source.contains("pub meeting_id: String"),
+            "recording metadata must require the canonical Rust meeting ID"
+        );
+        assert!(
+            source.contains("pub lifecycle: String")
+                && source.contains("pub completeness: String")
+                && source.contains("pub completeness_reason: Option<String>"),
+            "the first metadata write must mirror durable lifecycle and completeness"
+        );
+        assert!(
+            !source.contains("metadata.status = \"completed\""),
+            "the filesystem mirror cannot promote the durable lifecycle independently"
+        );
+    }
+
+    #[test]
+    fn meeting_identity_propagation_paths_use_id_not_title_authority() {
+        let manager_source = include_str!("recording_manager.rs");
+        let processing_source = include_str!("audio_processing.rs");
+        let commands_source = include_str!("recording_commands.rs");
+
+        assert!(
+            manager_source.contains("set_meeting_identity"),
+            "RecordingManager must receive the already committed identity"
+        );
+        assert!(
+            processing_source.contains("meeting_id: &str")
+                && processing_source.contains("Uuid::parse_str(meeting_id)"),
+            "recording directory creation must validate and use the UUID path component"
+        );
+        assert!(
+            commands_source.contains("move |start_result|")
+                && commands_source.contains("set_meeting_identity"),
+            "the Plan 01 identity must be threaded into capture before its first file write"
+        );
+    }
+
+    #[test]
+    fn meeting_identity_propagation_indexeddb_upgrade_preserves_legacy_records() {
+        let source = include_str!("../../../src/services/indexedDBService.ts");
+
+        assert!(
+            source.contains("DB_VERSION = 2"),
+            "the recovery cache needs a versioned upgrade"
+        );
+        assert!(
+            source.contains("lifecycle: MeetingLifecycle")
+                && source.contains("completeness: MeetingCompleteness")
+                && source.contains("completenessReason?: string"),
+            "recovery records must expose the durable lifecycle projection"
+        );
+        assert!(
+            source.contains("legacy_pre_phase1")
+                && source.contains("completion_not_verified")
+                && source.contains("openCursor()"),
+            "the upgrade must preserve existing keys while marking historical uncertainty"
+        );
+    }
+}

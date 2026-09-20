@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml meeting_identity_propagation --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::recording_saver::meeting_identity_propagation_tests::meeting_identity_propagation_metadata_starts_with_canonical_identity\nnot ok 2 - audio::recording_saver::meeting_identity_propagation_tests::meeting_identity_propagation_paths_use_id_not_title_authority\nnot ok 3 - audio::recording_saver::meeting_identity_propagation_tests::meeting_identity_propagation_indexeddb_upgrade_preserves_legacy_records\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "audio::recording_saver::meeting_identity_propagation_tests::meeting_identity_propagation_metadata_starts_with_canonical_identity",
+  "expected": "The committed Rust meeting ID is required by the first filesystem and IndexedDB writes while legacy cache records remain completion-unverified",
+  "actual": "Three named behavior assertions failed because native metadata still permits a missing ID, title/time owns the directory path, and IndexedDB has no conservative versioned upgrade"
+}
