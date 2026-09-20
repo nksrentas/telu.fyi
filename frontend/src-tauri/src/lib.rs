@@ -812,6 +812,7 @@ pub fn run() {
             database::commands::check_homebrew_database,
             database::commands::import_and_initialize_database,
             database::commands::initialize_fresh_database,
+            database::commands::reconcile_meeting,
             // Database and Models path commands
             database::commands::get_database_directory,
             database::commands::open_database_folder,

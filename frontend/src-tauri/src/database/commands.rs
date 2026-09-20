@@ -5,9 +5,16 @@ use tauri::{AppHandle, Emitter, Manager};
 
 use super::manager::DatabaseManager;
 use super::models::{RecoveryCommandError, RecoveryErrorCode, RecoveryRequest, RecoveryResult};
-use super::repositories::meeting::RecoveryRepositoryError;
+use super::repositories::meeting::{MeetingsRepository, RecoveryRepositoryError};
 use crate::state::AppState;
 use sqlx::SqlitePool;
+use uuid::Uuid;
+
+const MAX_RECOVERY_EVIDENCE_ITEMS: usize = 10_000;
+const MAX_RECOVERY_GAP_ITEMS: usize = 10_000;
+const MAX_RECOVERY_TRANSCRIPT_BYTES: usize = 1_000_000;
+const MAX_RECOVERY_TOTAL_TRANSCRIPT_BYTES: usize = 16_000_000;
+const MAX_RECOVERY_LABEL_BYTES: usize = 256;
 
 #[derive(Serialize)]
 pub struct DatabaseCheckResult {
@@ -16,18 +23,97 @@ pub struct DatabaseCheckResult {
 }
 
 async fn reconcile_meeting_with_pool(
-    _pool: &SqlitePool,
-    _request: RecoveryRequest,
+    pool: &SqlitePool,
+    request: RecoveryRequest,
 ) -> Result<RecoveryResult, RecoveryCommandError> {
-    Err(RecoveryCommandError {
-        code: RecoveryErrorCode::StorageFailure,
-    })
+    validate_recovery_payload(&request)?;
+    MeetingsRepository::reconcile_meeting(pool, &request)
+        .await
+        .map_err(map_recovery_repository_error)
 }
 
-fn map_recovery_repository_error(_error: RecoveryRepositoryError) -> RecoveryCommandError {
-    RecoveryCommandError {
-        code: RecoveryErrorCode::StorageFailure,
+fn validate_recovery_payload(request: &RecoveryRequest) -> Result<(), RecoveryCommandError> {
+    if Uuid::parse_str(&request.meeting_id).is_err()
+        || request.evidence.len() > MAX_RECOVERY_EVIDENCE_ITEMS
+        || request.gaps.len() > MAX_RECOVERY_GAP_ITEMS
+    {
+        return Err(recovery_command_error(RecoveryErrorCode::InvalidRequest));
     }
+
+    let mut total_transcript_bytes = 0usize;
+    for evidence in &request.evidence {
+        if evidence.meeting_id != request.meeting_id {
+            return Err(recovery_command_error(
+                RecoveryErrorCode::CrossMeetingScope,
+            ));
+        }
+        total_transcript_bytes = total_transcript_bytes
+            .checked_add(evidence.transcript.len())
+            .ok_or_else(|| recovery_command_error(RecoveryErrorCode::InvalidRequest))?;
+        if Uuid::parse_str(&evidence.evidence_id).is_err()
+            || evidence.source_track.trim().is_empty()
+            || evidence.source_track.len() > MAX_RECOVERY_LABEL_BYTES
+            || evidence.source_segment_key.trim().is_empty()
+            || evidence.source_segment_key.len() > MAX_RECOVERY_LABEL_BYTES
+            || evidence.sequence < 0
+            || evidence.transcript.trim().is_empty()
+            || evidence.transcript.len() > MAX_RECOVERY_TRANSCRIPT_BYTES
+            || total_transcript_bytes > MAX_RECOVERY_TOTAL_TRANSCRIPT_BYTES
+            || !evidence.audio_start_time.is_finite()
+            || !evidence.audio_end_time.is_finite()
+            || evidence.audio_start_time < 0.0
+            || evidence.audio_end_time < evidence.audio_start_time
+        {
+            return Err(recovery_command_error(RecoveryErrorCode::InvalidRequest));
+        }
+    }
+
+    for gap in &request.gaps {
+        if gap.meeting_id != request.meeting_id {
+            return Err(recovery_command_error(
+                RecoveryErrorCode::CrossMeetingScope,
+            ));
+        }
+        if gap.gap_id.trim().is_empty()
+            || gap.gap_id.len() > MAX_RECOVERY_LABEL_BYTES
+            || gap.gap_kind.trim().is_empty()
+            || gap.gap_kind.len() > MAX_RECOVERY_LABEL_BYTES
+            || gap.reason_code.trim().is_empty()
+            || gap.reason_code.len() > MAX_RECOVERY_LABEL_BYTES
+            || matches!(
+                (gap.audio_start_ms, gap.audio_end_ms),
+                (Some(start), Some(end)) if end < start
+            )
+        {
+            return Err(recovery_command_error(RecoveryErrorCode::InvalidRequest));
+        }
+    }
+
+    Ok(())
+}
+
+fn map_recovery_repository_error(error: RecoveryRepositoryError) -> RecoveryCommandError {
+    let code = match error {
+        RecoveryRepositoryError::InvalidRequest => RecoveryErrorCode::InvalidRequest,
+        RecoveryRepositoryError::MeetingNotFound => RecoveryErrorCode::MeetingNotFound,
+        RecoveryRepositoryError::StaleMeeting => RecoveryErrorCode::StaleMeeting,
+        RecoveryRepositoryError::CrossMeetingScope => RecoveryErrorCode::CrossMeetingScope,
+        RecoveryRepositoryError::IdentityConflict => RecoveryErrorCode::IdentityConflict,
+        RecoveryRepositoryError::Storage(_) => RecoveryErrorCode::StorageFailure,
+    };
+    recovery_command_error(code)
+}
+
+fn recovery_command_error(code: RecoveryErrorCode) -> RecoveryCommandError {
+    RecoveryCommandError { code }
+}
+
+#[tauri::command]
+pub async fn reconcile_meeting(
+    state: tauri::State<'_, AppState>,
+    request: RecoveryRequest,
+) -> Result<RecoveryResult, RecoveryCommandError> {
+    reconcile_meeting_with_pool(state.db_manager.pool(), request).await
 }
 
 /// Check if this is the first launch (no database exists yet)
@@ -368,6 +454,49 @@ mod meeting_recovery_command_tests {
         );
         assert_eq!(
             map_recovery_repository_error(RecoveryRepositoryError::CrossMeetingScope).code,
+            RecoveryErrorCode::CrossMeetingScope
+        );
+
+        let stale = MeetingsRepository::create_session(&pool, "Already complete")
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE meetings SET lifecycle = 'complete', completeness = 'complete' WHERE id = ?",
+        )
+        .bind(&stale.meeting_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let stale_error = reconcile_meeting_with_pool(
+            &pool,
+            RecoveryRequest {
+                meeting_id: stale.meeting_id,
+                evidence: Vec::new(),
+                gaps: Vec::new(),
+            },
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(stale_error.code, RecoveryErrorCode::StaleMeeting);
+
+        let target = MeetingsRepository::create_session(&pool, "Scope target")
+            .await
+            .unwrap();
+        let other = MeetingsRepository::create_session(&pool, "Scope source")
+            .await
+            .unwrap();
+        let cross_scope_error = reconcile_meeting_with_pool(
+            &pool,
+            RecoveryRequest {
+                meeting_id: target.meeting_id,
+                evidence: vec![evidence(&other.meeting_id)],
+                gaps: Vec::new(),
+            },
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            cross_scope_error.code,
             RecoveryErrorCode::CrossMeetingScope
         );
         let serialized = serde_json::to_string(&map_recovery_repository_error(
