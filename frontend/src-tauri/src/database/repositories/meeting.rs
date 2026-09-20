@@ -4,7 +4,7 @@ use crate::database::models::{MeetingModel, Transcript};
 pub use crate::database::models::{MeetingCompleteness, MeetingLifecycle};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use sqlx::{Connection, Error as SqlxError, SqliteConnection, SqlitePool};
+use sqlx::{sqlite::SqliteRow, Connection, Error as SqlxError, Row, SqliteConnection, SqlitePool};
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -123,23 +123,156 @@ impl MeetingsRepository {
 
     /// Persist the immutable terminal result for one Rust-owned meeting.
     ///
-    /// The RED scaffold deliberately returns an incomplete projection without
-    /// writing it. The behavior tests below define the transactional predicate
-    /// and idempotency contract implemented in the GREEN phase.
+    /// The transaction derives the terminal lifecycle from the authoritative
+    /// queue and durability facts. It never trusts a caller-provided lifecycle,
+    /// and a later retry cannot overwrite the first committed terminal result.
     pub async fn finalize_session(
-        _pool: &SqlitePool,
+        pool: &SqlitePool,
         input: &FinalizeMeetingInput,
     ) -> Result<FinalizationSnapshot, SqlxError> {
+        validate_identifier("meeting_id", &input.meeting_id)?;
+
+        let mut transaction = pool.begin().await?;
+        if let Some(existing) = load_finalization(&mut transaction, &input.meeting_id).await? {
+            transaction.rollback().await?;
+            return Ok(existing);
+        }
+
+        validate_finalization_input(input)?;
+        let reason_codes = finalization_reason_codes(input);
+        let lifecycle = if strict_complete_predicate(input, &reason_codes) {
+            MeetingLifecycle::Complete
+        } else {
+            MeetingLifecycle::Incomplete
+        };
+        let finalized_at_utc = Utc::now().to_rfc3339();
+
+        for gap in &input.gaps {
+            validate_identifier("gap work_id", &gap.work_id)?;
+            validate_identifier("gap_kind", &gap.gap_kind)?;
+            validate_identifier("gap reason_code", &gap.reason_code)?;
+            let audio_start_ms = optional_u64_to_i64("audio_start_ms", gap.audio_start_ms)?;
+            let audio_end_ms = optional_u64_to_i64("audio_end_ms", gap.audio_end_ms)?;
+            sqlx::query(
+                "INSERT OR IGNORE INTO meeting_finalization_gaps (
+                    meeting_id, work_id, gap_kind, reason_code,
+                    audio_start_ms, audio_end_ms, created_at_utc
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&input.meeting_id)
+            .bind(&gap.work_id)
+            .bind(&gap.gap_kind)
+            .bind(&gap.reason_code)
+            .bind(audio_start_ms)
+            .bind(audio_end_ms)
+            .bind(&finalized_at_utc)
+            .execute(&mut *transaction)
+            .await?;
+        }
+
+        let gap_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM meeting_finalization_gaps WHERE meeting_id = ?",
+        )
+        .bind(&input.meeting_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        let remaining_work_ids_json = encode_string_list(
+            "remaining_work_ids",
+            &normalized_string_list(&input.remaining_work_ids),
+        )?;
+        let reason_codes_json = encode_string_list("reason_codes", &reason_codes)?;
+
+        sqlx::query(
+            "INSERT INTO meeting_finalizations (
+                meeting_id, lifecycle,
+                queue_capacity, queue_depth, queue_active, queue_oldest_age_ms,
+                queue_accepted, queue_started, queue_completed, queue_failed,
+                queue_cancelled, queue_superseded, queue_rejected,
+                deadline_at_utc, deadline_ms,
+                capture_closed, durable_writes_succeeded,
+                remaining_work_ids_json, reason_codes_json, gap_count,
+                finalized_at_utc
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(&input.meeting_id)
+        .bind(lifecycle.as_str())
+        .bind(u64_to_i64("queue capacity", input.queue.capacity as u64)?)
+        .bind(u64_to_i64("queue depth", input.queue.depth)?)
+        .bind(u64_to_i64("queue active", input.queue.active)?)
+        .bind(optional_u64_to_i64(
+            "queue oldest age",
+            input.queue.oldest_age_ms,
+        )?)
+        .bind(u64_to_i64("queue accepted", input.queue.accepted)?)
+        .bind(u64_to_i64("queue started", input.queue.started)?)
+        .bind(u64_to_i64("queue completed", input.queue.completed)?)
+        .bind(u64_to_i64("queue failed", input.queue.failed)?)
+        .bind(u64_to_i64("queue cancelled", input.queue.cancelled)?)
+        .bind(u64_to_i64("queue superseded", input.queue.superseded)?)
+        .bind(u64_to_i64("queue rejected", input.queue.rejected)?)
+        .bind(&input.deadline_at_utc)
+        .bind(u64_to_i64("finalization deadline", input.deadline_ms)?)
+        .bind(input.capture_closed)
+        .bind(input.durable_writes_succeeded)
+        .bind(&remaining_work_ids_json)
+        .bind(&reason_codes_json)
+        .bind(gap_count)
+        .bind(&finalized_at_utc)
+        .execute(&mut *transaction)
+        .await?;
+
+        let completeness = match lifecycle {
+            MeetingLifecycle::Complete => MeetingCompleteness::Complete,
+            MeetingLifecycle::Incomplete => MeetingCompleteness::Incomplete,
+            _ => unreachable!("the terminal predicate returns only complete or incomplete"),
+        };
+        let completeness_reason = if reason_codes.is_empty() {
+            None
+        } else {
+            Some(reason_codes.join(","))
+        };
+        let updated = sqlx::query(
+            "UPDATE meetings
+             SET lifecycle = ?, completeness = ?, completeness_reason = ?, updated_at = ?
+             WHERE id = ?
+               AND lifecycle NOT IN ('complete', 'incomplete', 'recovered', 'legacy')",
+        )
+        .bind(lifecycle.as_str())
+        .bind(completeness.as_str())
+        .bind(completeness_reason)
+        .bind(Utc::now())
+        .bind(&input.meeting_id)
+        .execute(&mut *transaction)
+        .await?;
+        if updated.rows_affected() != 1 {
+            transaction.rollback().await?;
+            return Err(SqlxError::Protocol(
+                "meeting is missing or already has an unsupported terminal lifecycle".to_string(),
+            ));
+        }
+
+        transaction.commit().await?;
         Ok(FinalizationSnapshot {
             meeting_id: input.meeting_id.clone(),
-            lifecycle: MeetingLifecycle::Incomplete,
+            lifecycle,
             queue: input.queue.clone(),
             deadline_at_utc: input.deadline_at_utc.clone(),
             deadline_ms: input.deadline_ms,
-            remaining_work_ids: input.remaining_work_ids.clone(),
-            gap_count: input.gaps.len() as u64,
-            reason_codes: input.reason_codes.clone(),
+            remaining_work_ids: normalized_string_list(&input.remaining_work_ids),
+            gap_count: i64_to_u64("gap_count", gap_count)?,
+            reason_codes,
         })
+    }
+
+    pub async fn get_finalization(
+        pool: &SqlitePool,
+        meeting_id: &str,
+    ) -> Result<Option<FinalizationSnapshot>, SqlxError> {
+        validate_identifier("meeting_id", meeting_id)?;
+        let mut transaction = pool.begin().await?;
+        let result = load_finalization(&mut transaction, meeting_id).await?;
+        transaction.commit().await?;
+        Ok(result)
     }
 
     pub async fn get_meetings(pool: &SqlitePool) -> Result<Vec<MeetingModel>, sqlx::Error> {
@@ -363,6 +496,199 @@ impl MeetingsRepository {
         transaction.commit().await?;
         Ok(true)
     }
+}
+
+fn strict_complete_predicate(input: &FinalizeMeetingInput, reason_codes: &[String]) -> bool {
+    input.capture_closed
+        && input.durable_writes_succeeded
+        && input.queue.depth == 0
+        && input.queue.active == 0
+        && input.queue.failed == 0
+        && input.queue.cancelled == 0
+        && input.queue.superseded == 0
+        && input.queue.rejected == 0
+        && input.queue.accepted == input.queue.completed
+        && input.remaining_work_ids.is_empty()
+        && input.gaps.is_empty()
+        && reason_codes.is_empty()
+}
+
+fn finalization_reason_codes(input: &FinalizeMeetingInput) -> Vec<String> {
+    let mut reasons = input.reason_codes.clone();
+    if !input.capture_closed {
+        reasons.push("capture_not_closed".to_string());
+    }
+    if !input.durable_writes_succeeded {
+        reasons.push("durable_write_failed".to_string());
+    }
+    if input.queue.depth > 0 || !input.remaining_work_ids.is_empty() {
+        reasons.push("work_remaining".to_string());
+    }
+    if input.queue.failed > 0 {
+        reasons.push("work_failed".to_string());
+    }
+    if input.queue.cancelled > 0 {
+        reasons.push("work_cancelled".to_string());
+    }
+    if input.queue.superseded > 0 {
+        reasons.push("work_superseded".to_string());
+    }
+    if input.queue.rejected > 0 {
+        reasons.push("work_rejected".to_string());
+    }
+    if !input.gaps.is_empty() {
+        reasons.push("unresolved_gap".to_string());
+    }
+    normalized_string_list(&reasons)
+}
+
+fn validate_finalization_input(input: &FinalizeMeetingInput) -> Result<(), SqlxError> {
+    validate_identifier("deadline_at_utc", &input.deadline_at_utc)?;
+    if input.deadline_ms == 0 || input.queue.capacity == 0 {
+        return Err(SqlxError::Protocol(
+            "finalization deadline and queue capacity must be positive".to_string(),
+        ));
+    }
+    if input.queue.active > input.queue.depth
+        || input.queue.started > input.queue.accepted
+        || input.queue.accepted
+            != input.queue.depth
+                + input.queue.completed
+                + input.queue.failed
+                + input.queue.cancelled
+                + input.queue.superseded
+    {
+        return Err(SqlxError::Protocol(
+            "finalization queue snapshot violates conservation".to_string(),
+        ));
+    }
+    if input.remaining_work_ids.len() as u64 != input.queue.depth {
+        return Err(SqlxError::Protocol(
+            "remaining work IDs must exactly cover queue depth".to_string(),
+        ));
+    }
+    if input
+        .remaining_work_ids
+        .iter()
+        .any(|work_id| work_id.trim().is_empty())
+        || input
+            .reason_codes
+            .iter()
+            .any(|reason| reason.trim().is_empty())
+    {
+        return Err(SqlxError::Protocol(
+            "finalization identifiers and reasons cannot be empty".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+async fn load_finalization(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    meeting_id: &str,
+) -> Result<Option<FinalizationSnapshot>, SqlxError> {
+    let row = sqlx::query(
+        "SELECT
+            meeting_id, lifecycle,
+            queue_capacity, queue_depth, queue_active, queue_oldest_age_ms,
+            queue_accepted, queue_started, queue_completed, queue_failed,
+            queue_cancelled, queue_superseded, queue_rejected,
+            deadline_at_utc, deadline_ms,
+            remaining_work_ids_json, reason_codes_json, gap_count
+         FROM meeting_finalizations
+         WHERE meeting_id = ?",
+    )
+    .bind(meeting_id)
+    .fetch_optional(&mut **transaction)
+    .await?;
+    row.map(finalization_snapshot_from_row).transpose()
+}
+
+fn finalization_snapshot_from_row(row: SqliteRow) -> Result<FinalizationSnapshot, SqlxError> {
+    let lifecycle = match row.try_get::<String, _>("lifecycle")?.as_str() {
+        "complete" => MeetingLifecycle::Complete,
+        "incomplete" => MeetingLifecycle::Incomplete,
+        value => {
+            return Err(SqlxError::Protocol(format!(
+                "unsupported persisted finalization lifecycle: {value}"
+            )))
+        }
+    };
+    let capacity = i64_to_u64("queue_capacity", row.try_get("queue_capacity")?)?;
+    let capacity = usize::try_from(capacity)
+        .map_err(|_| SqlxError::Protocol("queue_capacity exceeds usize".to_string()))?;
+    let oldest_age_ms = row
+        .try_get::<Option<i64>, _>("queue_oldest_age_ms")?
+        .map(|value| i64_to_u64("queue_oldest_age_ms", value))
+        .transpose()?;
+
+    Ok(FinalizationSnapshot {
+        meeting_id: row.try_get("meeting_id")?,
+        lifecycle,
+        queue: QueueSnapshot {
+            capacity,
+            depth: i64_to_u64("queue_depth", row.try_get("queue_depth")?)?,
+            active: i64_to_u64("queue_active", row.try_get("queue_active")?)?,
+            oldest_age_ms,
+            accepted: i64_to_u64("queue_accepted", row.try_get("queue_accepted")?)?,
+            started: i64_to_u64("queue_started", row.try_get("queue_started")?)?,
+            completed: i64_to_u64("queue_completed", row.try_get("queue_completed")?)?,
+            failed: i64_to_u64("queue_failed", row.try_get("queue_failed")?)?,
+            cancelled: i64_to_u64("queue_cancelled", row.try_get("queue_cancelled")?)?,
+            superseded: i64_to_u64("queue_superseded", row.try_get("queue_superseded")?)?,
+            rejected: i64_to_u64("queue_rejected", row.try_get("queue_rejected")?)?,
+        },
+        deadline_at_utc: row.try_get("deadline_at_utc")?,
+        deadline_ms: i64_to_u64("deadline_ms", row.try_get("deadline_ms")?)?,
+        remaining_work_ids: decode_string_list(
+            "remaining_work_ids",
+            row.try_get("remaining_work_ids_json")?,
+        )?,
+        gap_count: i64_to_u64("gap_count", row.try_get("gap_count")?)?,
+        reason_codes: decode_string_list(
+            "reason_codes",
+            row.try_get("reason_codes_json")?,
+        )?,
+    })
+}
+
+fn validate_identifier(label: &str, value: &str) -> Result<(), SqlxError> {
+    if value.trim().is_empty() {
+        Err(SqlxError::Protocol(format!("{label} cannot be empty")))
+    } else {
+        Ok(())
+    }
+}
+
+fn normalized_string_list(values: &[String]) -> Vec<String> {
+    let mut normalized = values.to_vec();
+    normalized.sort();
+    normalized.dedup();
+    normalized
+}
+
+fn encode_string_list(label: &str, values: &[String]) -> Result<String, SqlxError> {
+    serde_json::to_string(values)
+        .map_err(|error| SqlxError::Protocol(format!("failed to encode {label}: {error}")))
+}
+
+fn decode_string_list(label: &str, value: String) -> Result<Vec<String>, SqlxError> {
+    serde_json::from_str(&value)
+        .map_err(|error| SqlxError::Protocol(format!("failed to decode {label}: {error}")))
+}
+
+fn u64_to_i64(label: &str, value: u64) -> Result<i64, SqlxError> {
+    i64::try_from(value)
+        .map_err(|_| SqlxError::Protocol(format!("{label} exceeds SQLite integer range")))
+}
+
+fn optional_u64_to_i64(label: &str, value: Option<u64>) -> Result<Option<i64>, SqlxError> {
+    value.map(|value| u64_to_i64(label, value)).transpose()
+}
+
+fn i64_to_u64(label: &str, value: i64) -> Result<u64, SqlxError> {
+    u64::try_from(value)
+        .map_err(|_| SqlxError::Protocol(format!("{label} cannot be negative")))
 }
 
 async fn delete_meeting_with_transaction(
