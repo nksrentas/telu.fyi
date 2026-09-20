@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 7
+open_count: 9
 waived_count: 0
 fixed_count: 0
-total_count: 7
-last_updated: 2026-09-20T20:19:40.568Z
+total_count: 9
+last_updated: 2026-09-20T21:12:05.724Z
 ---
 
 # Broken Windows Ledger
@@ -22,6 +22,8 @@ last_updated: 2026-09-20T20:19:40.568Z
 | 5 | 01 | deviation | frontend/src-tauri/src/audio/transcription/worker.rs |  | Routed post-persistence canonical transcript publication through the delivery-token emitter so acknowledgements cannot weaken the persistence-before-publish invariant. | open |  | 2026-09-20T19:47:25.718Z |  |
 | 6 | 01 | deviation | frontend/src/services/indexedDBService.ts |  | Made the v3 canonical evidence store an explicit IndexedDB upgrade while retaining the v2 legacy metadata cursor and legacy transcript rows. | open |  | 2026-09-20T19:54:41.899Z |  |
 | 7 | 01 | deviation | frontend/src-tauri/src/audio/recording_manager.rs |  | Resolved: bounded transcription integration required queue construction and ledger propagation through recording manager and command call sites | open |  | 2026-09-20T20:19:40.568Z |  |
+| 8 | 01 | deviation | frontend/src-tauri/src/audio/recording_commands.rs |  | Committed finalization required adjacent manager/command wiring before recording metadata could mirror authoritative terminal state | open |  | 2026-09-20T21:12:05.630Z |  |
+| 9 | 01 | deviation | frontend/src-tauri/src/lib.rs |  | Typed current-finalization read initially targeted the legacy queue-status command and was rewired to a dedicated authoritative IPC command | open |  | 2026-09-20T21:12:05.724Z |  |
 
 ````json
 [
@@ -107,6 +109,30 @@ last_updated: 2026-09-20T20:19:40.568Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-20T20:19:40.568Z",
+    "resolved_at": null
+  },
+  {
+    "id": 8,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src-tauri/src/audio/recording_commands.rs",
+    "line": null,
+    "description": "Committed finalization required adjacent manager/command wiring before recording metadata could mirror authoritative terminal state",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-20T21:12:05.630Z",
+    "resolved_at": null
+  },
+  {
+    "id": 9,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src-tauri/src/lib.rs",
+    "line": null,
+    "description": "Typed current-finalization read initially targeted the legacy queue-status command and was rewired to a dedicated authoritative IPC command",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-20T21:12:05.724Z",
     "resolved_at": null
   }
 ]
