@@ -16,6 +16,10 @@ const indexedDBService = readFileSync(
   join(root, 'frontend/src/services/indexedDBService.ts'),
   'utf8',
 );
+const recordingStopHook = readFileSync(
+  join(root, 'frontend/src/hooks/useRecordingStop.ts'),
+  'utf8',
+);
 
 test('provisional transcript stays structurally noncanonical and out of recovery evidence', () => {
   assert.match(transcriptService, /interface ProvisionalTranscriptUpdate/);
@@ -65,4 +69,13 @@ test('reload projection retains final evidence source, bounds, and completeness'
   assert.match(transcriptContext, /evidence_id:\s*segment\.evidence_id/);
   assert.match(transcriptContext, /capture_completeness:\s*segment\.capture_completeness/);
   assert.doesNotMatch(transcriptContext, /crypto\.randomUUID|Uuid|uuidv4/);
+});
+
+test('recording stop consumes Rust finalization without renderer inference or bulk save', () => {
+  assert.match(recordingStopHook, /FinalizationSnapshot/);
+  assert.match(recordingStopHook, /finalization\.lifecycle/);
+  assert.doesNotMatch(recordingStopHook, /MAX_WAIT_TIME|POLL_INTERVAL|last_activity_ms/);
+  assert.doesNotMatch(recordingStopHook, /setTimeout\s*\(/);
+  assert.doesNotMatch(recordingStopHook, /flushBuffer\s*\(/);
+  assert.doesNotMatch(recordingStopHook, /storageService\.saveMeeting\s*\(/);
 });

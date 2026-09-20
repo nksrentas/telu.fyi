@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml finalization --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::recording_commands::finalization_stop_contract_tests::finalization_shallow_and_full_queues_drain_to_terminal\nnot ok 2 - audio::recording_commands::finalization_stop_contract_tests::finalization_failed_queue_stays_explicitly_incomplete\nnot ok 3 - audio::recording_commands::finalization_stop_contract_tests::finalization_timeout_aborts_worker_and_records_remaining_ids\nnot ok 4 - audio::recording_commands::finalization_stop_contract_tests::finalization_stop_orders_close_then_finalizing_then_drain\n1..5\n# tests 5\n# pass 1\n# fail 4\n# cancelled 0\n",
+  "targetTest": "audio::recording_commands::finalization_stop_contract_tests::finalization_timeout_aborts_worker_and_records_remaining_ids",
+  "expected": "Stop closes producers, records finalizing, and returns bounded authoritative snapshots for empty, shallow, full, failed, and deadline-expired queues while the renderer consumes Rust lifecycle without inference",
+  "actual": "The scaffold did not await workers, abort a timed-out worker, retain remaining IDs, derive failure/deadline reasons, or order the stop transition; the renderer contract independently failed because the hook still polls, waits, flushes, and bulk-saves"
+}

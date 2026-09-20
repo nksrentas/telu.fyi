@@ -20,7 +20,9 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-use crate::database::repositories::meeting::{MeetingCompleteness, MeetingsRepository};
+use crate::database::repositories::meeting::{
+    FinalizationGapInput, FinalizeMeetingInput, MeetingCompleteness, MeetingsRepository,
+};
 pub use crate::database::repositories::meeting::StartMeetingResult;
 pub use crate::database::repositories::meeting::FinalizationSnapshot;
 use crate::state::AppState;
@@ -37,6 +39,7 @@ use super::device_monitor::{DeviceEvent, DeviceMonitorType};
 // Import transcription modules
 use super::transcription::{
     self,
+    queue_ledger::QueueLedger,
     reset_speech_detected_flag,
 };
 
@@ -154,6 +157,47 @@ pub struct TranscriptionStatus {
     pub chunks_in_queue: usize,
     pub is_processing: bool,
     pub last_activity_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FinalizationDrainReport {
+    deadline_expired: bool,
+    worker_failed: bool,
+    remaining_work_ids: Vec<String>,
+}
+
+async fn drain_transcription_to_deadline(
+    _task_handle: JoinHandle<()>,
+    _queue_ledger: Arc<QueueLedger>,
+    _deadline: Duration,
+) -> FinalizationDrainReport {
+    FinalizationDrainReport {
+        deadline_expired: false,
+        worker_failed: false,
+        remaining_work_ids: Vec::new(),
+    }
+}
+
+fn build_finalize_meeting_input(
+    meeting_id: &str,
+    queue_ledger: &QueueLedger,
+    deadline_at_utc: String,
+    deadline_ms: u64,
+    capture_closed: bool,
+    durable_writes_succeeded: bool,
+    drain: &FinalizationDrainReport,
+) -> FinalizeMeetingInput {
+    FinalizeMeetingInput {
+        meeting_id: meeting_id.to_string(),
+        capture_closed,
+        durable_writes_succeeded,
+        queue: queue_ledger.snapshot(Instant::now()),
+        deadline_at_utc,
+        deadline_ms,
+        remaining_work_ids: drain.remaining_work_ids.clone(),
+        reason_codes: Vec::new(),
+        gaps: Vec::<FinalizationGapInput>::new(),
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -2245,5 +2289,158 @@ mod ui_acknowledgement_contract_tests {
                 && service.contains("acknowledgeTranscriptVisible"),
             "React must acknowledge the final delivery only from a post-commit animation-frame callback"
         );
+    }
+}
+
+#[cfg(test)]
+mod finalization_stop_contract_tests {
+    use super::{
+        build_finalize_meeting_input, drain_transcription_to_deadline,
+        FinalizationDrainReport,
+    };
+    use crate::audio::transcription::queue_ledger::{
+        QueueLedger, WorkFailureReason, WorkOutcome,
+    };
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    async fn drain_with(
+        ledger: Arc<QueueLedger>,
+        worker: tokio::task::JoinHandle<()>,
+        deadline: Duration,
+    ) -> FinalizationDrainReport {
+        drain_transcription_to_deadline(worker, ledger, deadline).await
+    }
+
+    #[tokio::test]
+    async fn finalization_empty_queue_returns_bounded_authoritative_snapshot() {
+        let ledger = Arc::new(QueueLedger::new("meeting-empty", 2).unwrap());
+        let report = drain_with(
+            Arc::clone(&ledger),
+            tokio::spawn(async {}),
+            Duration::from_millis(50),
+        )
+        .await;
+        let input = build_finalize_meeting_input(
+            ledger.meeting_id(),
+            &ledger,
+            "2026-09-20T00:00:00Z".to_string(),
+            50,
+            true,
+            true,
+            &report,
+        );
+
+        assert!(!report.deadline_expired);
+        assert!(!report.worker_failed);
+        assert!(input.remaining_work_ids.is_empty());
+        assert_eq!(input.queue.depth, 0);
+    }
+
+    #[tokio::test]
+    async fn finalization_shallow_and_full_queues_drain_to_terminal() {
+        for work_count in [1_u64, 2_u64] {
+            let ledger = Arc::new(QueueLedger::new(format!("meeting-{work_count}"), 2).unwrap());
+            let now = Instant::now();
+            for id in 0..work_count {
+                ledger.accept(format!("work-{id}"), now).unwrap();
+                ledger.start(&format!("work-{id}"), now).unwrap();
+            }
+            let worker_ledger = Arc::clone(&ledger);
+            let worker = tokio::spawn(async move {
+                for id in 0..work_count {
+                    worker_ledger
+                        .finish(&format!("work-{id}"), WorkOutcome::Completed, Instant::now())
+                        .unwrap();
+                }
+            });
+
+            let report = drain_with(Arc::clone(&ledger), worker, Duration::from_millis(50)).await;
+            let snapshot = ledger.snapshot(Instant::now());
+            assert!(!report.deadline_expired);
+            assert!(!report.worker_failed);
+            assert!(report.remaining_work_ids.is_empty());
+            assert_eq!(snapshot.completed, work_count);
+            assert_eq!(snapshot.depth, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn finalization_failed_queue_stays_explicitly_incomplete() {
+        let ledger = Arc::new(QueueLedger::new("meeting-failed", 2).unwrap());
+        let now = Instant::now();
+        ledger.accept("work-failed", now).unwrap();
+        ledger.start("work-failed", now).unwrap();
+        let worker_ledger = Arc::clone(&ledger);
+        let worker = tokio::spawn(async move {
+            worker_ledger
+                .finish(
+                    "work-failed",
+                    WorkOutcome::Failed(WorkFailureReason::TranscriptionFailed),
+                    Instant::now(),
+                )
+                .unwrap();
+        });
+
+        let report = drain_with(Arc::clone(&ledger), worker, Duration::from_millis(50)).await;
+        let input = build_finalize_meeting_input(
+            ledger.meeting_id(),
+            &ledger,
+            "2026-09-20T00:00:00Z".to_string(),
+            50,
+            true,
+            true,
+            &report,
+        );
+
+        assert_eq!(input.queue.failed, 1);
+        assert!(input.reason_codes.iter().any(|reason| reason == "work_failed"));
+    }
+
+    #[tokio::test]
+    async fn finalization_timeout_aborts_worker_and_records_remaining_ids() {
+        let ledger = Arc::new(QueueLedger::new("meeting-timeout", 2).unwrap());
+        let now = Instant::now();
+        ledger.accept("work-pending", now).unwrap();
+        ledger.start("work-pending", now).unwrap();
+        let worker = tokio::spawn(async {
+            std::future::pending::<()>().await;
+        });
+
+        let report = drain_with(Arc::clone(&ledger), worker, Duration::from_millis(5)).await;
+        let input = build_finalize_meeting_input(
+            ledger.meeting_id(),
+            &ledger,
+            "2026-09-20T00:00:00Z".to_string(),
+            5,
+            true,
+            true,
+            &report,
+        );
+
+        assert!(report.deadline_expired);
+        assert_eq!(report.remaining_work_ids, vec!["work-pending"]);
+        assert_eq!(input.queue.cancelled, 1);
+        assert!(input.reason_codes.iter().any(|reason| reason == "deadline_exceeded"));
+    }
+
+    #[test]
+    fn finalization_stop_orders_close_then_finalizing_then_drain() {
+        let source = include_str!("recording_commands.rs");
+        let stop_start = source
+            .find("pub async fn stop_recording")
+            .expect("stop command must exist");
+        let stop = &source[stop_start..];
+        let close = stop
+            .find("stop_streams_and_force_flush")
+            .expect("stop must close capture and producers");
+        let finalizing = stop
+            .find("mark_finalizing")
+            .expect("stop must persist finalizing before drain");
+        let drain = stop
+            .find("drain_transcription_to_deadline")
+            .expect("stop must use a bounded ledger drain");
+
+        assert!(close < finalizing && finalizing < drain);
     }
 }
