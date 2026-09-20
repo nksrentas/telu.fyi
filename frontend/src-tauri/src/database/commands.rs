@@ -4,12 +4,30 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::manager::DatabaseManager;
+use super::models::{RecoveryCommandError, RecoveryErrorCode, RecoveryRequest, RecoveryResult};
+use super::repositories::meeting::RecoveryRepositoryError;
 use crate::state::AppState;
+use sqlx::SqlitePool;
 
 #[derive(Serialize)]
 pub struct DatabaseCheckResult {
     pub exists: bool,
     pub size: u64,
+}
+
+async fn reconcile_meeting_with_pool(
+    _pool: &SqlitePool,
+    _request: RecoveryRequest,
+) -> Result<RecoveryResult, RecoveryCommandError> {
+    Err(RecoveryCommandError {
+        code: RecoveryErrorCode::StorageFailure,
+    })
+}
+
+fn map_recovery_repository_error(_error: RecoveryRepositoryError) -> RecoveryCommandError {
+    RecoveryCommandError {
+        code: RecoveryErrorCode::StorageFailure,
+    }
 }
 
 /// Check if this is the first launch (no database exists yet)
@@ -275,4 +293,145 @@ pub async fn open_database_folder(app: AppHandle) -> Result<(), String> {
 
     info!("Opened database folder: {}", folder_path);
     Ok(())
+}
+
+#[cfg(test)]
+mod meeting_recovery_command_tests {
+    use super::*;
+    use crate::database::models::{
+        CaptureCompleteness, GapFact, MeetingLifecycle, TranscriptEvidenceInput,
+    };
+    use crate::database::repositories::meeting::MeetingsRepository;
+    use sqlx::sqlite::SqlitePoolOptions;
+    use uuid::Uuid;
+
+    async fn recovery_pool() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("command recovery database");
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("fresh migrations");
+        pool
+    }
+
+    fn evidence(meeting_id: &str) -> TranscriptEvidenceInput {
+        TranscriptEvidenceInput {
+            evidence_id: Uuid::new_v4().to_string(),
+            meeting_id: meeting_id.to_string(),
+            source_track: "mixed".to_string(),
+            source_segment_key: "command-segment".to_string(),
+            sequence: 1,
+            transcript: "recovered final".to_string(),
+            audio_start_time: 0.5,
+            audio_end_time: 1.5,
+            capture_completeness: CaptureCompleteness::Complete,
+        }
+    }
+
+    fn gap(meeting_id: &str, gap_id: &str, start: Option<u64>) -> GapFact {
+        GapFact {
+            gap_id: gap_id.to_string(),
+            meeting_id: meeting_id.to_string(),
+            gap_kind: "transcript_interval".to_string(),
+            reason_code: "forced_cancellation".to_string(),
+            audio_start_ms: start,
+            audio_end_ms: start.map(|value| value + 50),
+        }
+    }
+
+    #[tokio::test]
+    async fn meeting_recovery_command_validates_before_mutation_and_redacts_conflicts() {
+        let pool = recovery_pool().await;
+        let invalid = RecoveryRequest {
+            meeting_id: "../../sensitive/path".to_string(),
+            evidence: Vec::new(),
+            gaps: Vec::new(),
+        };
+        let result = reconcile_meeting_with_pool(&pool, invalid).await;
+        assert_eq!(
+            result.unwrap_err().code,
+            RecoveryErrorCode::InvalidRequest
+        );
+        let meeting_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meetings")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(meeting_count, 0, "invalid input cannot mutate SQLite");
+
+        assert_eq!(
+            map_recovery_repository_error(RecoveryRepositoryError::StaleMeeting).code,
+            RecoveryErrorCode::StaleMeeting
+        );
+        assert_eq!(
+            map_recovery_repository_error(RecoveryRepositoryError::CrossMeetingScope).code,
+            RecoveryErrorCode::CrossMeetingScope
+        );
+        let serialized = serde_json::to_string(&map_recovery_repository_error(
+            RecoveryRepositoryError::IdentityConflict,
+        ))
+        .unwrap();
+        assert!(!serialized.contains("path"));
+        assert!(!serialized.contains("transcript"));
+    }
+
+    #[test]
+    fn meeting_recovery_command_is_registered_in_the_tauri_handler() {
+        let lib_source = include_str!("../lib.rs");
+        assert!(
+            lib_source.contains("database::commands::reconcile_meeting"),
+            "the typed recovery command must be reachable through generate_handler"
+        );
+    }
+
+    #[tokio::test]
+    async fn meeting_recovery_command_returns_authoritative_ordered_gaps_with_explicit_unknowns() {
+        let pool = recovery_pool().await;
+        let meeting = MeetingsRepository::create_session(&pool, "Command recovery")
+            .await
+            .unwrap();
+        sqlx::query(
+            "UPDATE meetings
+             SET lifecycle = 'incomplete', completeness = 'incomplete',
+                 completeness_reason = 'interrupted'
+             WHERE id = ?",
+        )
+        .bind(&meeting.meeting_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+        let request = RecoveryRequest {
+            meeting_id: meeting.meeting_id.clone(),
+            evidence: vec![evidence(&meeting.meeting_id)],
+            gaps: vec![
+                gap(&meeting.meeting_id, "gap-z", Some(100)),
+                gap(&meeting.meeting_id, "gap-unknown", None),
+                gap(&meeting.meeting_id, "gap-a", Some(100)),
+            ],
+        };
+
+        let result = reconcile_meeting_with_pool(&pool, request)
+            .await
+            .expect("typed command result");
+        assert_eq!(result.meeting_id, meeting.meeting_id);
+        assert_eq!(result.lifecycle, MeetingLifecycle::Recovered);
+        assert_eq!(result.evidence_count, 1);
+        assert_eq!(result.gap_count, 3);
+        assert_eq!(
+            result
+                .gaps
+                .iter()
+                .map(|gap| gap.gap_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["gap-a", "gap-z", "gap-unknown"]
+        );
+        assert_eq!(result.gaps[2].audio_start_ms, None);
+        assert_eq!(result.gaps[2].audio_end_ms, None);
+        let serialized = serde_json::to_value(&result).unwrap();
+        assert!(serialized["gaps"][2].get("audio_start_ms").is_some());
+        assert!(serialized["gaps"][2]["audio_start_ms"].is_null());
+    }
 }

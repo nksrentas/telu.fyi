@@ -168,6 +168,22 @@ pub struct RecoveryResult {
     pub reconciled_at_utc: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RecoveryErrorCode {
+    InvalidRequest,
+    MeetingNotFound,
+    StaleMeeting,
+    CrossMeetingScope,
+    IdentityConflict,
+    StorageFailure,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecoveryCommandError {
+    pub code: RecoveryErrorCode,
+}
+
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct SummaryProcess {
     pub meeting_id: String,
