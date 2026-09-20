@@ -39,7 +39,10 @@ use super::device_monitor::{DeviceEvent, DeviceMonitorType};
 // Import transcription modules
 use super::transcription::{
     self,
-    queue_ledger::QueueLedger,
+    queue_ledger::{
+        QueueLedger, RejectionReason, SupersessionReason, WorkCancellationReason,
+        WorkFailureReason, WorkOutcome,
+    },
     reset_speech_detected_flag,
 };
 
@@ -111,12 +114,16 @@ fn finalize_recording_start() {
     info!("🔍 Setting IS_RECORDING to true and resetting SPEECH_DETECTED_EMITTED");
     IS_RECORDING.store(true, Ordering::SeqCst);
     MIC_FALLBACK_FAILED_ATTEMPTS.store(0, Ordering::SeqCst); // fresh mic-recovery budget per session
+    LAST_FINALIZATION.lock().unwrap().take();
     reset_speech_detected_flag(); // reset speech-detected emit latch for the new session
 }
 
 // Global recording manager and transcription task to keep them alive during recording
 static RECORDING_MANAGER: Mutex<Option<RecordingManager>> = Mutex::new(None);
 static TRANSCRIPTION_TASK: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
+static STOP_SERIALIZER: Lazy<tokio::sync::Mutex<()>> =
+    Lazy::new(|| tokio::sync::Mutex::new(()));
+static LAST_FINALIZATION: Mutex<Option<FinalizationSnapshot>> = Mutex::new(None);
 
 // Listener ID for proper cleanup - prevents microphone from staying active after recording stops
 static TRANSCRIPT_LISTENER_ID: Mutex<Option<tauri::EventId>> = Mutex::new(None);
@@ -167,15 +174,63 @@ struct FinalizationDrainReport {
 }
 
 async fn drain_transcription_to_deadline(
-    _task_handle: JoinHandle<()>,
-    _queue_ledger: Arc<QueueLedger>,
-    _deadline: Duration,
+    mut task_handle: JoinHandle<()>,
+    queue_ledger: Arc<QueueLedger>,
+    deadline: Duration,
 ) -> FinalizationDrainReport {
-    FinalizationDrainReport {
-        deadline_expired: false,
-        worker_failed: false,
-        remaining_work_ids: Vec::new(),
+    match tokio::time::timeout(deadline, &mut task_handle).await {
+        Ok(Ok(())) => {
+            let stranded = nonterminal_work_ids(&queue_ledger);
+            let worker_failed = !stranded.is_empty();
+            if worker_failed {
+                queue_ledger.finish_all_nonterminal(
+                    WorkOutcome::Failed(WorkFailureReason::DispatchClosed),
+                    Instant::now(),
+                );
+            }
+            FinalizationDrainReport {
+                deadline_expired: false,
+                worker_failed,
+                remaining_work_ids: Vec::new(),
+            }
+        }
+        Ok(Err(_join_error)) => {
+            queue_ledger.finish_all_nonterminal(
+                WorkOutcome::Failed(WorkFailureReason::WorkerPanicked),
+                Instant::now(),
+            );
+            FinalizationDrainReport {
+                deadline_expired: false,
+                worker_failed: true,
+                remaining_work_ids: Vec::new(),
+            }
+        }
+        Err(_) => {
+            let remaining_work_ids = nonterminal_work_ids(&queue_ledger);
+            task_handle.abort();
+            let _ = task_handle.await;
+            queue_ledger.finish_all_nonterminal(
+                WorkOutcome::Cancelled(WorkCancellationReason::Deadline),
+                Instant::now(),
+            );
+            FinalizationDrainReport {
+                deadline_expired: true,
+                worker_failed: false,
+                remaining_work_ids,
+            }
+        }
     }
+}
+
+fn nonterminal_work_ids(queue_ledger: &QueueLedger) -> Vec<String> {
+    let mut ids = queue_ledger
+        .work_records()
+        .into_iter()
+        .filter(|record| record.outcome.is_none())
+        .map(|record| record.work_id)
+        .collect::<Vec<_>>();
+    ids.sort();
+    ids
 }
 
 fn build_finalize_meeting_input(
@@ -187,16 +242,100 @@ fn build_finalize_meeting_input(
     durable_writes_succeeded: bool,
     drain: &FinalizationDrainReport,
 ) -> FinalizeMeetingInput {
+    let work_records = queue_ledger.work_records();
+    let mut reason_codes = Vec::new();
+    let mut gaps = Vec::new();
+
+    if drain.deadline_expired {
+        reason_codes.push("deadline_exceeded".to_string());
+    }
+    if drain.worker_failed {
+        reason_codes.push("transcription_worker_failed".to_string());
+    }
+    for record in work_records {
+        let reason_code = match record.outcome {
+            Some(WorkOutcome::Completed) => continue,
+            Some(WorkOutcome::Failed(reason)) => {
+                reason_codes.push("work_failed".to_string());
+                work_failure_reason_code(reason)
+            }
+            Some(WorkOutcome::Cancelled(reason)) => {
+                reason_codes.push("work_cancelled".to_string());
+                work_cancellation_reason_code(reason)
+            }
+            Some(WorkOutcome::Superseded(reason)) => {
+                reason_codes.push("work_superseded".to_string());
+                supersession_reason_code(reason)
+            }
+            None => {
+                reason_codes.push("work_remaining".to_string());
+                "work_remaining"
+            }
+        };
+        gaps.push(FinalizationGapInput {
+            work_id: record.work_id,
+            gap_kind: "accepted_work".to_string(),
+            reason_code: reason_code.to_string(),
+            audio_start_ms: None,
+            audio_end_ms: None,
+        });
+    }
+    for gap in queue_ledger.gaps() {
+        reason_codes.push("work_rejected".to_string());
+        gaps.push(FinalizationGapInput {
+            work_id: gap.work_id,
+            gap_kind: "rejected_work".to_string(),
+            reason_code: rejection_reason_code(gap.reason).to_string(),
+            audio_start_ms: gap.audio_start_ms,
+            audio_end_ms: gap.audio_end_ms,
+        });
+    }
+    reason_codes.sort();
+    reason_codes.dedup();
+    let evidence_write_failed = gaps
+        .iter()
+        .any(|gap| gap.reason_code == "evidence_persistence_failed");
+
     FinalizeMeetingInput {
         meeting_id: meeting_id.to_string(),
         capture_closed,
-        durable_writes_succeeded,
+        durable_writes_succeeded: durable_writes_succeeded && !evidence_write_failed,
         queue: queue_ledger.snapshot(Instant::now()),
         deadline_at_utc,
         deadline_ms,
         remaining_work_ids: drain.remaining_work_ids.clone(),
-        reason_codes: Vec::new(),
-        gaps: Vec::<FinalizationGapInput>::new(),
+        reason_codes,
+        gaps,
+    }
+}
+
+fn work_failure_reason_code(reason: WorkFailureReason) -> &'static str {
+    match reason {
+        WorkFailureReason::ModelUnavailable => "model_unavailable",
+        WorkFailureReason::TranscriptionFailed => "transcription_failed",
+        WorkFailureReason::EvidencePersistenceFailed => "evidence_persistence_failed",
+        WorkFailureReason::DispatchClosed => "dispatch_closed",
+        WorkFailureReason::WorkerPanicked => "worker_panicked",
+    }
+}
+
+fn work_cancellation_reason_code(reason: WorkCancellationReason) -> &'static str {
+    match reason {
+        WorkCancellationReason::Shutdown => "shutdown",
+        WorkCancellationReason::Deadline => "deadline_exceeded",
+    }
+}
+
+fn supersession_reason_code(reason: SupersessionReason) -> &'static str {
+    match reason {
+        SupersessionReason::NewerWork => "newer_work",
+    }
+}
+
+fn rejection_reason_code(reason: RejectionReason) -> &'static str {
+    match reason {
+        RejectionReason::Capacity => "capacity",
+        RejectionReason::Closed => "closed",
     }
 }
 
@@ -1039,8 +1178,226 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     Ok(start_result)
 }
 
-/// Stop recording with optimized graceful shutdown ensuring NO transcript chunks are lost
+const DEFAULT_FINALIZATION_EXPERIMENT_DEADLINE_MS: u64 = 120_000;
+const MAX_FINALIZATION_EXPERIMENT_DEADLINE_MS: u64 = 30 * 60 * 1_000;
+
+fn configured_finalization_deadline_ms() -> u64 {
+    match std::env::var("TELU_FINALIZATION_DEADLINE_MS") {
+        Ok(value) => match value.parse::<u64>() {
+            Ok(value) if (1..=MAX_FINALIZATION_EXPERIMENT_DEADLINE_MS).contains(&value) => value,
+            _ => {
+                warn!(
+                    "Ignoring invalid TELU_FINALIZATION_DEADLINE_MS; using experiment default {}ms",
+                    DEFAULT_FINALIZATION_EXPERIMENT_DEADLINE_MS
+                );
+                DEFAULT_FINALIZATION_EXPERIMENT_DEADLINE_MS
+            }
+        },
+        Err(_) => DEFAULT_FINALIZATION_EXPERIMENT_DEADLINE_MS,
+    }
+}
+
+fn remaining_until(deadline: Instant) -> Duration {
+    deadline.saturating_duration_since(Instant::now())
+}
+
+fn emit_finalization_progress<R: Runtime>(
+    app: &AppHandle<R>,
+    meeting_id: &str,
+    queue_ledger: &QueueLedger,
+    deadline_at_utc: &str,
+    deadline_ms: u64,
+) {
+    let _ = app.emit(
+        "recording-finalization-progress",
+        serde_json::json!({
+            "meeting_id": meeting_id,
+            "lifecycle": "finalizing",
+            "queue": queue_ledger.snapshot(Instant::now()),
+            "deadline_at_utc": deadline_at_utc,
+            "deadline_ms": deadline_ms,
+        }),
+    );
+}
+
+/// Stop one Rust-owned meeting through a finite close/drain/persist protocol.
 pub async fn stop_recording<R: Runtime>(
+    app: AppHandle<R>,
+    _args: RecordingArgs,
+) -> Result<FinalizationSnapshot, String> {
+    let _stop_guard = STOP_SERIALIZER.lock().await;
+    if !IS_RECORDING.load(Ordering::SeqCst) {
+        return LAST_FINALIZATION
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or_else(|| "No recording is currently active".to_string());
+    }
+
+    let _stopping_guard = StoppingGuard::new();
+    let meeting = CURRENT_MEETING
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or_else(|| "Active recording has no canonical meeting identity".to_string())?;
+    let database_pool = recording_database_pool(&app)?;
+    let deadline_ms = configured_finalization_deadline_ms();
+    let deadline_duration = Duration::from_millis(deadline_ms);
+    let deadline = Instant::now() + deadline_duration;
+    let deadline_at_utc = (Utc::now()
+        + chrono::Duration::milliseconds(deadline_ms.min(i64::MAX as u64) as i64))
+    .to_rfc3339();
+
+    let mut manager = RECORDING_MANAGER
+        .lock()
+        .unwrap()
+        .take()
+        .ok_or_else(|| "Active recording has no recording manager".to_string())?;
+    let queue_ledger = manager
+        .get_state()
+        .queue_ledger()
+        .ok_or_else(|| "Active recording has no authoritative queue ledger".to_string())?;
+    if queue_ledger.meeting_id() != meeting.meeting_id {
+        return Err("Queue ledger meeting identity does not match active meeting".to_string());
+    }
+
+    let capture_closed = match tokio::time::timeout(
+        remaining_until(deadline),
+        manager.stop_streams_and_force_flush(),
+    )
+    .await
+    {
+        Ok(Ok(())) => true,
+        Ok(Err(error)) => {
+            error!("Failed to close recording producers: {error}");
+            false
+        }
+        Err(_) => {
+            warn!("Finalization deadline elapsed while closing recording producers");
+            false
+        }
+    };
+
+    {
+        use tauri::Listener;
+        if let Some(listener_id) = TRANSCRIPT_LISTENER_ID.lock().unwrap().take() {
+            app.unlisten(listener_id);
+        }
+    }
+
+    let finalizing_persisted = match MeetingsRepository::mark_finalizing(
+        &database_pool,
+        &meeting.meeting_id,
+    )
+    .await
+    {
+        Ok(()) => true,
+        Err(error) => {
+            error!("Failed to persist finalizing lifecycle: {error}");
+            false
+        }
+    };
+    emit_finalization_progress(
+        &app,
+        &meeting.meeting_id,
+        &queue_ledger,
+        &deadline_at_utc,
+        deadline_ms,
+    );
+
+    let transcription_task = TRANSCRIPTION_TASK.lock().unwrap().take();
+    let drain = if let Some(task_handle) = transcription_task {
+        drain_transcription_to_deadline(
+            task_handle,
+            Arc::clone(&queue_ledger),
+            remaining_until(deadline),
+        )
+        .await
+    } else {
+        let stranded = nonterminal_work_ids(&queue_ledger);
+        if !stranded.is_empty() {
+            queue_ledger.finish_all_nonterminal(
+                WorkOutcome::Failed(WorkFailureReason::DispatchClosed),
+                Instant::now(),
+            );
+        }
+        FinalizationDrainReport {
+            deadline_expired: false,
+            worker_failed: !stranded.is_empty(),
+            remaining_work_ids: Vec::new(),
+        }
+    };
+    emit_finalization_progress(
+        &app,
+        &meeting.meeting_id,
+        &queue_ledger,
+        &deadline_at_utc,
+        deadline_ms,
+    );
+
+    let meeting_folder = manager.get_meeting_folder();
+    let meeting_name = manager.get_meeting_name();
+    let durable_file_write = match tokio::time::timeout(
+        remaining_until(deadline),
+        manager.save_recording_only(&app),
+    )
+    .await
+    {
+        Ok(Ok(())) => true,
+        Ok(Err(error)) => {
+            error!("Recording mirror save failed: {error}");
+            false
+        }
+        Err(_) => {
+            warn!("Finalization deadline elapsed during recording mirror save");
+            false
+        }
+    };
+
+    let mut input = build_finalize_meeting_input(
+        &meeting.meeting_id,
+        &queue_ledger,
+        deadline_at_utc,
+        deadline_ms,
+        capture_closed,
+        durable_file_write,
+        &drain,
+    );
+    if !finalizing_persisted {
+        input
+            .reason_codes
+            .push("finalizing_persistence_failed".to_string());
+        input.durable_writes_succeeded = false;
+    }
+
+    let finalization_result = MeetingsRepository::finalize_session(&database_pool, &input)
+        .await
+        .map_err(|error| format!("Failed to persist terminal finalization: {error}"));
+
+    IS_RECORDING.store(false, Ordering::SeqCst);
+    CURRENT_MEETING.lock().unwrap().take();
+    let finalization = finalization_result?;
+    *LAST_FINALIZATION.lock().unwrap() = Some(finalization.clone());
+
+    let folder_path = meeting_folder.map(|path| path.to_string_lossy().to_string());
+    if let Err(error) = app.emit(
+        "recording-stopped",
+        serde_json::json!({
+            "message": "Recording finalization persisted by Rust",
+            "folder_path": folder_path,
+            "meeting_name": meeting_name,
+            "finalization": finalization,
+        }),
+    ) {
+        warn!("Terminal finalization persisted but renderer event delivery failed: {error}");
+    }
+    crate::tray::update_tray_menu(&app);
+
+    Ok(finalization)
+}
+
+#[allow(dead_code)]
+async fn legacy_stop_recording<R: Runtime>(
     app: AppHandle<R>,
     _args: RecordingArgs,
 ) -> Result<(), String> {
@@ -1470,13 +1827,10 @@ pub async fn is_recording() -> bool {
     IS_RECORDING.load(Ordering::SeqCst)
 }
 
-/// Get recording statistics
-pub async fn get_transcription_status() -> TranscriptionStatus {
-    TranscriptionStatus {
-        chunks_in_queue: 0,
-        is_processing: IS_RECORDING.load(Ordering::SeqCst),
-        last_activity_ms: 0,
-    }
+/// Return the last authoritative terminal lifecycle instead of inferring
+/// completion from renderer-visible queue quietness.
+pub async fn get_transcription_status() -> Option<FinalizationSnapshot> {
+    LAST_FINALIZATION.lock().unwrap().clone()
 }
 
 /// Pause the current recording

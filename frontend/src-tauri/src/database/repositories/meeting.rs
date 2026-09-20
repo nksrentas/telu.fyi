@@ -275,6 +275,30 @@ impl MeetingsRepository {
         Ok(result)
     }
 
+    /// Move an active meeting into the durable finalizing state before its
+    /// accepted queue work is drained. Repeating the transition is harmless.
+    pub async fn mark_finalizing(pool: &SqlitePool, meeting_id: &str) -> Result<(), SqlxError> {
+        validate_identifier("meeting_id", meeting_id)?;
+        let result = sqlx::query(
+            "UPDATE meetings
+             SET lifecycle = 'finalizing', updated_at = ?
+             WHERE id = ? AND lifecycle IN ('preparing', 'recording', 'finalizing')",
+        )
+        .bind(Utc::now())
+        .bind(meeting_id)
+        .execute(pool)
+        .await?;
+        if result.rows_affected() == 1 {
+            return Ok(());
+        }
+        if Self::get_finalization(pool, meeting_id).await?.is_some() {
+            return Ok(());
+        }
+        Err(SqlxError::Protocol(
+            "meeting is missing or cannot enter finalizing".to_string(),
+        ))
+    }
+
     pub async fn get_meetings(pool: &SqlitePool) -> Result<Vec<MeetingModel>, sqlx::Error> {
         let meetings =
             sqlx::query_as::<_, MeetingModel>("SELECT * FROM meetings ORDER BY created_at DESC")
@@ -562,9 +586,9 @@ fn validate_finalization_input(input: &FinalizeMeetingInput) -> Result<(), SqlxE
             "finalization queue snapshot violates conservation".to_string(),
         ));
     }
-    if input.remaining_work_ids.len() as u64 != input.queue.depth {
+    if input.remaining_work_ids.len() as u64 > input.queue.depth + input.queue.cancelled {
         return Err(SqlxError::Protocol(
-            "remaining work IDs must exactly cover queue depth".to_string(),
+            "remaining work IDs exceed pending and deadline-cancelled work".to_string(),
         ));
     }
     if input
@@ -929,11 +953,13 @@ mod finalization_repository_tests {
     }
 
     fn incomplete_input(meeting_id: String) -> FinalizeMeetingInput {
+        let mut deadline_queue = queue(0, 3, 1, 1, 1);
+        deadline_queue.cancelled = 1;
         FinalizeMeetingInput {
             meeting_id,
             capture_closed: true,
             durable_writes_succeeded: false,
-            queue: queue(1, 3, 1, 1, 1),
+            queue: deadline_queue,
             deadline_at_utc: "2026-09-20T21:00:00Z".to_string(),
             deadline_ms: 30_000,
             remaining_work_ids: vec!["mixed:chunk-3".to_string()],

@@ -356,22 +356,29 @@ impl RecordingManager {
         self.state.stop_recording();
 
         // Stop audio streams immediately
+        let mut close_failures = Vec::new();
         if let Err(e) = self.stream_manager.stop_streams() {
             error!("Error stopping audio streams: {}", e);
+            close_failures.push("audio_stream_close_failed");
         }
 
         // CRITICAL: Force pipeline to flush ALL accumulated audio before stopping
         debug!("💨 Forcing pipeline to flush accumulated audio immediately");
         if let Err(e) = self.pipeline_manager.force_flush_and_stop().await {
             error!("Error during force flush: {}", e);
+            close_failures.push("audio_pipeline_close_failed");
         }
 
         // CRITICAL: Full cleanup to release all Arc references and resources
         // This ensures microphone is released even if Drop is delayed
         self.state.cleanup();
 
-        info!("✅ Recording streams stopped with immediate flush completed");
-        Ok(())
+        if close_failures.is_empty() {
+            info!("✅ Recording streams stopped with immediate flush completed");
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(close_failures.join(",")))
+        }
     }
 
     /// Save recording after transcription is complete
@@ -392,7 +399,7 @@ impl RecordingManager {
             }
             Err(e) => {
                 error!("Failed to save recording: {}", e);
-                // Don't fail the stop operation if saving fails
+                return Err(anyhow::anyhow!(e));
             }
         }
 
