@@ -46,7 +46,7 @@ Telu extends the active Tauri/Rust and Next.js/React Community Edition applicati
 **Verification approach:** Run short, continuous, overlapping, sustained-system-audio, overload, stop, restart, crash, and repeated-recovery scenarios on the declared target matrix; inspect stage telemetry and resource samples; verify idempotent database state and stable evidence IDs; block network access in local mode; snapshot provider-boundary disclosures and failure behavior.
 **Exit gate:** Phase 2 may proceed only when canonical meeting identity, stable final-transcript semantics, recovery reconciliation, capture-completeness reporting, and privacy-boundary checks pass. Phase 4 remains blocked unless continuous-speech freshness, backlog age, memory/resource behavior, and stop behavior are observable, bounded against the predeclared experiment thresholds, and passing. Unknown results count as failure.
 **Principal risks / stop conditions:** Split or late identity, partial transcripts treated as durable evidence, placeholder queue metrics, unbounded freshness or memory, silent transcript loss, fabricated confidence, ambiguous provider destinations, undisclosed egress, or silent local-to-hosted fallback. Stop dependent work when any required measurement or trust boundary is unknown or failing.
-**Plans:** 1/19 plans executed
+**Plans:** 2/19 plans executed
 Plans:
 **Wave 1**
 
@@ -54,7 +54,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Propagate the same identity into recording metadata, IndexedDB, and legacy migration projection.
+- [x] 01-02-PLAN.md — Propagate the same identity into recording metadata, IndexedDB, and legacy migration projection.
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -238,7 +238,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6. Each phase's e
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Baseline Observability, Identity, and Trust Boundaries | 1/19 | In Progress|  |
+| 1. Baseline Observability, Identity, and Trust Boundaries | 2/19 | In Progress|  |
 | 2. Evidence-Linked Post-Meeting Knowledge | 0/TBD | Not started | - |
 | 3. Bounded Sourced Preparation | 0/TBD | Not started | - |
 | 4. Cancellable Live-Loop Validation | 0/TBD | Not started | - |
