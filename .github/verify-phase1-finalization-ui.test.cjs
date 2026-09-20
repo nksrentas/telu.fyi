@@ -40,7 +40,7 @@ test('status is polite and throttled without percentage or completion inference'
   assert.match(overlays, /aria-live="polite"/);
   assert.match(overlays, /role="status"/);
   assert.match(overlays, /ANNOUNCEMENT_THROTTLE_MS = 5_000/);
-  assert.doesNotMatch(overlays, /Progress|progress bar|percentage|%/i);
+  assert.doesNotMatch(overlays, /<Progress\b|aria-valuenow|%\s*(complete|remaining|done)/i);
   assert.doesNotMatch(overlays, /last_activity|quiet|setInterval|queue\.depth === 0[\s\S]{0,80}(complete|Complete)/);
   assert.match(overlays, /transcriptService\.onFinalizationProgress/);
   assert.match(overlays, /transcriptService\.onRecordingStopped/);

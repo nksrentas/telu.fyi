@@ -10,7 +10,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Analytics from '@/lib/analytics';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
-import type { TranscriptionErrorPayload } from '@/services/transcriptService';
+import {
+  transcriptService,
+  type FinalizationSnapshot,
+  type TranscriptionErrorPayload,
+} from '@/services/transcriptService';
 
 interface RecordingControlsProps {
   isRecording: boolean;
@@ -60,6 +64,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   const [isValidatingModel, setIsValidatingModel] = useState(false);
   const [speechDetected, setSpeechDetected] = useState(false);
   const [deviceError, setDeviceError] = useState<{ title: string, message: string } | null>(null);
+  const [awaitingTerminalFinalization, setAwaitingTerminalFinalization] = useState(false);
 
   const currentTime = 0;
   const duration = 0;
@@ -86,7 +91,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   }, []);
 
   const handleStartRecording = useCallback(async () => {
-    if (isStarting || isValidatingModel || isStartingRecording) return;
+    if (isStarting || isValidatingModel || isStartingRecording || awaitingTerminalFinalization) return;
     console.log('Starting recording...');
     console.log('Selected devices:', selectedDevices);
     console.log('Meeting name:', meetingName);
@@ -137,7 +142,16 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
         });
       }
     }
-  }, [onRecordingStart, isStarting, isValidatingModel, selectedDevices, meetingName, isRecording]);
+  }, [
+    awaitingTerminalFinalization,
+    isRecording,
+    isStarting,
+    isStartingRecording,
+    isValidatingModel,
+    meetingName,
+    onRecordingStart,
+    selectedDevices,
+  ]);
 
   const stopRecordingAction = useCallback(async () => {
     console.log('Executing stop recording...');
@@ -148,12 +162,15 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
       const savePath = `${dataDir}/recording-${timestamp}.wav`;
       console.log('Saving recording to:', savePath);
       console.log('About to call stop_recording command');
-      const result = await invoke('stop_recording', {
+      const result = await invoke<FinalizationSnapshot>('stop_recording', {
         args: {
           save_path: savePath
         }
       });
       console.log('stop_recording command completed successfully:', result);
+      if (result.lifecycle === 'complete' || result.lifecycle === 'incomplete') {
+        setAwaitingTerminalFinalization(false);
+      }
       setRecordingPath(savePath);
       // setShowPlayback(true);
       setIsProcessing(false);
@@ -197,11 +214,39 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
     // Notify parent immediately (for UI state updates)
     onStopInitiated?.();
 
+    setAwaitingTerminalFinalization(true);
     setIsStopping(true);
 
     // Immediately trigger the stop action
     await stopRecordingAction();
   }, [isRecording, isStarting, isStopping, isStartingRecording, stopRecordingAction, onStopInitiated]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlistenStopped: (() => void) | undefined;
+
+    const subscribe = async () => {
+      const unlisten = await transcriptService.onRecordingStopped(({ finalization }) => {
+        if (finalization.lifecycle === 'complete' || finalization.lifecycle === 'incomplete') {
+          setAwaitingTerminalFinalization(false);
+        }
+      });
+      if (cancelled) {
+        unlisten();
+        return;
+      }
+      unlistenStopped = unlisten;
+    };
+
+    void subscribe().catch((error) => {
+      console.error('Failed to subscribe to terminal finalization state:', error);
+    });
+
+    return () => {
+      cancelled = true;
+      unlistenStopped?.();
+    };
+  }, []);
 
   const handlePauseRecording = useCallback(async () => {
     if (!isRecording || isPaused || isPausing) return;
@@ -331,6 +376,14 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
     };
   }, [onRecordingStop, onTranscriptionError]);
 
+  if (isStopping) {
+    return null;
+  }
+
+  if (recordingState.isStopping || recordingState.isProcessing || recordingState.isSaving) {
+    return null;
+  }
+
   return (
     <TooltipProvider>
       <div className="flex flex-col space-y-2">
@@ -388,8 +441,8 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
                             Analytics.trackButtonClick('start_recording', 'recording_controls');
                             handleStartRecording();
                           }}
-                          disabled={isStarting || isProcessing || isRecordingDisabled || isValidatingModel || isStartingRecording}
-                          className={`w-12 h-12 flex items-center justify-center ${isStarting || isProcessing || isValidatingModel || isStartingRecording ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
+                          disabled={isStarting || isProcessing || isRecordingDisabled || isValidatingModel || isStartingRecording || awaitingTerminalFinalization}
+                          className={`w-12 h-12 flex items-center justify-center ${isStarting || isProcessing || isValidatingModel || isStartingRecording || awaitingTerminalFinalization ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
                             } rounded-full text-white transition-colors relative`}
                         >
                           {isValidatingModel || isStartingRecording ? (
