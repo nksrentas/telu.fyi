@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml meeting_identity_start_failure --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - audio::recording_commands::meeting_identity_contract_tests::meeting_identity_start_failure_exposes_a_typed_persistence_code\nnot ok 2 - audio::recording_commands::meeting_identity_contract_tests::meeting_identity_start_failure_rejects_conflicting_projection_visibly\nnot ok 3 - audio::recording_commands::meeting_identity_contract_tests::meeting_identity_start_failure_redelivery_preserves_existing_metadata\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "audio::recording_commands::meeting_identity_contract_tests::meeting_identity_start_failure_exposes_a_typed_persistence_code",
+  "expected": "Persistence failures expose a typed code, conflicting identities are rejected visibly, and same-ID redelivery preserves existing metadata",
+  "actual": "Three named behavior assertions failed because typed failure and idempotent renderer projection are not implemented"
+}

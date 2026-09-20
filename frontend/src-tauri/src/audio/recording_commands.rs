@@ -1858,4 +1858,50 @@ mod meeting_identity_contract_tests {
         )));
         assert!(source.contains(concat!("Ok(start_", "result)")));
     }
+
+    #[test]
+    fn meeting_identity_start_failure_exposes_a_typed_persistence_code() {
+        let service = include_str!("../../../src/services/recordingService.ts");
+
+        assert!(
+            service.contains(concat!("export class Recording", "StartError")),
+            "the renderer must receive a typed recording-start error"
+        );
+        assert!(
+            service.contains("MEETING_IDENTITY_PERSISTENCE_FAILED"),
+            "identity persistence failures need a stable machine-readable code"
+        );
+    }
+
+    #[test]
+    fn meeting_identity_start_failure_rejects_conflicting_projection_visibly() {
+        let context = include_str!("../../../src/contexts/TranscriptContext.tsx");
+
+        assert!(
+            context.contains("MEETING_IDENTITY_CONFLICT"),
+            "a stale or conflicting renderer identity must be explicitly classified"
+        );
+        assert!(
+            context.contains("toast.error"),
+            "identity conflicts must be visible to the user"
+        );
+        assert!(
+            context.contains("currentMeetingIdRef"),
+            "event redelivery must compare against a stable identity projection"
+        );
+    }
+
+    #[test]
+    fn meeting_identity_start_failure_redelivery_preserves_existing_metadata() {
+        let context = include_str!("../../../src/contexts/TranscriptContext.tsx");
+
+        assert!(
+            context.contains("existingMetadata"),
+            "redelivery must load existing metadata instead of replacing it"
+        );
+        assert!(
+            context.contains("transcriptCount: existingMetadata.transcriptCount"),
+            "redelivery must preserve transcript progress for the canonical meeting"
+        );
+    }
 }
