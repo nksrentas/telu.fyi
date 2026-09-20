@@ -1,4 +1,5 @@
 use crate::api::{TranscriptSearchResult, TranscriptSegment};
+use crate::database::models::{TranscriptEvidence, TranscriptEvidenceInput};
 use chrono::Utc;
 use sqlx::{Connection, Error as SqlxError, SqlitePool};
 use tracing::{error, info};
@@ -7,6 +8,129 @@ use uuid::Uuid;
 pub struct TranscriptsRepository;
 
 impl TranscriptsRepository {
+    /// Incrementally persists a finalized transcript segment under caller-owned,
+    /// stable meeting and evidence identities.
+    ///
+    /// Immutable source identity is never rewritten on redelivery. Allowed
+    /// transcript, timing, ordering, and completeness corrections update the
+    /// existing row in one SQLite transaction.
+    pub async fn upsert_final_evidence(
+        pool: &SqlitePool,
+        evidence: &TranscriptEvidenceInput,
+    ) -> Result<TranscriptEvidence, SqlxError> {
+        Self::validate_final_evidence(evidence)?;
+
+        let now = Utc::now();
+        let mut transaction = pool.begin().await?;
+        let result = sqlx::query(
+            "INSERT INTO transcript_evidence (
+                evidence_id, meeting_id, source_track, source_segment_key,
+                sequence, transcript, audio_start_time, audio_end_time,
+                is_final, capture_completeness, created_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+             ON CONFLICT(evidence_id) DO UPDATE SET
+                sequence = excluded.sequence,
+                transcript = excluded.transcript,
+                audio_start_time = excluded.audio_start_time,
+                audio_end_time = excluded.audio_end_time,
+                capture_completeness = excluded.capture_completeness,
+                updated_at = excluded.updated_at
+             WHERE transcript_evidence.meeting_id = excluded.meeting_id
+               AND transcript_evidence.source_track = excluded.source_track
+               AND transcript_evidence.source_segment_key = excluded.source_segment_key",
+        )
+        .bind(&evidence.evidence_id)
+        .bind(&evidence.meeting_id)
+        .bind(&evidence.source_track)
+        .bind(&evidence.source_segment_key)
+        .bind(evidence.sequence)
+        .bind(&evidence.transcript)
+        .bind(evidence.audio_start_time)
+        .bind(evidence.audio_end_time)
+        .bind(evidence.capture_completeness.as_str())
+        .bind(now)
+        .bind(now)
+        .execute(&mut *transaction)
+        .await;
+
+        if let Err(error) = result {
+            let _ = transaction.rollback().await;
+            return Err(error);
+        }
+
+        let persisted = sqlx::query_as::<_, TranscriptEvidence>(
+            "SELECT * FROM transcript_evidence WHERE evidence_id = ?",
+        )
+        .bind(&evidence.evidence_id)
+        .fetch_one(&mut *transaction)
+        .await;
+
+        let persisted = match persisted {
+            Ok(persisted) => persisted,
+            Err(error) => {
+                let _ = transaction.rollback().await;
+                return Err(error);
+            }
+        };
+
+        if persisted.meeting_id != evidence.meeting_id
+            || persisted.source_track != evidence.source_track
+            || persisted.source_segment_key != evidence.source_segment_key
+        {
+            let _ = transaction.rollback().await;
+            return Err(SqlxError::Protocol(
+                "evidence identity cannot be reassigned to another source segment".to_string(),
+            ));
+        }
+
+        transaction.commit().await?;
+        Ok(persisted)
+    }
+
+    fn validate_final_evidence(evidence: &TranscriptEvidenceInput) -> Result<(), SqlxError> {
+        if Uuid::parse_str(&evidence.evidence_id).is_err() {
+            return Err(SqlxError::Protocol(
+                "evidence_id must be a valid UUID".to_string(),
+            ));
+        }
+        if Uuid::parse_str(&evidence.meeting_id).is_err() {
+            return Err(SqlxError::Protocol(
+                "meeting_id must be a valid UUID".to_string(),
+            ));
+        }
+        if evidence.source_track.trim().is_empty() {
+            return Err(SqlxError::Protocol(
+                "source_track cannot be empty".to_string(),
+            ));
+        }
+        if evidence.source_segment_key.trim().is_empty() {
+            return Err(SqlxError::Protocol(
+                "source_segment_key cannot be empty".to_string(),
+            ));
+        }
+        if evidence.sequence < 0 {
+            return Err(SqlxError::Protocol(
+                "sequence cannot be negative".to_string(),
+            ));
+        }
+        if evidence.transcript.trim().is_empty() {
+            return Err(SqlxError::Protocol(
+                "final transcript cannot be empty".to_string(),
+            ));
+        }
+        if !evidence.audio_start_time.is_finite()
+            || !evidence.audio_end_time.is_finite()
+            || evidence.audio_start_time < 0.0
+            || evidence.audio_end_time < evidence.audio_start_time
+        {
+            return Err(SqlxError::Protocol(
+                "audio bounds must be finite, non-negative, and ordered".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Saves a new meeting and its associated transcript segments.
     /// This function uses a transaction to ensure that either both the meeting
     /// and all its transcripts are saved, or none of them are.
@@ -148,6 +272,7 @@ impl TranscriptsRepository {
 #[cfg(test)]
 mod transcript_evidence_repository_tests {
     use super::*;
+    use crate::database::models::{CaptureCompleteness, TranscriptEvidenceInput};
     use sqlx::{sqlite::SqlitePoolOptions, Row};
 
     const MEETING_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141ae";
@@ -193,28 +318,21 @@ mod transcript_evidence_repository_tests {
             == 1
     }
 
-    async fn raw_upsert_final(pool: &SqlitePool, transcript: &str, end: f64) {
-        sqlx::query(
-            "INSERT INTO transcript_evidence (
-                evidence_id, meeting_id, source_track, source_segment_key,
-                sequence, transcript, audio_start_time, audio_end_time,
-                is_final, capture_completeness, created_at, updated_at
-             ) VALUES (?, ?, 'mixed', 'segment-42', 42, ?, 1.25, ?, 1, 'complete', ?, ?)
-             ON CONFLICT(evidence_id) DO UPDATE SET
-                sequence = excluded.sequence,
-                transcript = excluded.transcript,
-                audio_start_time = excluded.audio_start_time,
-                audio_end_time = excluded.audio_end_time,
-                capture_completeness = excluded.capture_completeness,
-                updated_at = excluded.updated_at",
+    async fn upsert_final(pool: &SqlitePool, transcript: &str, end: f64) {
+        TranscriptsRepository::upsert_final_evidence(
+            pool,
+            &TranscriptEvidenceInput {
+                evidence_id: EVIDENCE_ID.to_string(),
+                meeting_id: MEETING_ID.to_string(),
+                source_track: "mixed".to_string(),
+                source_segment_key: "segment-42".to_string(),
+                sequence: 42,
+                transcript: transcript.to_string(),
+                audio_start_time: 1.25,
+                audio_end_time: end,
+                capture_completeness: CaptureCompleteness::Complete,
+            },
         )
-        .bind(EVIDENCE_ID)
-        .bind(MEETING_ID)
-        .bind(transcript)
-        .bind(end)
-        .bind(Utc::now())
-        .bind(Utc::now())
-        .execute(pool)
         .await
         .expect("final evidence upsert");
     }
@@ -227,7 +345,7 @@ mod transcript_evidence_repository_tests {
             "final transcript evidence must have forward-migrated durable storage"
         );
 
-        raw_upsert_final(&pool, "first final", 2.5).await;
+        upsert_final(&pool, "first final", 2.5).await;
         let row = sqlx::query(
             "SELECT evidence_id, meeting_id, is_final, capture_completeness
              FROM transcript_evidence",
@@ -239,10 +357,7 @@ mod transcript_evidence_repository_tests {
         assert_eq!(row.get::<String, _>("evidence_id"), EVIDENCE_ID);
         assert_eq!(row.get::<String, _>("meeting_id"), MEETING_ID);
         assert_eq!(row.get::<i64, _>("is_final"), 1);
-        assert_eq!(
-            row.get::<String, _>("capture_completeness"),
-            "complete"
-        );
+        assert_eq!(row.get::<String, _>("capture_completeness"), "complete");
     }
 
     #[tokio::test]
@@ -253,8 +368,8 @@ mod transcript_evidence_repository_tests {
             "redelivery requires a stable evidence table and uniqueness contract"
         );
 
-        raw_upsert_final(&pool, "first final", 2.5).await;
-        raw_upsert_final(&pool, "corrected final", 2.75).await;
+        upsert_final(&pool, "first final", 2.5).await;
+        upsert_final(&pool, "corrected final", 2.75).await;
 
         let count = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM transcript_evidence WHERE meeting_id = ?",
@@ -263,12 +378,11 @@ mod transcript_evidence_repository_tests {
         .fetch_one(&pool)
         .await
         .expect("evidence count");
-        let row = sqlx::query(
-            "SELECT evidence_id, transcript, audio_end_time FROM transcript_evidence",
-        )
-        .fetch_one(&pool)
-        .await
-        .expect("redelivered final evidence");
+        let row =
+            sqlx::query("SELECT evidence_id, transcript, audio_end_time FROM transcript_evidence")
+                .fetch_one(&pool)
+                .await
+                .expect("redelivered final evidence");
 
         assert_eq!(count, 1);
         assert_eq!(row.get::<String, _>("evidence_id"), EVIDENCE_ID);
@@ -299,7 +413,10 @@ mod transcript_evidence_repository_tests {
         .execute(&pool)
         .await;
 
-        assert!(result.is_err(), "partial text must never enter evidence storage");
+        assert!(
+            result.is_err(),
+            "partial text must never enter evidence storage"
+        );
         let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM transcript_evidence")
             .fetch_one(&pool)
             .await

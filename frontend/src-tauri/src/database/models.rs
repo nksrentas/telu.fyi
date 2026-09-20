@@ -52,6 +52,23 @@ impl MeetingCompleteness {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(rename_all = "snake_case")]
+pub enum CaptureCompleteness {
+    Complete,
+    Incomplete,
+}
+
+impl CaptureCompleteness {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Complete => "complete",
+            Self::Incomplete => "incomplete",
+        }
+    }
+}
+
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct MeetingModel {
     pub id: String,
@@ -92,6 +109,35 @@ pub struct Transcript {
 }
 
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
+pub struct TranscriptEvidence {
+    pub evidence_id: String,
+    pub meeting_id: String,
+    pub source_track: String,
+    pub source_segment_key: String,
+    pub sequence: i64,
+    pub transcript: String,
+    pub audio_start_time: f64,
+    pub audio_end_time: f64,
+    pub is_final: bool,
+    pub capture_completeness: CaptureCompleteness,
+    pub created_at: DateTimeUtc,
+    pub updated_at: DateTimeUtc,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TranscriptEvidenceInput {
+    pub evidence_id: String,
+    pub meeting_id: String,
+    pub source_track: String,
+    pub source_segment_key: String,
+    pub sequence: i64,
+    pub transcript: String,
+    pub audio_start_time: f64,
+    pub audio_end_time: f64,
+    pub capture_completeness: CaptureCompleteness,
+}
+
+#[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct SummaryProcess {
     pub meeting_id: String,
     pub status: String,
@@ -103,7 +149,7 @@ pub struct SummaryProcess {
     pub end_time: Option<chrono::DateTime<chrono::Utc>>,
     pub chunk_count: i64,
     pub processing_time: f64,
-    pub metadata: Option<String>, // JSON
+    pub metadata: Option<String>,      // JSON
     pub result_backup: Option<String>, // Backup of result before regeneration
     pub result_backup_timestamp: Option<chrono::DateTime<chrono::Utc>>, // When backup was created
 }
@@ -155,9 +201,9 @@ pub struct Setting {
 impl Setting {
     /// Parse the custom OpenAI config from JSON string
     pub fn get_custom_openai_config(&self) -> Option<crate::summary::CustomOpenAIConfig> {
-        self.custom_openai_config.as_ref().and_then(|json| {
-            serde_json::from_str(json).ok()
-        })
+        self.custom_openai_config
+            .as_ref()
+            .and_then(|json| serde_json::from_str(json).ok())
     }
 }
 
