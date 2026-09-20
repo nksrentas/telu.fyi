@@ -137,6 +137,37 @@ pub struct TranscriptEvidenceInput {
     pub capture_completeness: CaptureCompleteness,
 }
 
+/// One durable capture or transcript gap carried through interrupted-session
+/// recovery. `None` bounds are serialized as explicit `null` values so callers
+/// can distinguish an unknown interval from an omitted field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GapFact {
+    pub gap_id: String,
+    pub meeting_id: String,
+    pub gap_kind: String,
+    pub reason_code: String,
+    pub audio_start_ms: Option<u64>,
+    pub audio_end_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RecoveryRequest {
+    pub meeting_id: String,
+    pub evidence: Vec<TranscriptEvidenceInput>,
+    pub gaps: Vec<GapFact>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecoveryResult {
+    pub meeting_id: String,
+    pub lifecycle: MeetingLifecycle,
+    pub completeness: MeetingCompleteness,
+    pub evidence_count: u64,
+    pub gap_count: u64,
+    pub gaps: Vec<GapFact>,
+    pub reconciled_at_utc: String,
+}
+
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct SummaryProcess {
     pub meeting_id: String,

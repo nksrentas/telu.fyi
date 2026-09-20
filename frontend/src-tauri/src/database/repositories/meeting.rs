@@ -1,7 +1,7 @@
 use crate::api::{MeetingDetails, MeetingTranscript};
 use crate::audio::transcription::QueueSnapshot;
-use crate::database::models::{MeetingModel, Transcript};
 pub use crate::database::models::{MeetingCompleteness, MeetingLifecycle};
+use crate::database::models::{MeetingModel, RecoveryRequest, RecoveryResult, Transcript};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteRow, Connection, Error as SqlxError, Row, SqliteConnection, SqlitePool};
@@ -52,7 +52,33 @@ pub struct FinalizationSnapshot {
     pub reason_codes: Vec<String>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum RecoveryRepositoryError {
+    #[error("invalid recovery request")]
+    InvalidRequest,
+    #[error("canonical meeting not found")]
+    MeetingNotFound,
+    #[error("meeting lifecycle is not recoverable")]
+    StaleMeeting,
+    #[error("recovery item belongs to another meeting")]
+    CrossMeetingScope,
+    #[error("stable recovery identity conflicts with durable state")]
+    IdentityConflict,
+    #[error("recovery storage failed")]
+    Storage(#[from] SqlxError),
+}
+
 impl MeetingsRepository {
+    /// Reconcile crash-staged final evidence and gap facts into one canonical
+    /// meeting. The RED-phase contract intentionally fails until the
+    /// transactional implementation is supplied.
+    pub async fn reconcile_meeting(
+        _pool: &SqlitePool,
+        _request: &RecoveryRequest,
+    ) -> Result<RecoveryResult, RecoveryRepositoryError> {
+        Err(RecoveryRepositoryError::InvalidRequest)
+    }
+
     /// Create the canonical meeting row before native capture is allowed to start.
     ///
     /// The identifier is always minted here in Rust. Callers receive it only
@@ -1070,5 +1096,271 @@ mod finalization_repository_tests {
         .unwrap();
         assert_eq!(finalization_count.0, 1);
         assert_eq!(gap_count.0, 1);
+    }
+}
+
+#[cfg(test)]
+mod meeting_recovery_repository_tests {
+    use super::{MeetingsRepository, RecoveryRepositoryError};
+    use crate::database::models::{
+        CaptureCompleteness, GapFact, MeetingCompleteness, MeetingLifecycle, RecoveryRequest,
+        TranscriptEvidenceInput,
+    };
+    use crate::database::repositories::transcript::TranscriptsRepository;
+    use sqlx::{sqlite::SqlitePoolOptions, Row, SqlitePool};
+    use uuid::Uuid;
+
+    async fn recovery_pool() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory recovery database");
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("fresh recovery migrations");
+        pool
+    }
+
+    async fn concurrent_recovery_pool() -> SqlitePool {
+        let directory = tempfile::tempdir().expect("recovery database directory");
+        let path = directory.keep().join("meeting-recovery.sqlite");
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let pool = SqlitePoolOptions::new()
+            .max_connections(4)
+            .connect(&url)
+            .await
+            .expect("concurrent recovery database");
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("fresh recovery migrations");
+        pool
+    }
+
+    fn evidence(meeting_id: &str, evidence_id: &str, source_key: &str) -> TranscriptEvidenceInput {
+        TranscriptEvidenceInput {
+            evidence_id: evidence_id.to_string(),
+            meeting_id: meeting_id.to_string(),
+            source_track: "mixed".to_string(),
+            source_segment_key: source_key.to_string(),
+            sequence: 1,
+            transcript: "durable final".to_string(),
+            audio_start_time: 1.25,
+            audio_end_time: 2.5,
+            capture_completeness: CaptureCompleteness::Complete,
+        }
+    }
+
+    fn gap(meeting_id: &str, gap_id: &str) -> GapFact {
+        GapFact {
+            gap_id: gap_id.to_string(),
+            meeting_id: meeting_id.to_string(),
+            gap_kind: "transcript_interval".to_string(),
+            reason_code: "device_lost".to_string(),
+            audio_start_ms: Some(2_500),
+            audio_end_ms: Some(3_000),
+        }
+    }
+
+    #[tokio::test]
+    async fn meeting_recovery_repository_reuses_canonical_meeting_and_evidence_ids() {
+        let pool = recovery_pool().await;
+        let meeting = MeetingsRepository::create_session(&pool, "Interrupted review")
+            .await
+            .expect("canonical meeting");
+        let evidence_id = Uuid::new_v4().to_string();
+        let staged_evidence = evidence(&meeting.meeting_id, &evidence_id, "segment-1");
+        TranscriptsRepository::upsert_final_evidence(&pool, &staged_evidence)
+            .await
+            .expect("already durable final evidence");
+
+        let result = MeetingsRepository::reconcile_meeting(
+            &pool,
+            &RecoveryRequest {
+                meeting_id: meeting.meeting_id.clone(),
+                evidence: vec![staged_evidence],
+                gaps: vec![gap(&meeting.meeting_id, "gap-device-1")],
+            },
+        )
+        .await;
+
+        assert!(result.is_ok(), "same-ID recovery must reconcile in place");
+        let result = result.unwrap();
+        assert_eq!(result.meeting_id, meeting.meeting_id);
+        assert_eq!(result.lifecycle, MeetingLifecycle::Recovered);
+        assert_eq!(result.completeness, MeetingCompleteness::RecoveredWithGaps);
+        let meeting_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meetings")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let evidence_row = sqlx::query(
+            "SELECT evidence_id, meeting_id FROM transcript_evidence WHERE evidence_id = ?",
+        )
+        .bind(&evidence_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(meeting_count, 1);
+        assert_eq!(evidence_row.get::<String, _>("evidence_id"), evidence_id);
+        assert_eq!(
+            evidence_row.get::<String, _>("meeting_id"),
+            result.meeting_id
+        );
+    }
+
+    #[tokio::test]
+    async fn meeting_recovery_repository_repeat_preserves_ids_counts_and_result() {
+        let pool = recovery_pool().await;
+        let meeting = MeetingsRepository::create_session(&pool, "Repeated recovery")
+            .await
+            .unwrap();
+        let evidence_id = Uuid::new_v4().to_string();
+        let request = RecoveryRequest {
+            meeting_id: meeting.meeting_id.clone(),
+            evidence: vec![evidence(
+                &meeting.meeting_id,
+                &evidence_id,
+                "segment-repeat",
+            )],
+            gaps: vec![gap(&meeting.meeting_id, "gap-repeat")],
+        };
+
+        let first = MeetingsRepository::reconcile_meeting(&pool, &request)
+            .await
+            .expect("first recovery");
+        let repeated = MeetingsRepository::reconcile_meeting(&pool, &request)
+            .await
+            .expect("repeated recovery");
+
+        assert_eq!(repeated, first);
+        assert_eq!(repeated.evidence_count, 1);
+        assert_eq!(repeated.gap_count, 1);
+        assert_eq!(repeated.gaps[0].gap_id, "gap-repeat");
+        let meeting_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meetings")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(meeting_count, 1);
+    }
+
+    #[tokio::test]
+    async fn meeting_recovery_repository_interruption_rolls_back_then_resumes_same_ids() {
+        let pool = recovery_pool().await;
+        let target = MeetingsRepository::create_session(&pool, "Recovery target")
+            .await
+            .unwrap();
+        let other = MeetingsRepository::create_session(&pool, "Other meeting")
+            .await
+            .unwrap();
+        let conflicting_id = Uuid::new_v4().to_string();
+        TranscriptsRepository::upsert_final_evidence(
+            &pool,
+            &evidence(&other.meeting_id, &conflicting_id, "other-segment"),
+        )
+        .await
+        .unwrap();
+        let new_id = Uuid::new_v4().to_string();
+        let interrupted = RecoveryRequest {
+            meeting_id: target.meeting_id.clone(),
+            evidence: vec![
+                evidence(&target.meeting_id, &new_id, "target-new"),
+                evidence(&target.meeting_id, &conflicting_id, "target-conflict"),
+            ],
+            gaps: vec![gap(&target.meeting_id, "gap-after-write")],
+        };
+
+        let error = MeetingsRepository::reconcile_meeting(&pool, &interrupted)
+            .await
+            .expect_err("cross-meeting stable ID must abort the transaction");
+        assert!(matches!(
+            error,
+            RecoveryRepositoryError::CrossMeetingScope | RecoveryRepositoryError::IdentityConflict
+        ));
+        let rolled_back: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM transcript_evidence WHERE evidence_id = ?")
+                .bind(&new_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(rolled_back, 0, "the earlier insert must roll back");
+
+        let resumed = RecoveryRequest {
+            meeting_id: target.meeting_id.clone(),
+            evidence: vec![evidence(&target.meeting_id, &new_id, "target-new")],
+            gaps: vec![gap(&target.meeting_id, "gap-after-write")],
+        };
+        let result = MeetingsRepository::reconcile_meeting(&pool, &resumed)
+            .await
+            .expect("same IDs must succeed after interrupted rollback");
+        assert_eq!(result.meeting_id, target.meeting_id);
+        assert_eq!(result.evidence_count, 1);
+        assert_eq!(
+            result.gap_count, 2,
+            "active interruption retains uncertain tail"
+        );
+    }
+
+    #[tokio::test]
+    async fn meeting_recovery_repository_concurrent_attempts_serialize_and_cross_scope_is_rejected()
+    {
+        let pool = concurrent_recovery_pool().await;
+        let meeting = MeetingsRepository::create_session(&pool, "Concurrent recovery")
+            .await
+            .unwrap();
+        let evidence_id = Uuid::new_v4().to_string();
+        let request = RecoveryRequest {
+            meeting_id: meeting.meeting_id.clone(),
+            evidence: vec![evidence(&meeting.meeting_id, &evidence_id, "segment-race")],
+            gaps: vec![gap(&meeting.meeting_id, "gap-race")],
+        };
+
+        let first_pool = pool.clone();
+        let first_request = request.clone();
+        let first = tokio::spawn(async move {
+            MeetingsRepository::reconcile_meeting(&first_pool, &first_request).await
+        });
+        let second_pool = pool.clone();
+        let second_request = request.clone();
+        let second = tokio::spawn(async move {
+            MeetingsRepository::reconcile_meeting(&second_pool, &second_request).await
+        });
+        let (first, second) = tokio::join!(first, second);
+        let first = first.unwrap().expect("first serialized recovery");
+        let second = second.unwrap().expect("second serialized recovery");
+        assert_eq!(first, second);
+
+        let evidence_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM transcript_evidence WHERE meeting_id = ?")
+                .bind(&meeting.meeting_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        let gap_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM meeting_finalization_gaps WHERE meeting_id = ?",
+        )
+        .bind(&meeting.meeting_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!((evidence_count, gap_count), (1, 2));
+
+        let other = MeetingsRepository::create_session(&pool, "Cross scoped")
+            .await
+            .unwrap();
+        let invalid = RecoveryRequest {
+            meeting_id: meeting.meeting_id.clone(),
+            evidence: vec![evidence(
+                &other.meeting_id,
+                &Uuid::new_v4().to_string(),
+                "wrong",
+            )],
+            gaps: Vec::new(),
+        };
+        let error = MeetingsRepository::reconcile_meeting(&pool, &invalid)
+            .await
+            .expect_err("cross-meeting payload must be rejected");
+        assert!(matches!(error, RecoveryRepositoryError::CrossMeetingScope));
     }
 }

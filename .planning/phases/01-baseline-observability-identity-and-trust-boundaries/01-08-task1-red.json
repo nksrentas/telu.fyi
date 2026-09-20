@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml meeting_recovery_repository --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - database::repositories::meeting::meeting_recovery_repository_tests::meeting_recovery_repository_reuses_canonical_meeting_and_evidence_ids\nnot ok 2 - database::repositories::meeting::meeting_recovery_repository_tests::meeting_recovery_repository_repeat_preserves_ids_counts_and_result\nnot ok 3 - database::repositories::meeting::meeting_recovery_repository_tests::meeting_recovery_repository_interruption_rolls_back_then_resumes_same_ids\nnot ok 4 - database::repositories::meeting::meeting_recovery_repository_tests::meeting_recovery_repository_concurrent_attempts_serialize_and_cross_scope_is_rejected\n1..4\n# tests 4\n# pass 0\n# fail 4\n# cancelled 0",
+  "targetTest": "database::repositories::meeting::meeting_recovery_repository_tests::meeting_recovery_repository_reuses_canonical_meeting_and_evidence_ids",
+  "expected": "Recovery reuses one canonical meeting and stable evidence/gap identities, is idempotent across repeats and interruption, and serializes concurrent same-meeting attempts while rejecting cross-meeting scope",
+  "actual": "Four named behavior assertions failed because reconcile_meeting returned the intentional InvalidRequest RED stub instead of transactionally reconciling durable state"
+}
