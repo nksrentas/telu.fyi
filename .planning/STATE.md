@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-09-20T19:22:01.304Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-09-20T19:49:13.383Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: 4e0800441343cf0915ccd881d67f47c57e0f6cf4
+state_head: bf4146b9f4c1c93cb2d5e122ffddd428bdfdb24e
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 4 of 19
+Plan: 5 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P01 | 23min | 2 tasks | 8 files |
 | Phase 01 P02 | 20min | 2 tasks | 13 files |
 | Phase 01 P03 | 19min | 2 tasks | 8 files |
+| Phase 01 P04 | 23min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,9 @@ Recent decisions affecting current work:
 - [Phase 01]: A final segment is identified by its immutable evidence UUID and stable meeting/source tuple; sequence is ordering metadata only.
 - [Phase 01]: Renderer-facing transcript output is canonical only after its evidence transaction commits; partial output remains provisional and non-citable.
 - [Phase 01]: Persistence failures expose a typed incomplete fact with identity, bounds, and transcript length but no transcript content.
+- [Phase 01]: Canonical React and IndexedDB transcript records reuse the Rust evidence UUID; legacy auto-increment cache rows remain separate and noncanonical.
+- [Phase 01]: ui_acknowledged denotes a post-React-commit animation-frame callback measured with Rust Instant, not physical pixel proof.
+- [Phase 01]: Delivery tokens are minted only inside the successful post-persistence canonical emit closure and are single-use, time-limited, and bound to meeting/evidence identity.
 
 ### Pending Todos
 
@@ -105,6 +109,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-20T19:22:01.287Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-09-20T19:49:13.370Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
