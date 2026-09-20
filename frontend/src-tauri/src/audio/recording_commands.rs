@@ -1423,6 +1423,11 @@ pub async fn stop_recording<R: Runtime>(
     IS_RECORDING.store(false, Ordering::SeqCst);
     CURRENT_MEETING.lock().unwrap().take();
     let finalization = finalization_result?;
+    if let Err(error) = manager.mirror_committed_finalization(&finalization) {
+        warn!(
+            "Terminal finalization committed but recording metadata mirror failed: {error}"
+        );
+    }
     *LAST_FINALIZATION.lock().unwrap() = Some(finalization.clone());
 
     let folder_path = meeting_folder.map(|path| path.to_string_lossy().to_string());

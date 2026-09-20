@@ -575,6 +575,17 @@ impl RecordingManager {
         self.recording_saver.get_meeting_name()
     }
 
+    /// Project the already committed terminal lifecycle into the recording
+    /// metadata mirror without granting the filesystem lifecycle authority.
+    pub fn mirror_committed_finalization(
+        &mut self,
+        finalization: &crate::database::repositories::meeting::FinalizationSnapshot,
+    ) -> Result<()> {
+        self.recording_saver
+            .mirror_committed_finalization(finalization)
+            .map_err(anyhow::Error::msg)
+    }
+
     /// Cleanup all resources without saving
     pub async fn cleanup_without_save(&mut self) {
         if self.is_recording() {

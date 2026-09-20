@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use super::recording_state::AudioChunk;
 use super::audio_processing::create_meeting_folder;
 use super::incremental_saver::IncrementalAudioSaver;
+use crate::database::models::{MeetingCompleteness, MeetingLifecycle};
+use crate::database::repositories::meeting::FinalizationSnapshot;
 
 /// Structured transcript segment for JSON export
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +37,10 @@ pub struct MeetingMetadata {
     pub lifecycle: String,
     pub completeness: String,
     pub completeness_reason: Option<String>,
+    #[serde(default)]
+    pub gap_count: u64,
+    #[serde(default)]
+    pub reason_codes: Vec<String>,
     pub devices: DeviceInfo,
     pub audio_file: String,
     pub transcript_file: String,
@@ -296,6 +302,8 @@ impl RecordingSaver {
                 .clone()
                 .ok_or_else(|| anyhow::anyhow!("durable meeting completeness is required"))?,
             completeness_reason: self.completeness_reason.clone(),
+            gap_count: 0,
+            reason_codes: Vec::new(),
             devices: DeviceInfo {
                 microphone: None,  // Could be enhanced to store actual device names
                 system_audio: None,
@@ -510,6 +518,48 @@ impl RecordingSaver {
     pub fn get_meeting_name(&self) -> Option<String> {
         self.meeting_name.clone()
     }
+
+    /// Mirror the terminal SQLite result into recording metadata.
+    ///
+    /// This method accepts only the repository-owned snapshot returned after
+    /// the terminal transaction commits. It never decides that a meeting is
+    /// complete from local file state, queue quietness, or elapsed time.
+    pub fn mirror_committed_finalization(
+        &mut self,
+        finalization: &FinalizationSnapshot,
+    ) -> Result<(), String> {
+        if self.meeting_id.as_deref() != Some(finalization.meeting_id.as_str()) {
+            return Err("committed finalization meeting identity does not match recording metadata".to_string());
+        }
+
+        let completeness = match finalization.lifecycle {
+            MeetingLifecycle::Incomplete => MeetingCompleteness::Incomplete,
+            MeetingLifecycle::Complete => MeetingCompleteness::Complete,
+            _ => return Err("terminal finalization snapshot is required".to_string()),
+        };
+        let folder = self
+            .meeting_folder
+            .clone()
+            .ok_or_else(|| "recording metadata folder is unavailable".to_string())?;
+        let mut metadata = self
+            .metadata
+            .clone()
+            .ok_or_else(|| "recording metadata is unavailable".to_string())?;
+
+        metadata.lifecycle = finalization.lifecycle.as_str().to_string();
+        metadata.completeness = completeness.as_str().to_string();
+        metadata.completeness_reason = finalization.reason_codes.first().cloned();
+        metadata.gap_count = finalization.gap_count;
+        metadata.reason_codes = finalization.reason_codes.clone();
+
+        self.write_metadata(&folder, &metadata)
+            .map_err(|error| format!("failed to mirror committed finalization: {error}"))?;
+        self.lifecycle = Some(metadata.lifecycle.clone());
+        self.completeness = Some(metadata.completeness.clone());
+        self.completeness_reason = metadata.completeness_reason.clone();
+        self.metadata = Some(metadata);
+        Ok(())
+    }
 }
 
 impl Default for RecordingSaver {
@@ -521,6 +571,9 @@ impl Default for RecordingSaver {
 #[cfg(test)]
 mod meeting_identity_propagation_tests {
     use super::{create_meeting_folder, RecordingSaver};
+    use crate::audio::transcription::QueueSnapshot;
+    use crate::database::models::MeetingLifecycle;
+    use crate::database::repositories::meeting::FinalizationSnapshot;
 
     #[test]
     fn meeting_identity_propagation_initial_metadata_contains_committed_state() {
@@ -706,5 +759,58 @@ mod meeting_identity_propagation_tests {
                 && !saver_source.contains("metadata.completeness = \"complete\""),
             "the saver cannot invent a complete lifecycle or completeness value"
         );
+    }
+
+    #[test]
+    fn recording_lifecycle_mirror_preserves_incomplete_terminal_facts() {
+        let meeting_id = "018f5e27-2f68-7e27-9c90-7c72123141ae";
+        let folder = tempfile::tempdir().expect("temporary recording folder");
+        let mut saver = RecordingSaver::new();
+        saver.set_meeting_name(Some("Weekly sync".to_string()));
+        saver.set_meeting_identity(
+            meeting_id.to_string(),
+            "preparing".to_string(),
+            "pending".to_string(),
+            None,
+        );
+        saver.meeting_folder = Some(folder.path().to_path_buf());
+        saver.metadata = Some(
+            saver
+                .build_initial_metadata(meeting_id, "Weekly sync", false)
+                .expect("initial metadata"),
+        );
+        let finalization = FinalizationSnapshot {
+            meeting_id: meeting_id.to_string(),
+            lifecycle: MeetingLifecycle::Incomplete,
+            queue: QueueSnapshot {
+                capacity: 8,
+                depth: 0,
+                active: 0,
+                oldest_age_ms: None,
+                accepted: 1,
+                started: 1,
+                completed: 0,
+                failed: 1,
+                cancelled: 0,
+                superseded: 0,
+                rejected: 0,
+            },
+            deadline_at_utc: "2026-09-20T21:00:00Z".to_string(),
+            deadline_ms: 120_000,
+            remaining_work_ids: Vec::new(),
+            gap_count: 1,
+            reason_codes: vec!["transcription_failed".to_string()],
+        };
+
+        saver
+            .mirror_committed_finalization(&finalization)
+            .expect("committed incomplete mirror");
+
+        let metadata = saver.metadata.expect("mirrored metadata");
+        assert_eq!(metadata.meeting_id, meeting_id);
+        assert_eq!(metadata.lifecycle, "incomplete");
+        assert_eq!(metadata.completeness, "incomplete");
+        assert_eq!(metadata.gap_count, 1);
+        assert_eq!(metadata.reason_codes, vec!["transcription_failed"]);
     }
 }

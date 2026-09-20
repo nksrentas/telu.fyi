@@ -64,6 +64,45 @@ export interface TranscriptionStatus {
   last_activity_ms: number;
 }
 
+export interface QueueSnapshot {
+  capacity: number;
+  depth: number;
+  active: number;
+  oldest_age_ms: number | null;
+  accepted: number;
+  started: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  superseded: number;
+  rejected: number;
+}
+
+export interface FinalizationSnapshot {
+  meeting_id: string;
+  lifecycle: 'complete' | 'incomplete';
+  queue: QueueSnapshot;
+  deadline_at_utc: string;
+  deadline_ms: number;
+  remaining_work_ids: string[];
+  gap_count: number;
+  reason_codes: string[];
+}
+
+export interface FinalizationProgressSnapshot {
+  meeting_id: string;
+  lifecycle: 'finalizing';
+  queue: QueueSnapshot;
+  deadline_at_utc: string;
+  deadline_ms: number;
+}
+
+export interface RecordingStoppedPayload {
+  message: string;
+  meeting_name?: string;
+  finalization: FinalizationSnapshot;
+}
+
 export interface TranscriptionErrorPayload {
   error: string;
   userMessage: string;
@@ -106,6 +145,11 @@ export class TranscriptService {
     return invoke<TranscriptionStatus>('get_transcription_status');
   }
 
+  /** Read the last Rust/SQLite-owned terminal state without deriving one. */
+  async getCurrentFinalization(): Promise<FinalizationSnapshot | null> {
+    return invoke<FinalizationSnapshot | null>('get_transcription_status');
+  }
+
   async acknowledgeTranscriptVisible(
     deliveryToken: string,
     meetingId: string,
@@ -138,6 +182,22 @@ export class TranscriptService {
    */
   async onTranscriptionComplete(callback: () => void): Promise<UnlistenFn> {
     return listen('transcription-complete', callback);
+  }
+
+  async onFinalizationProgress(
+    callback: (snapshot: FinalizationProgressSnapshot) => void,
+  ): Promise<UnlistenFn> {
+    return listen<FinalizationProgressSnapshot>('recording-finalization-progress', (event) => {
+      callback(event.payload);
+    });
+  }
+
+  async onRecordingStopped(
+    callback: (payload: RecordingStoppedPayload) => void,
+  ): Promise<UnlistenFn> {
+    return listen<RecordingStoppedPayload>('recording-stopped', (event) => {
+      callback(event.payload);
+    });
   }
 
   /**
