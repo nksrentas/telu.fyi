@@ -14,6 +14,26 @@ export interface RecordingState {
   is_active: boolean;
   recording_duration: number | null;
   active_duration: number | null;
+  meeting_id: string | null;
+  meeting_lifecycle: MeetingLifecycle | null;
+  meeting_title: string | null;
+  meeting_started_at_utc: string | null;
+}
+
+export type MeetingLifecycle =
+  | 'preparing'
+  | 'recording'
+  | 'finalizing'
+  | 'complete'
+  | 'incomplete'
+  | 'recovered'
+  | 'legacy';
+
+export interface StartMeetingResult {
+  meeting_id: string;
+  lifecycle: MeetingLifecycle;
+  title: string;
+  started_at_utc: string;
 }
 
 export interface RecordingStoppedPayload {
@@ -74,10 +94,10 @@ export class RecordingService {
 
   /**
    * Start recording (no device configuration)
-   * @returns Promise<void>
+   * @returns Promise with the canonical Rust-owned meeting identity
    */
-  async startRecording(): Promise<void> {
-    return withStartTimeout(invoke('start_recording'));
+  async startRecording(): Promise<StartMeetingResult> {
+    return withStartTimeout(invoke<StartMeetingResult>('start_recording'));
   }
 
   /**
@@ -85,14 +105,14 @@ export class RecordingService {
    * @param micDeviceName - Microphone device name (null for default)
    * @param systemDeviceName - System audio device name (null for default)
    * @param meetingName - Meeting name/title
-   * @returns Promise<void>
+   * @returns Promise with the canonical Rust-owned meeting identity
    */
   async startRecordingWithDevices(
     micDeviceName: string | null,
     systemDeviceName: string | null,
     meetingName: string
-  ): Promise<void> {
-    return withStartTimeout(invoke('start_recording_with_devices_and_meeting', {
+  ): Promise<StartMeetingResult> {
+    return withStartTimeout(invoke<StartMeetingResult>('start_recording_with_devices_and_meeting', {
       micDeviceName,
       systemDeviceName,
       meetingName
@@ -133,8 +153,10 @@ export class RecordingService {
    * @param callback - Function to call when recording starts
    * @returns Promise that resolves to unlisten function
    */
-  async onRecordingStarted(callback: () => void): Promise<UnlistenFn> {
-    return listen('recording-started', callback);
+  async onRecordingStarted(callback: (payload: StartMeetingResult) => void): Promise<UnlistenFn> {
+    return listen<StartMeetingResult>('recording-started', (event) => {
+      callback(event.payload);
+    });
   }
 
   /**

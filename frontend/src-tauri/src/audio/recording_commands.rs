@@ -6,12 +6,18 @@
 use anyhow::Result;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
+use sqlx::{Error as SqlxError, SqlitePool};
+use std::future::Future;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::task::JoinHandle;
+
+use crate::database::repositories::meeting::MeetingsRepository;
+pub use crate::database::repositories::meeting::StartMeetingResult;
+use crate::state::AppState;
 
 use super::{
     recording_manager::RecordingStartError,
@@ -106,9 +112,15 @@ static TRANSCRIPTION_TASK: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 // Listener ID for proper cleanup - prevents microphone from staying active after recording stops
 static TRANSCRIPT_LISTENER_ID: Mutex<Option<tauri::EventId>> = Mutex::new(None);
 
+// Canonical identity for the live native session. This is a projection of the
+// committed SQLite row and exists only to support event redelivery/page reload;
+// it never mints or remaps an ID.
+static CURRENT_MEETING: Mutex<Option<StartMeetingResult>> = Mutex::new(None);
+
 const TRANSCRIPTION_RUNTIME_START_ERROR_CODE: &str =
     "TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED";
 const TRANSCRIPTION_RUNTIME_USER_MESSAGE: &str = "Speech recognition could not initialize. Restart Meetily. If the problem continues, repair or reinstall the app.";
+const MEETING_IDENTITY_PERSISTENCE_ERROR_CODE: &str = "MEETING_IDENTITY_PERSISTENCE_FAILED";
 
 // ============================================================================
 // PUBLIC TYPES
@@ -124,6 +136,55 @@ pub struct TranscriptionStatus {
     pub chunks_in_queue: usize,
     pub is_processing: bool,
     pub last_activity_ms: u64,
+}
+
+#[derive(Debug)]
+enum StartMeetingFailure {
+    IdentityPersistence(SqlxError),
+    Capture(RecordingStartError),
+}
+
+/// Commit the Rust-owned meeting identity before invoking the native capture
+/// closure. Keeping this ordering in one helper makes the failure invariant
+/// directly testable without touching physical audio devices.
+async fn persist_session_before_capture<T, F, Fut>(
+    pool: &SqlitePool,
+    title: String,
+    start_capture: F,
+) -> Result<(StartMeetingResult, T), StartMeetingFailure>
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<T, RecordingStartError>>,
+{
+    let start_result = MeetingsRepository::create_session(pool, title)
+        .await
+        .map_err(StartMeetingFailure::IdentityPersistence)?;
+    let capture = start_capture()
+        .await
+        .map_err(StartMeetingFailure::Capture)?;
+    Ok((start_result, capture))
+}
+
+fn recording_database_pool<R: Runtime>(app: &AppHandle<R>) -> Result<SqlitePool, String> {
+    app.try_state::<AppState>()
+        .map(|state| state.db_manager.pool().clone())
+        .ok_or_else(|| MEETING_IDENTITY_PERSISTENCE_ERROR_CODE.to_string())
+}
+
+fn map_start_meeting_failure<R: Runtime>(
+    app: &AppHandle<R>,
+    failure: StartMeetingFailure,
+) -> String {
+    match failure {
+        StartMeetingFailure::IdentityPersistence(_source) => {
+            error!(
+                "Recording start blocked before capture; code={}",
+                MEETING_IDENTITY_PERSISTENCE_ERROR_CODE
+            );
+            MEETING_IDENTITY_PERSISTENCE_ERROR_CODE.to_string()
+        }
+        StartMeetingFailure::Capture(error) => map_recording_start_error(app, error),
+    }
 }
 
 fn map_recording_start_error<R: Runtime>(
@@ -299,7 +360,9 @@ async fn prepare_audio_for_recording(
 // ============================================================================
 
 /// Start recording with default devices
-pub async fn start_recording<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+pub async fn start_recording<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<StartMeetingResult, String> {
     start_recording_with_meeting_name(app, None).await
 }
 
@@ -307,7 +370,7 @@ pub async fn start_recording<R: Runtime>(app: AppHandle<R>) -> Result<(), String
 pub async fn start_recording_with_meeting_name<R: Runtime>(
     app: AppHandle<R>,
     meeting_name: Option<String>,
-) -> Result<(), String> {
+) -> Result<StartMeetingResult, String> {
     info!(
         "Starting recording with default devices, meeting: {:?}",
         meeting_name
@@ -380,9 +443,6 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     // Async-first approach - no more blocking operations!
     info!("🚀 Starting async recording initialization");
 
-    // Create new recording manager only after startup validation succeeds
-    let mut manager = RecordingManager::new();
-
     // Always ensure a meeting name is set so incremental saver initializes
     let effective_meeting_name = meeting_name.clone().unwrap_or_else(|| {
         // Example: Meeting 2025-10-03_08-25-23
@@ -392,7 +452,13 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
             now.format("%Y-%m-%d_%H-%M-%S")
         )
     });
-    manager.set_meeting_name(Some(effective_meeting_name));
+
+    let database_pool = recording_database_pool(&app)?;
+
+    // Constructing/configuring the manager is side-effect free. The helper
+    // below commits identity before its closure may start capture.
+    let mut manager = RecordingManager::new();
+    manager.set_meeting_name(Some(effective_meeting_name.clone()));
 
     // Set up error callback
     let app_for_error = app.clone();
@@ -400,11 +466,16 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
         let _ = app_for_error.emit("recording-error", error.user_message());
     });
 
-    // Start recording with resolved devices (replaces start_recording_with_defaults_and_auto_save call)
-    let transcription_receiver = manager
-        .start_recording(microphone_device, system_device, auto_save)
+    // Persist the canonical meeting before native capture can accept audio.
+    let (start_result, (mut manager, transcription_receiver)) =
+        persist_session_before_capture(&database_pool, effective_meeting_name, move || async move {
+            let transcription_receiver = manager
+                .start_recording(microphone_device, system_device, auto_save)
+                .await?;
+            Ok((manager, transcription_receiver))
+        })
         .await
-        .map_err(|error| map_recording_start_error(&app, error))?;
+        .map_err(|failure| map_start_meeting_failure(&app, failure))?;
 
     // Take the device event receiver BEFORE storing manager globally.
     // A background task will process device events (hot-swap) without frontend polling.
@@ -425,6 +496,10 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     // Flip recording live + reset per-session flags (speech-detected latch,
     // mic-recovery budget). Shared with the other start path — see helper.
     finalize_recording_start();
+    {
+        let mut current_meeting = CURRENT_MEETING.lock().unwrap();
+        *current_meeting = Some(start_result.clone());
+    }
     drop(engine_lifecycle_guard);
 
     // Start optimized parallel transcription task and store handle
@@ -468,18 +543,15 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     }
 
     // Emit success event
-    app.emit("recording-started", serde_json::json!({
-        "message": "Recording started successfully with parallel processing",
-        "devices": ["Default Microphone", "Default System Audio"],
-        "workers": 3
-    })).map_err(|e| e.to_string())?;
+    app.emit("recording-started", &start_result)
+        .map_err(|e| e.to_string())?;
 
     // Update tray menu to reflect recording state
     crate::tray::update_tray_menu(&app);
 
     info!("✅ Recording started successfully with async-first approach");
 
-    Ok(())
+    Ok(start_result)
 }
 
 /// Start recording with specific devices
@@ -487,7 +559,7 @@ pub async fn start_recording_with_devices<R: Runtime>(
     app: AppHandle<R>,
     mic_device_name: Option<String>,
     system_device_name: Option<String>,
-) -> Result<(), String> {
+) -> Result<StartMeetingResult, String> {
     start_recording_with_devices_and_meeting(app, mic_device_name, system_device_name, None).await
 }
 
@@ -497,7 +569,7 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     mic_device_name: Option<String>,
     system_device_name: Option<String>,
     meeting_name: Option<String>,
-) -> Result<(), String> {
+) -> Result<StartMeetingResult, String> {
     info!(
         "Starting recording with specific devices: mic={:?}, system={:?}, meeting={:?}",
         mic_device_name, system_device_name, meeting_name
@@ -556,9 +628,6 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     // Async-first approach for custom devices - no more blocking operations!
     info!("🚀 Starting async recording initialization with custom devices");
 
-    // Create new recording manager
-    let mut manager = RecordingManager::new();
-
     // Load recording preferences to check auto_save setting
     let auto_save = match super::recording_preferences::load_recording_preferences(&app).await {
         Ok(prefs) => {
@@ -579,7 +648,11 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
             now.format("%Y-%m-%d_%H-%M-%S")
         )
     });
-    manager.set_meeting_name(Some(effective_meeting_name));
+
+    let database_pool = recording_database_pool(&app)?;
+
+    let mut manager = RecordingManager::new();
+    manager.set_meeting_name(Some(effective_meeting_name.clone()));
 
     // Set up error callback
     let app_for_error = app.clone();
@@ -587,11 +660,16 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
         let _ = app_for_error.emit("recording-error", error.user_message());
     });
 
-    // Start recording with specified devices and auto_save setting
-    let transcription_receiver = manager
-        .start_recording(mic_device, system_device, auto_save)
+    // Persist the canonical meeting before native capture can accept audio.
+    let (start_result, (mut manager, transcription_receiver)) =
+        persist_session_before_capture(&database_pool, effective_meeting_name, move || async move {
+            let transcription_receiver = manager
+                .start_recording(mic_device, system_device, auto_save)
+                .await?;
+            Ok((manager, transcription_receiver))
+        })
         .await
-        .map_err(|error| map_recording_start_error(&app, error))?;
+        .map_err(|failure| map_start_meeting_failure(&app, failure))?;
 
     // Take the device event receiver BEFORE storing manager globally.
     // A background task will process device events (hot-swap) without frontend polling.
@@ -612,6 +690,10 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     // Flip recording live + reset per-session flags (speech-detected latch,
     // mic-recovery budget). Shared with the other start path — see helper.
     finalize_recording_start();
+    {
+        let mut current_meeting = CURRENT_MEETING.lock().unwrap();
+        *current_meeting = Some(start_result.clone());
+    }
     drop(engine_lifecycle_guard);
 
     // Start optimized parallel transcription task and store handle
@@ -655,21 +737,15 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     }
 
     // Emit success event
-    app.emit("recording-started", serde_json::json!({
-        "message": "Recording started with custom devices and parallel processing",
-        "devices": [
-            mic_device_name.unwrap_or_else(|| "Default Microphone".to_string()),
-            system_device_name.unwrap_or_else(|| "Default System Audio".to_string())
-        ],
-        "workers": 3
-    })).map_err(|e| e.to_string())?;
+    app.emit("recording-started", &start_result)
+        .map_err(|e| e.to_string())?;
 
     // Update tray menu to reflect recording state
     crate::tray::update_tray_menu(&app);
 
     info!("✅ Recording started with custom devices using async-first approach");
 
-    Ok(())
+    Ok(start_result)
 }
 
 /// Stop recording with optimized graceful shutdown ensuring NO transcript chunks are lost
@@ -1049,6 +1125,7 @@ pub async fn stop_recording<R: Runtime>(
     // Set recording flag to false
     info!("🔍 Setting IS_RECORDING to false");
     IS_RECORDING.store(false, Ordering::SeqCst);
+    CURRENT_MEETING.lock().unwrap().take();
     // IS_RECORDING_STOPPING is cleared by _stopping_guard on scope exit.
 
     // Step 4.5: Prepare metadata for frontend (NO database save)
@@ -1195,6 +1272,7 @@ pub async fn is_recording_paused() -> bool {
 pub async fn get_recording_state() -> serde_json::Value {
     let is_recording = IS_RECORDING.load(Ordering::SeqCst);
     let manager_guard = RECORDING_MANAGER.lock().unwrap();
+    let current_meeting = CURRENT_MEETING.lock().unwrap().clone();
 
     if let Some(manager) = manager_guard.as_ref() {
         serde_json::json!({
@@ -1203,6 +1281,10 @@ pub async fn get_recording_state() -> serde_json::Value {
             "is_active": manager.is_active(),
             "recording_duration": manager.get_recording_duration(),
             "active_duration": manager.get_active_recording_duration(),
+            "meeting_id": current_meeting.as_ref().map(|meeting| meeting.meeting_id.clone()),
+            "meeting_lifecycle": current_meeting.as_ref().map(|meeting| meeting.lifecycle),
+            "meeting_title": current_meeting.as_ref().map(|meeting| meeting.title.clone()),
+            "meeting_started_at_utc": current_meeting.as_ref().map(|meeting| meeting.started_at_utc.clone()),
             "total_pause_duration": manager.get_total_pause_duration(),
             "current_pause_duration": manager.get_current_pause_duration()
         })
@@ -1213,6 +1295,10 @@ pub async fn get_recording_state() -> serde_json::Value {
             "is_active": false,
             "recording_duration": null,
             "active_duration": null,
+            "meeting_id": current_meeting.as_ref().map(|meeting| meeting.meeting_id.clone()),
+            "meeting_lifecycle": current_meeting.as_ref().map(|meeting| meeting.lifecycle),
+            "meeting_title": current_meeting.as_ref().map(|meeting| meeting.title.clone()),
+            "meeting_started_at_utc": current_meeting.as_ref().map(|meeting| meeting.started_at_utc.clone()),
             "total_pause_duration": 0.0,
             "current_pause_duration": null
         })
@@ -1698,6 +1784,13 @@ async fn trigger_mic_fallback_to_default<R: Runtime>(
 
 #[cfg(test)]
 mod meeting_identity_contract_tests {
+    use super::{persist_session_before_capture, StartMeetingFailure};
+    use sqlx::SqlitePool;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
     #[test]
     fn meeting_identity_is_persisted_before_capture_start() {
         let source = include_str!("recording_commands.rs");
@@ -1731,5 +1824,38 @@ mod meeting_identity_contract_tests {
             !context.contains(concat!("meeting-${Date.", "now()}")),
             "TranscriptContext must not mint a timestamp meeting identity"
         );
+    }
+
+    #[tokio::test]
+    async fn meeting_identity_persistence_failure_blocks_capture() {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        let capture_started = Arc::new(AtomicBool::new(false));
+        let capture_probe = Arc::clone(&capture_started);
+
+        let result = persist_session_before_capture(
+            &pool,
+            "Failure injection".to_string(),
+            move || async move {
+                capture_probe.store(true, Ordering::SeqCst);
+                Ok(())
+            },
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(StartMeetingFailure::IdentityPersistence(_))
+        ));
+        assert!(!capture_started.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn meeting_identity_event_and_command_return_share_the_same_result() {
+        let source = include_str!("recording_commands.rs");
+        assert!(source.contains(concat!(
+            "app.emit(\"recording-started\", &start_",
+            "result)"
+        )));
+        assert!(source.contains(concat!("Ok(start_", "result)")));
     }
 }

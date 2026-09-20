@@ -1,12 +1,138 @@
 use crate::api::{MeetingDetails, MeetingTranscript};
 use crate::database::models::{MeetingModel, Transcript};
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use sqlx::{Connection, Error as SqlxError, SqliteConnection, SqlitePool};
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub struct MeetingsRepository;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeetingLifecycle {
+    Preparing,
+    Recording,
+    Finalizing,
+    Complete,
+    Incomplete,
+    Recovered,
+    Legacy,
+}
+
+impl MeetingLifecycle {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Preparing => "preparing",
+            Self::Recording => "recording",
+            Self::Finalizing => "finalizing",
+            Self::Complete => "complete",
+            Self::Incomplete => "incomplete",
+            Self::Recovered => "recovered",
+            Self::Legacy => "legacy",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MeetingCompleteness {
+    Pending,
+    Complete,
+    Incomplete,
+    RecoveredWithGaps,
+    CompletionNotVerified,
+}
+
+impl MeetingCompleteness {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Complete => "complete",
+            Self::Incomplete => "incomplete",
+            Self::RecoveredWithGaps => "recovered_with_gaps",
+            Self::CompletionNotVerified => "completion_not_verified",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StartMeetingResult {
+    pub meeting_id: String,
+    pub lifecycle: MeetingLifecycle,
+    pub title: String,
+    pub started_at_utc: String,
+}
+
 impl MeetingsRepository {
+    /// Create the canonical meeting row before native capture is allowed to start.
+    ///
+    /// The identifier is always minted here in Rust. Callers receive it only
+    /// after the insert transaction commits, so a renderer can transport the
+    /// identity but cannot create or replace it.
+    pub async fn create_session(
+        pool: &SqlitePool,
+        title: impl Into<String>,
+    ) -> Result<StartMeetingResult, SqlxError> {
+        let title = title.into();
+        if title.trim().is_empty() {
+            return Err(SqlxError::Protocol(
+                "meeting title cannot be empty".to_string(),
+            ));
+        }
+
+        let meeting_id = Uuid::new_v4().to_string();
+        let started_at = Utc::now();
+        let started_at_utc = started_at.to_rfc3339();
+        let lifecycle = MeetingLifecycle::Preparing;
+        let completeness = MeetingCompleteness::Pending;
+
+        let mut transaction = pool.begin().await?;
+        let insert_result = sqlx::query(
+            "INSERT INTO meetings (
+                id,
+                title,
+                created_at,
+                updated_at,
+                lifecycle,
+                completeness,
+                completeness_reason,
+                started_at_utc
+            ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?)",
+        )
+        .bind(&meeting_id)
+        .bind(&title)
+        .bind(started_at)
+        .bind(started_at)
+        .bind(lifecycle.as_str())
+        .bind(completeness.as_str())
+        .bind(&started_at_utc)
+        .execute(&mut *transaction)
+        .await;
+
+        match insert_result {
+            Ok(result) if result.rows_affected() == 1 => {
+                transaction.commit().await?;
+                Ok(StartMeetingResult {
+                    meeting_id,
+                    lifecycle,
+                    title,
+                    started_at_utc,
+                })
+            }
+            Ok(_) => {
+                let _ = transaction.rollback().await;
+                Err(SqlxError::Protocol(
+                    "canonical meeting insert did not create exactly one row".to_string(),
+                ))
+            }
+            Err(error) => {
+                let _ = transaction.rollback().await;
+                Err(error)
+            }
+        }
+    }
+
     pub async fn get_meetings(pool: &SqlitePool) -> Result<Vec<MeetingModel>, sqlx::Error> {
         let meetings =
             sqlx::query_as::<_, MeetingModel>("SELECT * FROM meetings ORDER BY created_at DESC")
@@ -275,7 +401,26 @@ async fn delete_meeting_with_transaction(
 
 #[cfg(test)]
 mod meeting_identity_tests {
+    use super::{MeetingLifecycle, MeetingsRepository};
     use sqlx::{Row, SqlitePool};
+    use uuid::Uuid;
+
+    async fn phase_one_pool() -> SqlitePool {
+        let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::raw_sql(include_str!("../../../migrations/20250916100000_initial_schema.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(include_str!("../../../migrations/20251006000000_add_audio_sync_fields.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::raw_sql(include_str!("../../../migrations/20260920000100_phase1_meeting_identity.sql"))
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool
+    }
 
     #[tokio::test]
     async fn meeting_identity_schema_marks_legacy_rows_unverified() {
@@ -344,6 +489,41 @@ mod meeting_identity_tests {
         assert!(
             source.contains(concat!("transaction.", "commit().await")),
             "session creation must commit through a SQLx transaction"
+        );
+    }
+
+    #[tokio::test]
+    async fn meeting_identity_create_session_commits_one_rust_owned_id() {
+        let pool = phase_one_pool().await;
+
+        let result = MeetingsRepository::create_session(&pool, "Planning review")
+            .await
+            .unwrap();
+
+        assert_eq!(result.lifecycle, MeetingLifecycle::Preparing);
+        assert!(Uuid::parse_str(&result.meeting_id).is_ok());
+
+        let row = sqlx::query(
+            "SELECT id, title, lifecycle, completeness, completeness_reason, started_at_utc
+             FROM meetings",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM meetings")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(count.0, 1);
+        assert_eq!(row.get::<String, _>("id"), result.meeting_id);
+        assert_eq!(row.get::<String, _>("title"), result.title);
+        assert_eq!(row.get::<String, _>("lifecycle"), "preparing");
+        assert_eq!(row.get::<String, _>("completeness"), "pending");
+        assert_eq!(row.get::<Option<String>, _>("completeness_reason"), None);
+        assert_eq!(
+            row.get::<String, _>("started_at_utc"),
+            result.started_at_utc
         );
     }
 }

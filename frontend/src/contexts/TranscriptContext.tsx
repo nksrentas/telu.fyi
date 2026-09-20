@@ -5,7 +5,7 @@ import { Transcript, TranscriptUpdate } from '@/types';
 import { toast } from 'sonner';
 import { useRecordingState } from './RecordingStateContext';
 import { transcriptService } from '@/services/transcriptService';
-import { recordingService } from '@/services/recordingService';
+import { recordingService, StartMeetingResult } from '@/services/recordingService';
 import { indexedDBService } from '@/services/indexedDBService';
 
 interface TranscriptContextType {
@@ -42,6 +42,42 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     transcriptsRef.current = transcripts;
   }, [transcripts]);
+
+  const projectStartMeeting = useCallback(async (payload: StartMeetingResult) => {
+    setCurrentMeetingId(payload.meeting_id);
+
+    // This is a reload transport for the Rust-owned ID, never an identity source.
+    sessionStorage.setItem('indexeddb_current_meeting_id', payload.meeting_id);
+
+    const parsedStartTime = Date.parse(payload.started_at_utc);
+    const startTime = Number.isNaN(parsedStartTime) ? Date.now() : parsedStartTime;
+    await indexedDBService.saveMeetingMetadata({
+      meetingId: payload.meeting_id,
+      title: payload.title,
+      startTime,
+      lastUpdated: Date.now(),
+      transcriptCount: 0,
+      savedToSQLite: false,
+      folderPath: undefined,
+    });
+    setMeetingTitle(payload.title);
+
+    // Fetch folder path from backend and update metadata. The canonical ID is
+    // already durable even when this optional recovery metadata lookup fails.
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const folderPath = await invoke<string>('get_meeting_folder_path');
+      if (folderPath) {
+        const metadata = await indexedDBService.getMeetingMetadata(payload.meeting_id);
+        if (metadata) {
+          metadata.folderPath = folderPath;
+          await indexedDBService.saveMeetingMetadata(metadata);
+        }
+      }
+    } catch (_error) {
+      // Non-fatal: stop will update the recovery metadata if capture completes.
+    }
+  }, []);
 
   // Smart auto-scroll: Track user scroll position
   useEffect(() => {
@@ -92,51 +128,9 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         await indexedDBService.init();
 
         // Listen for recording-started event
-        unlistenRecordingStarted = await recordingService.onRecordingStarted(async () => {
+        unlistenRecordingStarted = await recordingService.onRecordingStarted(async (payload) => {
           try {
-            // Generate unique meeting ID
-            const meetingId = `meeting-${Date.now()}`;
-            setCurrentMeetingId(meetingId);
-
-            // Store in sessionStorage as fallback for markMeetingAsSaved
-            sessionStorage.setItem('indexeddb_current_meeting_id', meetingId);
-            console.log('[Recording Started] 💾 IndexedDB meeting ID stored:', meetingId);
-
-            // Get meeting name
-            const meetingName = await recordingService.getRecordingMeetingName();
-
-            // Use a better fallback that matches the backend's naming pattern
-            const effectiveTitle = meetingName || `Meeting ${new Date().toISOString().slice(0, 19).replace('T', '_').replace(/:/g, '-')}`;
-
-            // Initialize meeting metadata in IndexedDB
-            await indexedDBService.saveMeetingMetadata({
-              meetingId,
-              title: effectiveTitle,
-              startTime: Date.now(),
-              lastUpdated: Date.now(),
-              transcriptCount: 0,
-              savedToSQLite: false,
-              folderPath: undefined // Will update shortly
-            });
-
-            // Synchronize meeting title to state (fixes tray stop title issue)
-            setMeetingTitle(effectiveTitle);
-
-            // Fetch folder path from backend and update metadata
-            // This ensures folder path is persisted even if app crashes
-            try {
-              const { invoke } = await import('@tauri-apps/api/core');
-              const folderPath = await invoke<string>('get_meeting_folder_path');
-              if (folderPath) {
-                const metadata = await indexedDBService.getMeetingMetadata(meetingId);
-                if (metadata) {
-                  metadata.folderPath = folderPath;
-                  await indexedDBService.saveMeetingMetadata(metadata);
-                }
-              }
-            } catch (error) {
-              // Non-fatal - will be set on stop if recording completes normally
-            }
+            await projectStartMeeting(payload);
           } catch (error) {
             console.error('Failed to initialize meeting in IndexedDB:', error);
           }
@@ -175,7 +169,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         console.log('🧹 Recording stopped listener cleaned up');
       }
     };
-  }, [currentMeetingId]);
+  }, [currentMeetingId, projectStartMeeting]);
 
   // Main transcript buffering logic with sequence_id ordering
   useEffect(() => {
@@ -362,6 +356,27 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   // This fixes the issue where reloading during active recording causes state desync
   useEffect(() => {
     const syncFromBackend = async () => {
+      if (recordingState.isRecording && !currentMeetingId) {
+        try {
+          const backendState = await recordingService.getRecordingState();
+          if (
+            backendState.meeting_id &&
+            backendState.meeting_lifecycle &&
+            backendState.meeting_title &&
+            backendState.meeting_started_at_utc
+          ) {
+            await projectStartMeeting({
+              meeting_id: backendState.meeting_id,
+              lifecycle: backendState.meeting_lifecycle,
+              title: backendState.meeting_title,
+              started_at_utc: backendState.meeting_started_at_utc,
+            });
+          }
+        } catch (error) {
+          console.error('[Reload Sync] Failed to restore meeting identity:', error);
+        }
+      }
+
       // If recording is active and we have no local transcripts, sync from backend
       if (recordingState.isRecording && transcripts.length === 0) {
         try {
@@ -402,7 +417,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
     };
 
     syncFromBackend();
-  }, [recordingState.isRecording]); // Run when recording state changes
+  }, [recordingState.isRecording, currentMeetingId, projectStartMeeting]); // Run when recording state changes
 
   // Manual transcript update handler (for RecordingControls component)
   const addTranscript = useCallback((update: TranscriptUpdate) => {
