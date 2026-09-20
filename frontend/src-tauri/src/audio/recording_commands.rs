@@ -509,7 +509,12 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     drop(engine_lifecycle_guard);
 
     // Start optimized parallel transcription task and store handle
-    let task_handle = transcription::start_transcription_task(app.clone(), transcription_receiver);
+    let task_handle = transcription::start_transcription_task(
+        app.clone(),
+        transcription_receiver,
+        database_pool.clone(),
+        start_result.meeting_id.clone(),
+    );
     {
         let mut global_task = TRANSCRIPTION_TASK.lock().unwrap();
         *global_task = Some(task_handle);
@@ -709,7 +714,12 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     drop(engine_lifecycle_guard);
 
     // Start optimized parallel transcription task and store handle
-    let task_handle = transcription::start_transcription_task(app.clone(), transcription_receiver);
+    let task_handle = transcription::start_transcription_task(
+        app.clone(),
+        transcription_receiver,
+        database_pool.clone(),
+        start_result.meeting_id.clone(),
+    );
     {
         let mut global_task = TRANSCRIPTION_TASK.lock().unwrap();
         *global_task = Some(task_handle);

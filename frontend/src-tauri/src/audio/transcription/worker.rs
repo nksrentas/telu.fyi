@@ -5,11 +5,16 @@
 use super::engine::TranscriptionEngine;
 use super::provider::TranscriptionError;
 use crate::audio::AudioChunk;
+use crate::database::models::{CaptureCompleteness, TranscriptEvidence, TranscriptEvidenceInput};
+use crate::database::repositories::transcript::TranscriptsRepository;
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
+use std::future::Future;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Runtime};
+use uuid::Uuid;
 
 // Sequence counter for transcript updates
 static SEQUENCE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -17,10 +22,15 @@ static SEQUENCE_COUNTER: AtomicU64 = AtomicU64::new(0);
 // Speech detection flag - reset per recording session
 static SPEECH_DETECTED_EMITTED: AtomicBool = AtomicBool::new(false);
 
+const TRANSCRIPT_EVIDENCE_PERSISTENCE_FAILED: &str = "TRANSCRIPT_EVIDENCE_PERSISTENCE_FAILED";
+
 /// Reset the speech detected flag for a new recording session
 pub fn reset_speech_detected_flag() {
     SPEECH_DETECTED_EMITTED.store(false, Ordering::SeqCst);
-    info!("🔍 SPEECH_DETECTED_EMITTED reset to: {}", SPEECH_DETECTED_EMITTED.load(Ordering::SeqCst));
+    info!(
+        "🔍 SPEECH_DETECTED_EMITTED reset to: {}",
+        SPEECH_DETECTED_EMITTED.load(Ordering::SeqCst)
+    );
 }
 
 /// Returns true if the transcript text is non-trivial and should be emitted.
@@ -41,7 +51,115 @@ pub struct TranscriptUpdate {
     // NEW: Recording-relative timestamps for playback sync
     pub audio_start_time: f64, // Seconds from recording start (e.g., 125.3)
     pub audio_end_time: f64,   // Seconds from recording start (e.g., 128.6)
-    pub duration: f64,          // Segment duration in seconds (e.g., 3.3)
+    pub duration: f64,         // Segment duration in seconds (e.g., 3.3)
+    pub meeting_id: Option<String>,
+    pub evidence_id: Option<String>,
+    pub source_segment_key: Option<String>,
+    pub is_final: bool,
+    pub is_canonical: bool,
+    pub capture_completeness: Option<CaptureCompleteness>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct TranscriptEvidencePersistenceFailure {
+    pub code: String,
+    pub meeting_id: String,
+    pub evidence_id: String,
+    pub source_track: String,
+    pub source_segment_key: String,
+    pub sequence_id: u64,
+    pub audio_start_time: f64,
+    pub audio_end_time: f64,
+    pub is_final: bool,
+    pub capture_completeness: CaptureCompleteness,
+    pub transcript_length: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FinalEvidencePublication {
+    Published,
+    PersistenceFailed,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_transcript_update(
+    text: String,
+    timestamp: String,
+    source_track: String,
+    source_segment_key: String,
+    meeting_id: String,
+    sequence_id: u64,
+    is_partial: bool,
+    confidence: f32,
+    audio_start_time: f64,
+    audio_end_time: f64,
+) -> TranscriptUpdate {
+    TranscriptUpdate {
+        text,
+        timestamp,
+        source: source_track,
+        sequence_id,
+        chunk_start_time: audio_start_time,
+        is_partial,
+        confidence,
+        audio_start_time,
+        audio_end_time,
+        duration: audio_end_time - audio_start_time,
+        meeting_id: Some(meeting_id),
+        evidence_id: None,
+        source_segment_key: Some(source_segment_key),
+        is_final: !is_partial,
+        is_canonical: false,
+        capture_completeness: None,
+    }
+}
+
+async fn persist_and_publish_final<P, PersistFuture, EmitCanonical, EmitFailure>(
+    evidence: TranscriptEvidenceInput,
+    mut update: TranscriptUpdate,
+    persist: P,
+    emit_canonical: EmitCanonical,
+    emit_failure: EmitFailure,
+) -> Result<FinalEvidencePublication, String>
+where
+    P: FnOnce(TranscriptEvidenceInput) -> PersistFuture,
+    PersistFuture: Future<Output = Result<TranscriptEvidence, ()>>,
+    EmitCanonical: FnOnce(&TranscriptUpdate) -> Result<(), String>,
+    EmitFailure: FnOnce(&TranscriptEvidencePersistenceFailure) -> Result<(), String>,
+{
+    let failure = TranscriptEvidencePersistenceFailure {
+        code: TRANSCRIPT_EVIDENCE_PERSISTENCE_FAILED.to_string(),
+        meeting_id: evidence.meeting_id.clone(),
+        evidence_id: evidence.evidence_id.clone(),
+        source_track: evidence.source_track.clone(),
+        source_segment_key: evidence.source_segment_key.clone(),
+        sequence_id: evidence.sequence as u64,
+        audio_start_time: evidence.audio_start_time,
+        audio_end_time: evidence.audio_end_time,
+        is_final: true,
+        capture_completeness: CaptureCompleteness::Incomplete,
+        transcript_length: evidence.transcript.chars().count(),
+    };
+
+    let persisted = match persist(evidence).await {
+        Ok(persisted) => persisted,
+        Err(()) => {
+            emit_failure(&failure)?;
+            return Ok(FinalEvidencePublication::PersistenceFailed);
+        }
+    };
+
+    update.meeting_id = Some(persisted.meeting_id);
+    update.evidence_id = Some(persisted.evidence_id);
+    update.source = persisted.source_track;
+    update.source_segment_key = Some(persisted.source_segment_key);
+    update.is_partial = false;
+    update.is_final = true;
+    update.is_canonical = true;
+    update.capture_completeness = Some(persisted.capture_completeness);
+    emit_canonical(&update)?;
+
+    Ok(FinalEvidencePublication::Published)
 }
 
 // NOTE: get_transcript_history and get_recording_meeting_name functions
@@ -51,12 +169,15 @@ pub struct TranscriptUpdate {
 pub fn start_transcription_task<R: Runtime>(
     app: AppHandle<R>,
     transcription_receiver: tokio::sync::mpsc::UnboundedReceiver<AudioChunk>,
+    database_pool: SqlitePool,
+    meeting_id: String,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         info!("🚀 Starting optimized parallel transcription task - guaranteeing zero chunk loss");
 
         // Initialize transcription engine (Whisper or Parakeet based on config)
-        let transcription_engine = match super::engine::get_or_init_transcription_engine(&app).await {
+        let transcription_engine = match super::engine::get_or_init_transcription_engine(&app).await
+        {
             Ok(engine) => engine,
             Err(e) => {
                 error!("Failed to initialize transcription engine: {}", e);
@@ -80,7 +201,11 @@ pub fn start_transcription_task<R: Runtime>(
         let chunks_completed = Arc::new(AtomicU64::new(0));
         let input_finished = Arc::new(AtomicBool::new(false));
 
-        info!("📊 Starting {} transcription worker{} (serial mode for ordered emission)", NUM_WORKERS, if NUM_WORKERS == 1 { "" } else { "s" });
+        info!(
+            "📊 Starting {} transcription worker{} (serial mode for ordered emission)",
+            NUM_WORKERS,
+            if NUM_WORKERS == 1 { "" } else { "s" }
+        );
 
         // Spawn worker tasks
         let mut worker_handles = Vec::new();
@@ -95,6 +220,8 @@ pub fn start_transcription_task<R: Runtime>(
             let chunks_completed_clone = chunks_completed.clone();
             let input_finished_clone = input_finished.clone();
             let chunks_queued_clone = chunks_queued.clone();
+            let database_pool_clone = database_pool.clone();
+            let meeting_id_clone = meeting_id.clone();
 
             let worker_handle = tokio::spawn(async move {
                 info!("👷 Worker {} started", worker_id);
@@ -114,7 +241,10 @@ pub fn start_transcription_task<R: Runtime>(
                         worker_id, engine_name, current_model
                     );
                 } else {
-                    warn!("⚠️ Worker {} pre-validation: {} model not loaded - chunks may be skipped", worker_id, engine_name);
+                    warn!(
+                        "⚠️ Worker {} pre-validation: {} model not loaded - chunks may be skipped",
+                        worker_id, engine_name
+                    );
                 }
 
                 loop {
@@ -147,16 +277,13 @@ pub fn start_transcription_task<R: Runtime>(
                                 continue;
                             }
 
+                            let chunk_id = chunk.chunk_id;
                             let chunk_timestamp = chunk.timestamp;
                             let chunk_duration = chunk.data.len() as f64 / chunk.sample_rate as f64;
 
                             // Transcribe with provider-agnostic approach
-                            match transcribe_chunk_with_provider(
-                                &engine_clone,
-                                chunk,
-                                &app_clone,
-                            )
-                            .await
+                            match transcribe_chunk_with_provider(&engine_clone, chunk, &app_clone)
+                                .await
                             {
                                 Ok((transcript, confidence_opt, is_partial)) => {
                                     let confidence_str = match confidence_opt {
@@ -164,17 +291,28 @@ pub fn start_transcription_task<R: Runtime>(
                                         None => "N/A".to_string(),
                                     };
 
-                                    info!("🔍 Worker {} transcription result: text='{}', confidence={}, partial={}",
-                worker_id, transcript, confidence_str, is_partial);
+                                    info!(
+                                        "Worker {} transcription result: characters={}, confidence={}, partial={}",
+                                        worker_id,
+                                        transcript.chars().count(),
+                                        confidence_str,
+                                        is_partial
+                                    );
 
                                     if should_emit_transcript(&transcript) {
                                         // PERFORMANCE: Only log transcription results, not every processing step
-                                        info!("✅ Worker {} transcribed: {} (confidence: {}, partial: {})",
-                                              worker_id, transcript, confidence_str, is_partial);
+                                        info!(
+                                            "Worker {} produced transcript output (characters={}, confidence={}, partial={})",
+                                            worker_id,
+                                            transcript.chars().count(),
+                                            confidence_str,
+                                            is_partial
+                                        );
 
                                         // Emit speech-detected event for frontend UX (only on first detection per session)
                                         // This is lightweight and provides better user feedback
-                                        let current_flag = SPEECH_DETECTED_EMITTED.load(Ordering::SeqCst);
+                                        let current_flag =
+                                            SPEECH_DETECTED_EMITTED.load(Ordering::SeqCst);
                                         info!("🔍 Checking speech-detected flag: current={}, will_emit={}", current_flag, !current_flag);
 
                                         if !current_flag {
@@ -190,41 +328,144 @@ pub fn start_transcription_task<R: Runtime>(
                                         }
 
                                         // Generate sequence ID and calculate timestamps FIRST
-                                        let sequence_id = SEQUENCE_COUNTER.fetch_add(1, Ordering::SeqCst);
+                                        let sequence_id =
+                                            SEQUENCE_COUNTER.fetch_add(1, Ordering::SeqCst);
                                         let audio_start_time = chunk_timestamp; // Already in seconds from recording start
                                         let audio_end_time = chunk_timestamp + chunk_duration;
 
-                                        // Save structured transcript segment to recording manager (only final results)
-                                        // Save ALL segments (partial and final) to ensure complete JSON
-                                        // Create structured segment with full timestamp data
-                                        // NOTE: This is now handled via the transcript-update event emission below
-                                        // The recording_commands module listens to these events and saves them
-                                        // This decouples the transcription worker from direct RECORDING_MANAGER access
-
-                                        // Emit transcript update with NEW recording-relative timestamps
-
-                                        let update = TranscriptUpdate {
-                                            text: transcript,
-                                            timestamp: format_current_timestamp(), // Wall-clock for reference
-                                            source: "Audio".to_string(),
+                                        let source_track = "mixed".to_string();
+                                        let source_segment_key = format!("chunk-{}", chunk_id);
+                                        let update = build_transcript_update(
+                                            transcript,
+                                            format_current_timestamp(),
+                                            source_track.clone(),
+                                            source_segment_key.clone(),
+                                            meeting_id_clone.clone(),
                                             sequence_id,
-                                            chunk_start_time: chunk_timestamp, // Legacy compatibility
                                             is_partial,
-                                            confidence: confidence_opt.unwrap_or(0.85), // Default for providers without confidence
-                                            // NEW: Recording-relative timestamps for sync
+                                            confidence_opt.unwrap_or(0.85),
                                             audio_start_time,
                                             audio_end_time,
-                                            duration: chunk_duration,
-                                        };
+                                        );
 
-                                        if let Err(e) = app_clone.emit("transcript-update", &update)
-                                        {
-                                            error!(
-                                                "Worker {}: Failed to emit transcript update: {}",
-                                                worker_id, e
-                                            );
+                                        if is_partial {
+                                            if let Err(error) =
+                                                app_clone.emit("transcript-update", &update)
+                                            {
+                                                error!(
+                                                    "Worker {} failed to emit provisional transcript update: {}",
+                                                    worker_id, error
+                                                );
+                                            }
+                                        } else {
+                                            let evidence_id = Uuid::new_v4().to_string();
+                                            if let Ok(sequence) = i64::try_from(sequence_id) {
+                                                let evidence = TranscriptEvidenceInput {
+                                                    evidence_id: evidence_id.clone(),
+                                                    meeting_id: meeting_id_clone.clone(),
+                                                    source_track,
+                                                    source_segment_key,
+                                                    sequence,
+                                                    transcript: update.text.clone(),
+                                                    audio_start_time,
+                                                    audio_end_time,
+                                                    capture_completeness:
+                                                        CaptureCompleteness::Complete,
+                                                };
+                                                let persist_pool = database_pool_clone.clone();
+                                                let canonical_app = app_clone.clone();
+                                                let failure_app = app_clone.clone();
+
+                                                match persist_and_publish_final(
+                                                    evidence,
+                                                    update,
+                                                    move |input| async move {
+                                                        TranscriptsRepository::upsert_final_evidence(
+                                                            &persist_pool,
+                                                            &input,
+                                                        )
+                                                        .await
+                                                        .map_err(|_| ())
+                                                    },
+                                                    move |canonical| {
+                                                        canonical_app
+                                                            .emit("transcript-update", canonical)
+                                                            .map_err(|_| {
+                                                                "canonical_transcript_emit_failed"
+                                                                    .to_string()
+                                                            })
+                                                    },
+                                                    move |failure| {
+                                                        failure_app
+                                                            .emit(
+                                                                "transcript-evidence-persistence-failed",
+                                                                failure,
+                                                            )
+                                                            .map_err(|_| {
+                                                                "evidence_failure_emit_failed"
+                                                                    .to_string()
+                                                            })
+                                                    },
+                                                )
+                                                .await
+                                                {
+                                                    Ok(FinalEvidencePublication::Published) => {
+                                                        info!(
+                                                            "Worker {} committed and published final evidence {}",
+                                                            worker_id, evidence_id
+                                                        );
+                                                    }
+                                                    Ok(
+                                                        FinalEvidencePublication::PersistenceFailed,
+                                                    ) => {
+                                                        error!(
+                                                            "Worker {} suppressed canonical publication after evidence persistence failed for {}",
+                                                            worker_id, evidence_id
+                                                        );
+                                                    }
+                                                    Err(code) => {
+                                                        error!(
+                                                            "Worker {} could not publish transcript evidence outcome: {}",
+                                                            worker_id, code
+                                                        );
+                                                    }
+                                                }
+                                            } else {
+                                                let failure =
+                                                    TranscriptEvidencePersistenceFailure {
+                                                        code:
+                                                            TRANSCRIPT_EVIDENCE_PERSISTENCE_FAILED
+                                                                .to_string(),
+                                                        meeting_id: meeting_id_clone.clone(),
+                                                        evidence_id,
+                                                        source_track,
+                                                        source_segment_key,
+                                                        sequence_id,
+                                                        audio_start_time,
+                                                        audio_end_time,
+                                                        is_final: true,
+                                                        capture_completeness:
+                                                            CaptureCompleteness::Incomplete,
+                                                        transcript_length: update
+                                                            .text
+                                                            .chars()
+                                                            .count(),
+                                                    };
+                                                if let Err(emit_error) = app_clone.emit(
+                                                    "transcript-evidence-persistence-failed",
+                                                    failure,
+                                                ) {
+                                                    error!(
+                                                        "Worker {} failed to emit the typed evidence failure: {}",
+                                                        worker_id, emit_error
+                                                    );
+                                                }
+                                                error!(
+                                                    "Worker {} suppressed canonical publication because the evidence sequence exceeded SQLite range",
+                                                    worker_id
+                                                );
+                                            }
                                         }
-                                        // PERFORMANCE: Removed verbose logging of every emission
                                     }
                                 }
                                 Err(e) => {
@@ -237,13 +478,20 @@ pub fn start_transcription_task<R: Runtime>(
                                             continue;
                                         }
                                         TranscriptionError::ModelNotLoaded => {
-                                            warn!("Worker {}: Model unloaded during transcription", worker_id);
+                                            warn!(
+                                                "Worker {}: Model unloaded during transcription",
+                                                worker_id
+                                            );
                                             chunks_completed_clone.fetch_add(1, Ordering::SeqCst);
                                             continue;
                                         }
                                         _ => {
-                                            warn!("Worker {}: Transcription failed: {}", worker_id, e);
-                                            let _ = app_clone.emit("transcription-warning", e.to_string());
+                                            warn!(
+                                                "Worker {}: Transcription failed: {}",
+                                                worker_id, e
+                                            );
+                                            let _ = app_clone
+                                                .emit("transcription-warning", e.to_string());
                                         }
                                     }
                                 }
@@ -451,8 +699,11 @@ async fn transcribe_chunk_with_provider<R: Runtime>(
                     }
 
                     info!(
-                        "Whisper transcription complete for chunk {}: '{}' (confidence: {:.2}, partial: {})",
-                        chunk.chunk_id, cleaned_text, confidence, is_partial
+                        "Whisper transcription complete for chunk {} (characters={}, confidence: {:.2}, partial: {})",
+                        chunk.chunk_id,
+                        cleaned_text.chars().count(),
+                        confidence,
+                        is_partial
                     );
 
                     Ok((cleaned_text, Some(confidence), is_partial))
@@ -487,8 +738,9 @@ async fn transcribe_chunk_with_provider<R: Runtime>(
                     }
 
                     info!(
-                        "Parakeet transcription complete for chunk {}: '{}'",
-                        chunk.chunk_id, cleaned_text
+                        "Parakeet transcription complete for chunk {} (characters={})",
+                        chunk.chunk_id,
+                        cleaned_text.chars().count()
                     );
 
                     // Parakeet doesn't provide confidence or partial results
@@ -532,10 +784,10 @@ async fn transcribe_chunk_with_provider<R: Runtime>(
                     };
 
                     info!(
-                        "{} transcription complete for chunk {}: '{}' ({}, partial: {})",
+                        "{} transcription complete for chunk {} (characters={}, {}, partial: {})",
                         provider.provider_name(),
                         chunk.chunk_id,
-                        cleaned_text,
+                        cleaned_text.chars().count(),
                         confidence_str,
                         result.is_partial
                     );
@@ -588,72 +840,151 @@ fn format_recording_time(seconds: f64) -> String {
     let secs = total_seconds % 60;
 
     format!("[{:02}:{:02}]", minutes, secs)
-    }
+}
 
-    #[cfg(test)]
-    mod tests {
-        use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::models::DateTimeUtc;
 
-        fn worker_source() -> &'static str {
-            include_str!("worker.rs")
-                .split("#[cfg(test)]")
-                .next()
-                .expect("worker implementation before test module")
-        }
-
-        #[test]
-        fn keeps_short_acknowledgements() {
-            assert!(should_emit_transcript("Yes"));
-            assert!(should_emit_transcript("ok"));
-        }
-
-        #[test]
-        fn drops_empty_and_whitespace_only() {
-            assert!(!should_emit_transcript(""));
-            assert!(!should_emit_transcript("   "));
-        }
-
-        #[test]
-        fn transcript_evidence_commit_precedes_canonical_publication() {
-            let source = worker_source();
-            let persist = source
-                .find("upsert_final_evidence")
-                .expect("final worker output must call the evidence repository");
-            let canonical = source
-                .find("is_canonical: true")
-                .expect("committed final output must be explicitly canonical");
-
-            assert!(
-                persist < canonical,
-                "the durable evidence write must occur before canonical publication"
-            );
-        }
-
-        #[test]
-        fn transcript_evidence_failure_is_typed_and_suppresses_canonical_publication() {
-            let source = worker_source();
-            assert!(
-                source.contains("TranscriptEvidencePersistenceFailure"),
-                "repository failure must produce a typed incomplete fact"
-            );
-            assert!(
-                source.contains("TRANSCRIPT_EVIDENCE_PERSISTENCE_FAILED"),
-                "repository failure must carry a stable machine-readable code"
-            );
-            assert!(
-                source.contains("transcript-evidence-persistence-failed"),
-                "the typed failure fact must cross the event boundary"
-            );
-        }
-
-        #[test]
-        fn transcript_evidence_partials_remain_provisional_and_non_citable() {
-            let source = worker_source();
-            assert!(
-                source.contains("evidence_id: None")
-                    && source.contains("is_canonical: false")
-                    && source.contains("is_final: false"),
-                "partial output must have no evidence identity, finality, or canonical status"
-            );
+    fn evidence_input() -> TranscriptEvidenceInput {
+        TranscriptEvidenceInput {
+            evidence_id: "018f5e27-2f68-7e27-9c90-7c72123141af".to_string(),
+            meeting_id: "018f5e27-2f68-7e27-9c90-7c72123141ae".to_string(),
+            source_track: "mixed".to_string(),
+            source_segment_key: "chunk-42".to_string(),
+            sequence: 42,
+            transcript: "final words".to_string(),
+            audio_start_time: 1.25,
+            audio_end_time: 2.5,
+            capture_completeness: CaptureCompleteness::Complete,
         }
     }
+
+    fn persisted_evidence(input: &TranscriptEvidenceInput) -> TranscriptEvidence {
+        let now = DateTimeUtc(chrono::Utc::now());
+        TranscriptEvidence {
+            evidence_id: input.evidence_id.clone(),
+            meeting_id: input.meeting_id.clone(),
+            source_track: input.source_track.clone(),
+            source_segment_key: input.source_segment_key.clone(),
+            sequence: input.sequence,
+            transcript: input.transcript.clone(),
+            audio_start_time: input.audio_start_time,
+            audio_end_time: input.audio_end_time,
+            is_final: true,
+            capture_completeness: input.capture_completeness,
+            created_at: now.clone(),
+            updated_at: now,
+        }
+    }
+
+    fn candidate_update(is_partial: bool) -> TranscriptUpdate {
+        build_transcript_update(
+            "final words".to_string(),
+            "12:34:56".to_string(),
+            "mixed".to_string(),
+            "chunk-42".to_string(),
+            "018f5e27-2f68-7e27-9c90-7c72123141ae".to_string(),
+            42,
+            is_partial,
+            0.9,
+            1.25,
+            2.5,
+        )
+    }
+
+    #[test]
+    fn keeps_short_acknowledgements() {
+        assert!(should_emit_transcript("Yes"));
+        assert!(should_emit_transcript("ok"));
+    }
+
+    #[test]
+    fn drops_empty_and_whitespace_only() {
+        assert!(!should_emit_transcript(""));
+        assert!(!should_emit_transcript("   "));
+    }
+
+    #[tokio::test]
+    async fn transcript_evidence_commit_precedes_canonical_publication() {
+        let input = evidence_input();
+        let persisted = persisted_evidence(&input);
+        let order = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let canonical = Arc::new(std::sync::Mutex::new(None));
+
+        let persist_order = order.clone();
+        let canonical_order = order.clone();
+        let canonical_output = canonical.clone();
+        let outcome = persist_and_publish_final(
+            input,
+            candidate_update(false),
+            move |_| async move {
+                persist_order.lock().unwrap().push("persist");
+                Ok(persisted)
+            },
+            move |update| {
+                canonical_order.lock().unwrap().push("canonical");
+                *canonical_output.lock().unwrap() = Some(update.clone());
+                Ok(())
+            },
+            |_| Err("failure event must not emit".to_string()),
+        )
+        .await
+        .expect("publication result");
+
+        assert_eq!(outcome, FinalEvidencePublication::Published);
+        assert_eq!(*order.lock().unwrap(), vec!["persist", "canonical"]);
+        let canonical = canonical.lock().unwrap().clone().expect("canonical update");
+        assert!(canonical.is_final);
+        assert!(canonical.is_canonical);
+        assert!(!canonical.is_partial);
+        assert!(canonical.evidence_id.is_some());
+    }
+
+    #[tokio::test]
+    async fn transcript_evidence_failure_is_typed_and_suppresses_canonical_publication() {
+        let canonical_emitted = Arc::new(AtomicBool::new(false));
+        let failure = Arc::new(std::sync::Mutex::new(None));
+        let canonical_flag = canonical_emitted.clone();
+        let failure_output = failure.clone();
+
+        let outcome = persist_and_publish_final(
+            evidence_input(),
+            candidate_update(false),
+            |_| async { Err(()) },
+            move |_| {
+                canonical_flag.store(true, Ordering::SeqCst);
+                Ok(())
+            },
+            move |fact| {
+                *failure_output.lock().unwrap() = Some(fact.clone());
+                Ok(())
+            },
+        )
+        .await
+        .expect("failure publication result");
+
+        assert_eq!(outcome, FinalEvidencePublication::PersistenceFailed);
+        assert!(!canonical_emitted.load(Ordering::SeqCst));
+        let failure = failure.lock().unwrap().clone().expect("typed failure fact");
+        assert_eq!(failure.code, TRANSCRIPT_EVIDENCE_PERSISTENCE_FAILED);
+        assert_eq!(
+            failure.capture_completeness,
+            CaptureCompleteness::Incomplete
+        );
+        assert!(failure.is_final);
+        assert_eq!(failure.transcript_length, "final words".chars().count());
+    }
+
+    #[test]
+    fn transcript_evidence_partials_remain_provisional_and_non_citable() {
+        let partial = candidate_update(true);
+
+        assert!(partial.is_partial);
+        assert!(!partial.is_final);
+        assert!(!partial.is_canonical);
+        assert!(partial.evidence_id.is_none());
+        assert!(partial.capture_completeness.is_none());
+    }
+}
