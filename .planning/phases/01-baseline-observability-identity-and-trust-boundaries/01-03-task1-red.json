@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml transcript_evidence_repository --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - database::repositories::transcript::transcript_evidence_repository_tests::transcript_evidence_repository_inserts_one_final_for_existing_meeting\nnot ok 2 - database::repositories::transcript::transcript_evidence_repository_tests::transcript_evidence_repository_redelivery_preserves_identity_and_row_count\nnot ok 3 - database::repositories::transcript::transcript_evidence_repository_tests::transcript_evidence_repository_rejects_partial_segments\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0\n",
+  "targetTest": "database::repositories::transcript::transcript_evidence_repository_tests::transcript_evidence_repository_inserts_one_final_for_existing_meeting",
+  "expected": "A forward migration and repository contract persist exactly one stable final-evidence row for an existing meeting, update it idempotently on redelivery, and reject partial text",
+  "actual": "Three named behavior assertions failed because the transcript_evidence durable storage contract does not exist yet"
+}

@@ -144,3 +144,166 @@ impl TranscriptsRepository {
         }
     }
 }
+
+#[cfg(test)]
+mod transcript_evidence_repository_tests {
+    use super::*;
+    use sqlx::{sqlite::SqlitePoolOptions, Row};
+
+    const MEETING_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141ae";
+    const EVIDENCE_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141af";
+
+    async fn migrated_pool() -> SqlitePool {
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory SQLite pool");
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("fresh migration set");
+
+        let now = Utc::now();
+        sqlx::query(
+            "INSERT INTO meetings (
+                id, title, created_at, updated_at, lifecycle, completeness,
+                completeness_reason, started_at_utc
+             ) VALUES (?, 'Evidence test', ?, ?, 'recording', 'pending', NULL, ?)",
+        )
+        .bind(MEETING_ID)
+        .bind(now)
+        .bind(now)
+        .bind(now.to_rfc3339())
+        .execute(&pool)
+        .await
+        .expect("canonical meeting fixture");
+
+        pool
+    }
+
+    async fn evidence_table_exists(pool: &SqlitePool) -> bool {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM sqlite_master
+             WHERE type = 'table' AND name = 'transcript_evidence'",
+        )
+        .fetch_one(pool)
+        .await
+        .expect("schema inspection")
+            == 1
+    }
+
+    async fn raw_upsert_final(pool: &SqlitePool, transcript: &str, end: f64) {
+        sqlx::query(
+            "INSERT INTO transcript_evidence (
+                evidence_id, meeting_id, source_track, source_segment_key,
+                sequence, transcript, audio_start_time, audio_end_time,
+                is_final, capture_completeness, created_at, updated_at
+             ) VALUES (?, ?, 'mixed', 'segment-42', 42, ?, 1.25, ?, 1, 'complete', ?, ?)
+             ON CONFLICT(evidence_id) DO UPDATE SET
+                sequence = excluded.sequence,
+                transcript = excluded.transcript,
+                audio_start_time = excluded.audio_start_time,
+                audio_end_time = excluded.audio_end_time,
+                capture_completeness = excluded.capture_completeness,
+                updated_at = excluded.updated_at",
+        )
+        .bind(EVIDENCE_ID)
+        .bind(MEETING_ID)
+        .bind(transcript)
+        .bind(end)
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(pool)
+        .await
+        .expect("final evidence upsert");
+    }
+
+    #[tokio::test]
+    async fn transcript_evidence_repository_inserts_one_final_for_existing_meeting() {
+        let pool = migrated_pool().await;
+        assert!(
+            evidence_table_exists(&pool).await,
+            "final transcript evidence must have forward-migrated durable storage"
+        );
+
+        raw_upsert_final(&pool, "first final", 2.5).await;
+        let row = sqlx::query(
+            "SELECT evidence_id, meeting_id, is_final, capture_completeness
+             FROM transcript_evidence",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("inserted final evidence");
+
+        assert_eq!(row.get::<String, _>("evidence_id"), EVIDENCE_ID);
+        assert_eq!(row.get::<String, _>("meeting_id"), MEETING_ID);
+        assert_eq!(row.get::<i64, _>("is_final"), 1);
+        assert_eq!(
+            row.get::<String, _>("capture_completeness"),
+            "complete"
+        );
+    }
+
+    #[tokio::test]
+    async fn transcript_evidence_repository_redelivery_preserves_identity_and_row_count() {
+        let pool = migrated_pool().await;
+        assert!(
+            evidence_table_exists(&pool).await,
+            "redelivery requires a stable evidence table and uniqueness contract"
+        );
+
+        raw_upsert_final(&pool, "first final", 2.5).await;
+        raw_upsert_final(&pool, "corrected final", 2.75).await;
+
+        let count = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM transcript_evidence WHERE meeting_id = ?",
+        )
+        .bind(MEETING_ID)
+        .fetch_one(&pool)
+        .await
+        .expect("evidence count");
+        let row = sqlx::query(
+            "SELECT evidence_id, transcript, audio_end_time FROM transcript_evidence",
+        )
+        .fetch_one(&pool)
+        .await
+        .expect("redelivered final evidence");
+
+        assert_eq!(count, 1);
+        assert_eq!(row.get::<String, _>("evidence_id"), EVIDENCE_ID);
+        assert_eq!(row.get::<String, _>("transcript"), "corrected final");
+        assert_eq!(row.get::<f64, _>("audio_end_time"), 2.75);
+    }
+
+    #[tokio::test]
+    async fn transcript_evidence_repository_rejects_partial_segments() {
+        let pool = migrated_pool().await;
+        assert!(
+            evidence_table_exists(&pool).await,
+            "partial rejection requires the final-evidence storage contract"
+        );
+
+        let result = sqlx::query(
+            "INSERT INTO transcript_evidence (
+                evidence_id, meeting_id, source_track, source_segment_key,
+                sequence, transcript, audio_start_time, audio_end_time,
+                is_final, capture_completeness, created_at, updated_at
+             ) VALUES (?, ?, 'mixed', 'partial-42', 42, 'provisional',
+                       1.25, 2.5, 0, 'complete', ?, ?)",
+        )
+        .bind(EVIDENCE_ID)
+        .bind(MEETING_ID)
+        .bind(Utc::now())
+        .bind(Utc::now())
+        .execute(&pool)
+        .await;
+
+        assert!(result.is_err(), "partial text must never enter evidence storage");
+        let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM transcript_evidence")
+            .fetch_one(&pool)
+            .await
+            .expect("evidence count after rejected partial");
+        assert_eq!(count, 0);
+    }
+}
