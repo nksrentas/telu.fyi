@@ -2,6 +2,56 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(rename_all = "snake_case")]
+pub enum MeetingLifecycle {
+    Preparing,
+    Recording,
+    Finalizing,
+    Complete,
+    Incomplete,
+    Recovered,
+    Legacy,
+}
+
+impl MeetingLifecycle {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Preparing => "preparing",
+            Self::Recording => "recording",
+            Self::Finalizing => "finalizing",
+            Self::Complete => "complete",
+            Self::Incomplete => "incomplete",
+            Self::Recovered => "recovered",
+            Self::Legacy => "legacy",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(rename_all = "snake_case")]
+pub enum MeetingCompleteness {
+    Pending,
+    Complete,
+    Incomplete,
+    RecoveredWithGaps,
+    CompletionNotVerified,
+}
+
+impl MeetingCompleteness {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Pending => "pending",
+            Self::Complete => "complete",
+            Self::Incomplete => "incomplete",
+            Self::RecoveredWithGaps => "recovered_with_gaps",
+            Self::CompletionNotVerified => "completion_not_verified",
+        }
+    }
+}
+
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize)]
 pub struct MeetingModel {
     pub id: String,
@@ -9,6 +59,10 @@ pub struct MeetingModel {
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
     pub folder_path: Option<String>,
+    pub lifecycle: MeetingLifecycle,
+    pub completeness: MeetingCompleteness,
+    pub completeness_reason: Option<String>,
+    pub started_at_utc: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]

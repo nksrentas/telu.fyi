@@ -4,6 +4,10 @@ mod ffmpeg;
 mod onnxruntime;
 
 fn main() {
+    // sqlx::migrate! embeds migrations at compile time, so changes beneath
+    // this directory must invalidate the build script output.
+    println!("cargo:rerun-if-changed=migrations");
+
     // GPU Acceleration Detection and Build Guidance
     detect_and_report_gpu_capabilities();
 

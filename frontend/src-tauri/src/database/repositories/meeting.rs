@@ -1,5 +1,6 @@
 use crate::api::{MeetingDetails, MeetingTranscript};
 use crate::database::models::{MeetingModel, Transcript};
+pub use crate::database::models::{MeetingCompleteness, MeetingLifecycle};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::{Connection, Error as SqlxError, SqliteConnection, SqlitePool};
@@ -7,54 +8,6 @@ use tracing::{error, info};
 use uuid::Uuid;
 
 pub struct MeetingsRepository;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MeetingLifecycle {
-    Preparing,
-    Recording,
-    Finalizing,
-    Complete,
-    Incomplete,
-    Recovered,
-    Legacy,
-}
-
-impl MeetingLifecycle {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Preparing => "preparing",
-            Self::Recording => "recording",
-            Self::Finalizing => "finalizing",
-            Self::Complete => "complete",
-            Self::Incomplete => "incomplete",
-            Self::Recovered => "recovered",
-            Self::Legacy => "legacy",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MeetingCompleteness {
-    Pending,
-    Complete,
-    Incomplete,
-    RecoveredWithGaps,
-    CompletionNotVerified,
-}
-
-impl MeetingCompleteness {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Pending => "pending",
-            Self::Complete => "complete",
-            Self::Incomplete => "incomplete",
-            Self::RecoveredWithGaps => "recovered_with_gaps",
-            Self::CompletionNotVerified => "completion_not_verified",
-        }
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StartMeetingResult {
@@ -188,7 +141,7 @@ impl MeetingsRepository {
 
         // Get meeting details
         let meeting: Option<MeetingModel> =
-            sqlx::query_as("SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?")
+            sqlx::query_as("SELECT * FROM meetings WHERE id = ?")
                 .bind(meeting_id)
                 .fetch_optional(&mut *transaction)
                 .await?;
@@ -246,7 +199,7 @@ impl MeetingsRepository {
         }
 
         let meeting: Option<MeetingModel> =
-            sqlx::query_as("SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?")
+            sqlx::query_as("SELECT * FROM meetings WHERE id = ?")
                 .bind(meeting_id)
                 .fetch_optional(pool)
                 .await?;
