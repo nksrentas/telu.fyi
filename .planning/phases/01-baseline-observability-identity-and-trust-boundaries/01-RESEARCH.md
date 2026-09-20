@@ -176,7 +176,8 @@ Plan an IndexedDB version upgrade that makes the Rust meeting ID the meeting key
 
 No external packages are recommended for this phase, so the package-legitimacy gate is not triggered. [VERIFIED: frontend/src-tauri/Cargo.toml:75-145] If implementation introduces any package despite this recommendation, the planner must add the ecosystem registry check, legitimacy seam, Node postinstall inspection where applicable, MSRV check against exact declared `rust-version = "1.77"`, and a human checkpoint for every `SUS` result. [VERIFIED: frontend/src-tauri/Cargo.toml:1-9]
 
-**Packages removed due to `SLOP` verdict:** none.  
+**Packages removed due to `SLOP` verdict:** none.
+
 **Packages flagged as suspicious `SUS`:** none.
 
 ## Architecture Patterns
@@ -413,60 +414,82 @@ The repository contains Rust inline tests but no package-level frontend `test` s
 
 ### Pitfall 1: Instrumenting after the first unbounded queue
 
-**What goes wrong:** capture timestamps look healthy while segmentation or queue wait dominates end-to-end freshness.  
-**Why it happens:** the existing worker sees chunks only after VAD and queueing. [VERIFIED: frontend/src-tauri/src/audio/pipeline.rs:735-759]  
-**How to avoid:** instrument capture, segment boundary, acceptance, start, final, persistence, emit, and acknowledgement separately.  
+**What goes wrong:** capture timestamps look healthy while segmentation or queue wait dominates end-to-end freshness.
+
+**Why it happens:** the existing worker sees chunks only after VAD and queueing. [VERIFIED: frontend/src-tauri/src/audio/pipeline.rs:735-759]
+
+**How to avoid:** instrument capture, segment boundary, acceptance, start, final, persistence, emit, and acknowledgement separately.
+
 **Warning sign:** only provider/transcription duration is available, or total delay cannot be decomposed. [ASSUMED]
 
 ### Pitfall 2: Blocking the capture callback to get backpressure
 
-**What goes wrong:** native audio capture stalls or becomes unstable.  
-**Why it happens:** awaiting capacity on a latency-sensitive callback conflates durable capture and transcription admission.  
-**How to avoid:** use non-blocking bounded admission at callback-facing seams, explicitly record `Full` as rejection/gap, and keep recording durability separate from suggestion/transcription work. [ASSUMED]  
+**What goes wrong:** native audio capture stalls or becomes unstable.
+
+**Why it happens:** awaiting capacity on a latency-sensitive callback conflates durable capture and transcription admission.
+
+**How to avoid:** use non-blocking bounded admission at callback-facing seams, explicitly record `Full` as rejection/gap, and keep recording durability separate from suggestion/transcription work. [ASSUMED]
+
 **Warning sign:** `.await`, file I/O, JSON serialization, or contended locks appear in the capture callback. [ASSUMED]
 
 ### Pitfall 3: Treating sequence order as evidence identity
 
-**What goes wrong:** process-global counters, restart, retry, or recovery create collisions/remapping.  
-**Why it happens:** current sequence IDs are useful for ordering but the counter is global and not reset. [VERIFIED: frontend/src-tauri/src/audio/transcription/worker.rs:14-23]  
+**What goes wrong:** process-global counters, restart, retry, or recovery create collisions/remapping.
+
+**Why it happens:** current sequence IDs are useful for ordering but the counter is global and not reset. [VERIFIED: frontend/src-tauri/src/audio/transcription/worker.rs:14-23]
+
 **How to avoid:** assign an independent stable evidence UUID once; keep session-local sequence only for display ordering. [ASSUMED]
 
 ### Pitfall 4: Backfilling historical “complete” without evidence
 
-**What goes wrong:** old meetings gain a guarantee the old schema never recorded.  
-**Why it happens:** a non-null migration default is convenient.  
-**How to avoid:** mark legacy completeness as unknown/incomplete with a reason, or require an explicit product decision backed by a reconstruction rule. [ASSUMED]  
+**What goes wrong:** old meetings gain a guarantee the old schema never recorded.
+
+**Why it happens:** a non-null migration default is convenient.
+
+**How to avoid:** mark legacy completeness as unknown/incomplete with a reason, or require an explicit product decision backed by a reconstruction rule. [ASSUMED]
+
 **Warning sign:** migration sets every existing row to `complete`. [ASSUMED]
 
 ### Pitfall 5: Letting three stores become three authorities
 
-**What goes wrong:** SQLite, recording metadata, and IndexedDB disagree after crash.  
-**Why it happens:** each currently writes its own identity/status on a different timeline. [VERIFIED: frontend/src-tauri/src/audio/recording_saver.rs:240-255] [VERIFIED: frontend/src/services/indexedDBService.ts:95-116] [VERIFIED: frontend/src-tauri/src/database/repositories/transcript.rs:13-60]  
+**What goes wrong:** SQLite, recording metadata, and IndexedDB disagree after crash.
+
+**Why it happens:** each currently writes its own identity/status on a different timeline. [VERIFIED: frontend/src-tauri/src/audio/recording_saver.rs:240-255] [VERIFIED: frontend/src/services/indexedDBService.ts:95-116] [VERIFIED: frontend/src-tauri/src/database/repositories/transcript.rs:13-60]
+
 **How to avoid:** SQLite/Rust lifecycle is canonical; folder metadata mirrors it; IndexedDB is an idempotent cache/recovery carrier. [ASSUMED]
 
 ### Pitfall 6: Calling an emitted event “visible”
 
-**What goes wrong:** the metric omits IPC parsing, React scheduling, and rendering.  
-**Why it happens:** Rust only observes successful event dispatch. [CITED: https://v2.tauri.app/concept/inter-process-communication/]  
-**How to avoid:** correlate an opaque delivery token with an explicit frontend acknowledgement after state commit.  
+**What goes wrong:** the metric omits IPC parsing, React scheduling, and rendering.
+
+**Why it happens:** Rust only observes successful event dispatch. [CITED: https://v2.tauri.app/concept/inter-process-communication/]
+
+**How to avoid:** correlate an opaque delivery token with an explicit frontend acknowledgement after state commit.
+
 **Warning sign:** `app.emit()` timestamp is the endpoint of BASE-02. [ASSUMED]
 
 ### Pitfall 7: A local provider with remote background traffic
 
-**What goes wrong:** the canary sees egress from updater, analytics, model metadata/download, or configurable endpoints and misattributes it—or misses it entirely.  
-**Why it happens:** provider locality covers one operation, not the whole app. Startup update check is enabled by default. [VERIFIED: frontend/src/hooks/useUpdateCheck.ts:11-58]  
+**What goes wrong:** the canary sees egress from updater, analytics, model metadata/download, or configurable endpoints and misattributes it—or misses it entirely.
+
+**Why it happens:** provider locality covers one operation, not the whole app. Startup update check is enabled by default. [VERIFIED: frontend/src/hooks/useUpdateCheck.ts:11-58]
+
 **How to avoid:** test-mode control and outbound-attempt attribution must include all network-capable subsystems. [ASSUMED]
 
 ### Pitfall 8: Overclaiming battery impact
 
-**What goes wrong:** CPU percentage is reported as energy consumption or coarse battery percentage is treated as precise.  
-**Why it happens:** current `sysinfo` integration measures memory/CPU but not battery. [VERIFIED: frontend/src-tauri/src/whisper_engine/system_monitor.rs:8-16]  
+**What goes wrong:** CPU percentage is reported as energy consumption or coarse battery percentage is treated as precise.
+
+**Why it happens:** current `sysinfo` integration measures memory/CPU but not battery. [VERIFIED: frontend/src-tauri/src/whisper_engine/system_monitor.rs:8-16]
+
 **How to avoid:** record power source and battery start/end/duration on declared hardware, separate CPU/memory proxy from observed battery delta, and report unknown where measurement resolution is inadequate. [ASSUMED]
 
 ### Pitfall 9: Embedded migration not rebuilt
 
-**What goes wrong:** a migration file changes but the binary does not embed it during an incremental rebuild.  
-**Why it happens:** SQLx documents the stable-Rust need for a migration-directory rerun directive, and current `build.rs` lacks it. [CITED: https://docs.rs/sqlx/0.8.6/sqlx/macro.migrate.html] [VERIFIED: frontend/src-tauri/build.rs:1-25]  
+**What goes wrong:** a migration file changes but the binary does not embed it during an incremental rebuild.
+
+**Why it happens:** SQLx documents the stable-Rust need for a migration-directory rerun directive, and current `build.rs` lacks it. [CITED: https://docs.rs/sqlx/0.8.6/sqlx/macro.migrate.html] [VERIFIED: frontend/src-tauri/build.rs:1-25]
+
 **How to avoid:** add the directive and a packaged upgrade test. [ASSUMED]
 
 ## Code Examples
@@ -666,5 +689,6 @@ The current main capability includes exact permissions `"fs:read-all"`, `"fs:wri
 - Pitfalls: HIGH for observed failure modes; MEDIUM for the recommended remedy details.
 - Environment and thresholds: LOW until the project declares a reference machine, exact model/language/device matrix, battery protocol, queue capacity, and finalization deadline.
 
-**Research date:** 2026-09-20  
+**Research date:** 2026-09-20
+
 **Valid until:** 2026-10-20 for stable repository findings; re-check official dependency/security docs and the live branch immediately before planning if the checkout changes.
