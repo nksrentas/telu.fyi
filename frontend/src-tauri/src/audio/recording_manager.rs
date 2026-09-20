@@ -230,11 +230,21 @@ impl RecordingManager {
         microphone_device: Option<Arc<AudioDevice>>,
         system_device: Option<Arc<AudioDevice>>,
         auto_save: bool,
-    ) -> std::result::Result<mpsc::UnboundedReceiver<AudioChunk>, RecordingStartError> {
+    ) -> std::result::Result<mpsc::Receiver<AudioChunk>, RecordingStartError> {
         info!("Starting recording manager (auto_save: {})", auto_save);
 
         // Set up transcription channel
-        let (transcription_sender, transcription_receiver) = mpsc::unbounded_channel::<AudioChunk>();
+        let transcription_capacity = self
+            .state
+            .queue_ledger()
+            .ok_or_else(|| {
+                RecordingStartError::TranscriptionRuntime(anyhow::anyhow!(
+                    "transcription queue ledger is not initialized"
+                ))
+            })?
+            .capacity();
+        let (transcription_sender, transcription_receiver) =
+            mpsc::channel::<AudioChunk>(transcription_capacity);
         let (recording_sender, recording_receiver) = mpsc::unbounded_channel::<AudioChunk>();
 
         // Start recording state first
@@ -522,13 +532,18 @@ impl RecordingManager {
         lifecycle: String,
         completeness: String,
         completeness_reason: Option<String>,
-    ) {
+    ) -> Result<()> {
+        let capacity = super::pipeline::transcription_queue_capacity()?;
+        self.state
+            .initialize_queue_ledger(meeting_id.clone(), capacity)
+            .map_err(|error| anyhow::anyhow!("queue ledger initialization failed: {:?}", error))?;
         self.recording_saver.set_meeting_identity(
             meeting_id,
             lifecycle,
             completeness,
             completeness_reason,
         );
+        Ok(())
     }
 
     /// Add a structured transcript segment to be saved later

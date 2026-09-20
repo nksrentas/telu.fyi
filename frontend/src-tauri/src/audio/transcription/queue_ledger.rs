@@ -93,6 +93,8 @@ pub struct QueueGap {
     pub event_sequence: u64,
     pub rejected_at: Instant,
     pub reason: RejectionReason,
+    pub audio_start_ms: Option<u64>,
+    pub audio_end_ms: Option<u64>,
 }
 
 #[derive(Debug)]
@@ -130,6 +132,10 @@ impl QueueLedger {
 
     pub fn meeting_id(&self) -> &str {
         &self.meeting_id
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.capacity
     }
 
     pub fn accept(
@@ -198,6 +204,17 @@ impl QueueLedger {
         reason: RejectionReason,
         rejected_at: Instant,
     ) -> Result<u64, QueueTransitionError> {
+        self.reject_with_bounds(work_id, reason, rejected_at, None, None)
+    }
+
+    pub fn reject_with_bounds(
+        &self,
+        work_id: impl Into<String>,
+        reason: RejectionReason,
+        rejected_at: Instant,
+        audio_start_ms: Option<u64>,
+        audio_end_ms: Option<u64>,
+    ) -> Result<u64, QueueTransitionError> {
         let work_id = validate_work_id(work_id.into())?;
         let mut state = self.lock_state();
         ensure_new_work_id(&state, &work_id)?;
@@ -207,6 +224,8 @@ impl QueueLedger {
             event_sequence,
             rejected_at,
             reason,
+            audio_start_ms,
+            audio_end_ms,
         });
         Ok(event_sequence)
     }
@@ -274,11 +293,32 @@ impl QueueLedger {
         self.lock_state().gaps.clone()
     }
 
+    /// Assign one terminal outcome to every accepted item that has not reached
+    /// a terminal state. Used only when a worker cannot continue (for example,
+    /// model initialization failure or a worker panic).
+    pub fn finish_all_nonterminal(&self, outcome: WorkOutcome, terminal_at: Instant) -> u64 {
+        let mut state = self.lock_state();
+        let mut finished = 0;
+        for record in &mut state.work {
+            if record.outcome.is_none() {
+                let earliest = record.started_at.unwrap_or(record.accepted_at);
+                record.terminal_at = Some(terminal_at.max(earliest));
+                record.outcome = Some(outcome);
+                finished += 1;
+            }
+        }
+        finished
+    }
+
     fn lock_state(&self) -> std::sync::MutexGuard<'_, QueueLedgerState> {
         self.state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+}
+
+pub fn transcription_work_id(chunk_id: u64) -> String {
+    format!("mixed:chunk-{chunk_id}")
 }
 
 fn validate_work_id(work_id: String) -> Result<String, QueueTransitionError> {

@@ -690,7 +690,7 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
                 start_result.lifecycle.as_str().to_string(),
                 MeetingCompleteness::Pending.as_str().to_string(),
                 None,
-            );
+            )?;
             let transcription_receiver = manager
                 .start_recording(microphone_device, system_device, auto_save)
                 .await?;
@@ -712,7 +712,7 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
 
     // Spawn background device event processor (mic-disconnect fallback).
     if let Some(receiver) = device_event_receiver {
-        spawn_device_event_processor(app.clone(), receiver, session);
+        spawn_device_event_processor(app.clone(), receiver, session.clone());
     }
 
     // Flip recording live + reset per-session flags (speech-detected latch,
@@ -725,11 +725,15 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     drop(engine_lifecycle_guard);
 
     // Start optimized parallel transcription task and store handle
+    let queue_ledger = session
+        .queue_ledger()
+        .expect("successful recording start initializes the transcription queue ledger");
     let task_handle = transcription::start_transcription_task(
         app.clone(),
         transcription_receiver,
         database_pool.clone(),
         start_result.meeting_id.clone(),
+        queue_ledger,
     );
     {
         let mut global_task = TRANSCRIPTION_TASK.lock().unwrap();
@@ -895,7 +899,7 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
                 start_result.lifecycle.as_str().to_string(),
                 MeetingCompleteness::Pending.as_str().to_string(),
                 None,
-            );
+            )?;
             let transcription_receiver = manager
                 .start_recording(mic_device, system_device, auto_save)
                 .await?;
@@ -917,7 +921,7 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
 
     // Spawn background device event processor (mic-disconnect fallback).
     if let Some(receiver) = device_event_receiver {
-        spawn_device_event_processor(app.clone(), receiver, session);
+        spawn_device_event_processor(app.clone(), receiver, session.clone());
     }
 
     // Flip recording live + reset per-session flags (speech-detected latch,
@@ -930,11 +934,15 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     drop(engine_lifecycle_guard);
 
     // Start optimized parallel transcription task and store handle
+    let queue_ledger = session
+        .queue_ledger()
+        .expect("successful recording start initializes the transcription queue ledger");
     let task_handle = transcription::start_transcription_task(
         app.clone(),
         transcription_receiver,
         database_pool.clone(),
         start_result.meeting_id.clone(),
+        queue_ledger,
     );
     {
         let mut global_task = TRANSCRIPTION_TASK.lock().unwrap();

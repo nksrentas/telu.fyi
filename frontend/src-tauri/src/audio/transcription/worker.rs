@@ -7,7 +7,9 @@ use super::provider::TranscriptionError;
 use crate::audio::AudioChunk;
 use crate::database::models::{CaptureCompleteness, TranscriptEvidence, TranscriptEvidenceInput};
 use crate::database::repositories::transcript::TranscriptsRepository;
-use super::queue_ledger::{WorkFailureReason, WorkOutcome};
+use super::queue_ledger::{
+    transcription_work_id, QueueLedger, WorkFailureReason, WorkOutcome,
+};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -40,8 +42,14 @@ fn should_emit_transcript(text: &str) -> bool {
     !text.trim().is_empty()
 }
 
-fn terminal_outcome_for_transcription_error(_error: &TranscriptionError) -> WorkOutcome {
-    WorkOutcome::Completed
+fn terminal_outcome_for_transcription_error(error: &TranscriptionError) -> WorkOutcome {
+    match error {
+        TranscriptionError::AudioTooShort { .. } => WorkOutcome::Completed,
+        TranscriptionError::ModelNotLoaded => {
+            WorkOutcome::Failed(WorkFailureReason::ModelUnavailable)
+        }
+        _ => WorkOutcome::Failed(WorkFailureReason::TranscriptionFailed),
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -175,9 +183,10 @@ where
 /// Optimized parallel transcription task ensuring ZERO chunk loss
 pub fn start_transcription_task<R: Runtime>(
     app: AppHandle<R>,
-    transcription_receiver: tokio::sync::mpsc::UnboundedReceiver<AudioChunk>,
+    mut transcription_receiver: tokio::sync::mpsc::Receiver<AudioChunk>,
     database_pool: SqlitePool,
     meeting_id: String,
+    queue_ledger: Arc<QueueLedger>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         info!("🚀 Starting optimized parallel transcription task - guaranteeing zero chunk loss");
@@ -187,6 +196,11 @@ pub fn start_transcription_task<R: Runtime>(
         {
             Ok(engine) => engine,
             Err(e) => {
+                drop(transcription_receiver);
+                queue_ledger.finish_all_nonterminal(
+                    WorkOutcome::Failed(WorkFailureReason::ModelUnavailable),
+                    std::time::Instant::now(),
+                );
                 error!("Failed to initialize transcription engine: {}", e);
                 let _ = app.emit("transcription-error", serde_json::json!({
                     "error": e,
@@ -200,13 +214,9 @@ pub fn start_transcription_task<R: Runtime>(
 
         // Create parallel workers for faster processing while preserving ALL chunks
         const NUM_WORKERS: usize = 1; // Serial processing ensures transcripts emit in chronological order
-        let (work_sender, work_receiver) = tokio::sync::mpsc::unbounded_channel::<AudioChunk>();
+        let (work_sender, work_receiver) =
+            tokio::sync::mpsc::channel::<AudioChunk>(queue_ledger.capacity());
         let work_receiver = Arc::new(tokio::sync::Mutex::new(work_receiver));
-
-        // Track completion: AtomicU64 for chunks queued, AtomicU64 for chunks completed
-        let chunks_queued = Arc::new(AtomicU64::new(0));
-        let chunks_completed = Arc::new(AtomicU64::new(0));
-        let input_finished = Arc::new(AtomicBool::new(false));
 
         info!(
             "📊 Starting {} transcription worker{} (serial mode for ordered emission)",
@@ -224,11 +234,9 @@ pub fn start_transcription_task<R: Runtime>(
             };
             let app_clone = app.clone();
             let work_receiver_clone = work_receiver.clone();
-            let chunks_completed_clone = chunks_completed.clone();
-            let input_finished_clone = input_finished.clone();
-            let chunks_queued_clone = chunks_queued.clone();
             let database_pool_clone = database_pool.clone();
             let meeting_id_clone = meeting_id.clone();
+            let queue_ledger_clone = queue_ledger.clone();
 
             let worker_handle = tokio::spawn(async move {
                 info!("👷 Worker {} started", worker_id);
@@ -263,6 +271,17 @@ pub fn start_transcription_task<R: Runtime>(
 
                     match chunk {
                         Some(chunk) => {
+                            let work_id = transcription_work_id(chunk.chunk_id);
+                            if let Err(error) = queue_ledger_clone
+                                .start(&work_id, std::time::Instant::now())
+                            {
+                                error!(
+                                    "Worker {} could not start transcription work {}: {:?}",
+                                    worker_id, work_id, error
+                                );
+                                continue;
+                            }
+
                             // PERFORMANCE OPTIMIZATION: Reduce logging in hot path
                             // Only log every 10th chunk per worker to reduce I/O overhead
                             let should_log_this_chunk = chunk.chunk_id % 10 == 0;
@@ -279,14 +298,23 @@ pub fn start_transcription_task<R: Runtime>(
                             // Check if model is still loaded before processing
                             if !engine_clone.is_model_loaded().await {
                                 warn!("⚠️ Worker {}: Model unloaded, but continuing to preserve chunk {}", worker_id, chunk.chunk_id);
-                                // Still count as completed even if we can't process
-                                chunks_completed_clone.fetch_add(1, Ordering::SeqCst);
+                                if let Err(error) = queue_ledger_clone.finish(
+                                    &work_id,
+                                    WorkOutcome::Failed(WorkFailureReason::ModelUnavailable),
+                                    std::time::Instant::now(),
+                                ) {
+                                    error!(
+                                        "Worker {} could not fail model-unavailable work {}: {:?}",
+                                        worker_id, work_id, error
+                                    );
+                                }
                                 continue;
                             }
 
                             let chunk_id = chunk.chunk_id;
                             let chunk_timestamp = chunk.timestamp;
                             let chunk_duration = chunk.data.len() as f64 / chunk.sample_rate as f64;
+                            let mut terminal_outcome = WorkOutcome::Completed;
 
                             // Transcribe with provider-agnostic approach
                             match transcribe_chunk_with_provider(&engine_clone, chunk, &app_clone)
@@ -359,6 +387,9 @@ pub fn start_transcription_task<R: Runtime>(
                                             if let Err(error) =
                                                 app_clone.emit("transcript-update", &update)
                                             {
+                                                terminal_outcome = WorkOutcome::Failed(
+                                                    WorkFailureReason::TranscriptionFailed,
+                                                );
                                                 error!(
                                                     "Worker {} failed to emit provisional transcript update: {}",
                                                     worker_id, error
@@ -423,12 +454,18 @@ pub fn start_transcription_task<R: Runtime>(
                                                     Ok(
                                                         FinalEvidencePublication::PersistenceFailed,
                                                     ) => {
+                                                        terminal_outcome = WorkOutcome::Failed(
+                                                            WorkFailureReason::EvidencePersistenceFailed,
+                                                        );
                                                         error!(
                                                             "Worker {} suppressed canonical publication after evidence persistence failed for {}",
                                                             worker_id, evidence_id
                                                         );
                                                     }
                                                     Err(code) => {
+                                                        terminal_outcome = WorkOutcome::Failed(
+                                                            WorkFailureReason::EvidencePersistenceFailed,
+                                                        );
                                                         error!(
                                                             "Worker {} could not publish transcript evidence outcome: {}",
                                                             worker_id, code
@@ -436,6 +473,9 @@ pub fn start_transcription_task<R: Runtime>(
                                                     }
                                                 }
                                             } else {
+                                                terminal_outcome = WorkOutcome::Failed(
+                                                    WorkFailureReason::EvidencePersistenceFailed,
+                                                );
                                                 let failure =
                                                     TranscriptEvidencePersistenceFailure {
                                                         code:
@@ -474,87 +514,48 @@ pub fn start_transcription_task<R: Runtime>(
                                     }
                                 }
                                 Err(e) => {
-                                    // Improved error handling with specific cases
-                                    match e {
-                                        TranscriptionError::AudioTooShort { .. } => {
-                                            // Skip silently, this is expected for very short chunks
-                                            info!("Worker {}: {}", worker_id, e);
-                                            chunks_completed_clone.fetch_add(1, Ordering::SeqCst);
-                                            continue;
-                                        }
-                                        TranscriptionError::ModelNotLoaded => {
-                                            warn!(
-                                                "Worker {}: Model unloaded during transcription",
-                                                worker_id
-                                            );
-                                            chunks_completed_clone.fetch_add(1, Ordering::SeqCst);
-                                            continue;
-                                        }
-                                        _ => {
-                                            warn!(
-                                                "Worker {}: Transcription failed: {}",
-                                                worker_id, e
-                                            );
-                                            let _ = app_clone
-                                                .emit("transcription-warning", e.to_string());
-                                        }
+                                    terminal_outcome =
+                                        terminal_outcome_for_transcription_error(&e);
+                                    if matches!(e, TranscriptionError::AudioTooShort { .. }) {
+                                        info!("Worker {}: {}", worker_id, e);
+                                    } else {
+                                        warn!("Worker {}: Transcription failed: {}", worker_id, e);
+                                        let _ = app_clone
+                                            .emit("transcription-warning", e.to_string());
                                     }
                                 }
                             }
 
-                            // Mark chunk as completed
-                            let completed =
-                                chunks_completed_clone.fetch_add(1, Ordering::SeqCst) + 1;
-                            let queued = chunks_queued_clone.load(Ordering::SeqCst);
-
-                            // PERFORMANCE: Only log progress every 5th chunk to reduce I/O overhead
-                            if completed % 5 == 0 || should_log_this_chunk {
-                                info!(
-                                    "Worker {}: Progress {}/{} chunks ({:.1}%)",
-                                    worker_id,
-                                    completed,
-                                    queued,
-                                    (completed as f64 / queued.max(1) as f64 * 100.0)
+                            if let Err(error) = queue_ledger_clone.finish(
+                                &work_id,
+                                terminal_outcome,
+                                std::time::Instant::now(),
+                            ) {
+                                error!(
+                                    "Worker {} could not terminally account work {}: {:?}",
+                                    worker_id, work_id, error
                                 );
                             }
 
-                            // Emit progress event for frontend
-                            let progress_percentage = if queued > 0 {
-                                (completed as f64 / queued as f64 * 100.0) as u32
-                            } else {
-                                100
-                            };
+                            let snapshot = queue_ledger_clone.snapshot(std::time::Instant::now());
 
                             let _ = app_clone.emit("transcription-progress", serde_json::json!({
                                 "worker_id": worker_id,
-                                "chunks_completed": completed,
-                                "chunks_queued": queued,
-                                "progress_percentage": progress_percentage,
-                                "message": format!("Worker {} processing... ({}/{})", worker_id, completed, queued)
+                                "capacity": snapshot.capacity,
+                                "depth": snapshot.depth,
+                                "active": snapshot.active,
+                                "oldest_age_ms": snapshot.oldest_age_ms,
+                                "accepted": snapshot.accepted,
+                                "started": snapshot.started,
+                                "completed": snapshot.completed,
+                                "failed": snapshot.failed,
+                                "cancelled": snapshot.cancelled,
+                                "superseded": snapshot.superseded,
+                                "rejected": snapshot.rejected,
                             }));
                         }
                         None => {
-                            // No more chunks available
-                            if input_finished_clone.load(Ordering::SeqCst) {
-                                // Double-check that all queued chunks are actually completed
-                                let final_queued = chunks_queued_clone.load(Ordering::SeqCst);
-                                let final_completed = chunks_completed_clone.load(Ordering::SeqCst);
-
-                                if final_completed >= final_queued {
-                                    info!(
-                                        "👷 Worker {} finishing - all {}/{} chunks processed",
-                                        worker_id, final_completed, final_queued
-                                    );
-                                    break;
-                                } else {
-                                    warn!("👷 Worker {} detected potential chunk loss: {}/{} completed, waiting...", worker_id, final_completed, final_queued);
-                                    // AGGRESSIVE POLLING: Reduced from 50ms to 5ms for faster chunk detection during shutdown
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
-                                }
-                            } else {
-                                // AGGRESSIVE POLLING: Reduced from 10ms to 1ms for faster response during shutdown
-                                tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
-                            }
+                            break;
                         }
                     }
                 }
@@ -566,85 +567,53 @@ pub fn start_transcription_task<R: Runtime>(
         }
 
         // Main dispatcher: receive chunks and distribute to workers
-        let mut receiver = transcription_receiver;
-        while let Some(chunk) = receiver.recv().await {
-            let queued = chunks_queued.fetch_add(1, Ordering::SeqCst) + 1;
-            info!(
-                "📥 Dispatching chunk {} to workers (total queued: {})",
-                chunk.chunk_id, queued
-            );
+        while let Some(chunk) = transcription_receiver.recv().await {
+            let work_id = transcription_work_id(chunk.chunk_id);
+            info!("📥 Dispatching transcription work {}", work_id);
 
-            if let Err(_) = work_sender.send(chunk) {
-                error!("❌ Failed to send chunk to workers - this should not happen!");
+            if work_sender.send(chunk).await.is_err() {
+                let _ = queue_ledger.finish(
+                    &work_id,
+                    WorkOutcome::Failed(WorkFailureReason::DispatchClosed),
+                    std::time::Instant::now(),
+                );
+                error!("❌ Transcription worker channel closed while dispatching {}", work_id);
                 break;
             }
         }
 
-        // Signal that input is finished
-        input_finished.store(true, Ordering::SeqCst);
         drop(work_sender); // Close the channel to signal workers
-
-        let total_chunks_queued = chunks_queued.load(Ordering::SeqCst);
-        info!("📭 Input finished with {} total chunks queued. Waiting for all {} workers to complete...",
-              total_chunks_queued, NUM_WORKERS);
-
-        // Emit final chunk count to frontend
-        let _ = app.emit("transcription-queue-complete", serde_json::json!({
-            "total_chunks": total_chunks_queued,
-            "message": format!("{} chunks queued for processing - waiting for completion", total_chunks_queued)
-        }));
+        info!("📭 Input closed. Waiting for all {} workers to terminate...", NUM_WORKERS);
 
         // Wait for all workers to complete
+        let mut worker_panicked = false;
         for (worker_id, handle) in worker_handles.into_iter().enumerate() {
             if let Err(e) = handle.await {
+                worker_panicked = true;
                 error!("❌ Worker {} panicked: {:?}", worker_id, e);
             } else {
                 info!("✅ Worker {} completed successfully", worker_id);
             }
         }
 
-        // Final verification with retry logic to catch any stragglers
-        let mut verification_attempts = 0;
-        const MAX_VERIFICATION_ATTEMPTS: u32 = 10;
+        let stranded_outcome = if worker_panicked {
+            WorkOutcome::Failed(WorkFailureReason::WorkerPanicked)
+        } else {
+            WorkOutcome::Failed(WorkFailureReason::DispatchClosed)
+        };
+        queue_ledger.finish_all_nonterminal(stranded_outcome, std::time::Instant::now());
+        let final_snapshot = queue_ledger.snapshot(std::time::Instant::now());
+        let _ = app.emit("transcription-queue-terminal", &final_snapshot);
 
-        loop {
-            let final_queued = chunks_queued.load(Ordering::SeqCst);
-            let final_completed = chunks_completed.load(Ordering::SeqCst);
-
-            if final_queued == final_completed {
-                info!(
-                    "🎉 ALL {} chunks processed successfully - ZERO chunks lost!",
-                    final_completed
-                );
-                break;
-            } else if verification_attempts < MAX_VERIFICATION_ATTEMPTS {
-                verification_attempts += 1;
-                warn!("⚠️ Chunk count mismatch (attempt {}): {} queued, {} completed - waiting for stragglers...",
-                     verification_attempts, final_queued, final_completed);
-
-                // Wait a bit for any remaining chunks to be processed
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            } else {
-                error!(
-                    "❌ CRITICAL: After {} attempts, chunk loss detected: {} queued, {} completed",
-                    MAX_VERIFICATION_ATTEMPTS, final_queued, final_completed
-                );
-
-                // Emit critical error event
-                let _ = app.emit(
-                    "transcript-chunk-loss-detected",
-                    serde_json::json!({
-                        "chunks_queued": final_queued,
-                        "chunks_completed": final_completed,
-                        "chunks_lost": final_queued - final_completed,
-                        "message": "Some transcript chunks may have been lost during shutdown"
-                    }),
-                );
-                break;
-            }
-        }
-
-        info!("✅ Parallel transcription task completed - all workers finished, ready for model unload");
+        info!(
+            "✅ Transcription workers terminated with accepted={}, completed={}, failed={}, cancelled={}, superseded={}, rejected={}",
+            final_snapshot.accepted,
+            final_snapshot.completed,
+            final_snapshot.failed,
+            final_snapshot.cancelled,
+            final_snapshot.superseded,
+            final_snapshot.rejected,
+        );
     })
 }
 
@@ -922,6 +891,15 @@ mod tests {
     #[test]
     fn bounded_transcription_worker_join_precedes_any_queue_complete_signal() {
         let source = include_str!("worker.rs");
+        let pipeline = include_str!("../pipeline.rs");
+        assert!(
+            !source.contains(concat!("mpsc::unbounded", "_channel::<AudioChunk>"))
+                && !pipeline.contains(concat!(
+                    "transcription_sender: mpsc::Unbounded",
+                    "Sender<AudioChunk>"
+                )),
+            "both transcription handoffs must use finite Tokio channels"
+        );
         let join_position = source
             .find("handle.await")
             .expect("worker task must be joined before completion can be claimed");

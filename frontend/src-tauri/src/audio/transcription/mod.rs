@@ -17,8 +17,9 @@ pub use engine::{
 pub use parakeet_provider::ParakeetProvider;
 pub use provider::{TranscriptResult, TranscriptionError, TranscriptionProvider};
 pub use queue_ledger::{
-    QueueGap, QueueLedger, QueueSnapshot, QueueTransitionError, QueueWorkRecord, RejectionReason,
-    SupersessionReason, WorkCancellationReason, WorkFailureReason, WorkOutcome,
+    transcription_work_id, QueueGap, QueueLedger, QueueSnapshot, QueueTransitionError,
+    QueueWorkRecord, RejectionReason, SupersessionReason, WorkCancellationReason,
+    WorkFailureReason, WorkOutcome,
 };
 pub use whisper_provider::WhisperProvider;
 pub use worker::{reset_speech_detected_flag, start_transcription_task, TranscriptUpdate};

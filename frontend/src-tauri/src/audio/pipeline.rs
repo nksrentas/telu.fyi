@@ -10,7 +10,9 @@ use rubato::{Resampler, SincFixedIn, SincInterpolationParameters, SincInterpolat
 
 use super::devices::AudioDevice;
 use super::recording_state::{AudioChunk, AudioError, RecordingState, DeviceType};
-use super::transcription::queue_ledger::{QueueLedger, RejectionReason};
+use super::transcription::queue_ledger::{
+    transcription_work_id, QueueLedger, QueueTransitionError, RejectionReason,
+};
 use super::audio_processing::{audio_to_mono, LoudnessNormalizer, NoiseSuppressionProcessor, HighPassFilter};
 use super::vad::{ContinuousVadProcessor};
 
@@ -27,18 +29,108 @@ use super::vad::{ContinuousVadProcessor};
 /// during continuous speech is tracked separately in #756.
 const VAD_REDEMPTION_TIME_MS: u32 = 500;
 
+/// Default experiment input, not a release threshold. Operators may override
+/// it with `TELU_TRANSCRIPTION_QUEUE_CAPACITY`; every authoritative snapshot
+/// records the effective value.
+pub const DEFAULT_TRANSCRIPTION_QUEUE_CAPACITY: usize = 8;
+const MAX_TRANSCRIPTION_QUEUE_CAPACITY: usize = 4096;
+
+pub fn transcription_queue_capacity() -> Result<usize> {
+    match std::env::var("TELU_TRANSCRIPTION_QUEUE_CAPACITY") {
+        Ok(raw) => {
+            let capacity = raw.parse::<usize>().map_err(|_| {
+                anyhow::anyhow!("TELU_TRANSCRIPTION_QUEUE_CAPACITY must be an integer")
+            })?;
+            if !(1..=MAX_TRANSCRIPTION_QUEUE_CAPACITY).contains(&capacity) {
+                return Err(anyhow::anyhow!(
+                    "TELU_TRANSCRIPTION_QUEUE_CAPACITY must be between 1 and {}",
+                    MAX_TRANSCRIPTION_QUEUE_CAPACITY
+                ));
+            }
+            Ok(capacity)
+        }
+        Err(std::env::VarError::NotPresent) => Ok(DEFAULT_TRANSCRIPTION_QUEUE_CAPACITY),
+        Err(error) => Err(anyhow::anyhow!(
+            "TELU_TRANSCRIPTION_QUEUE_CAPACITY is not valid Unicode: {}",
+            error
+        )),
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TranscriptionAdmission {
     Accepted,
     Rejected(RejectionReason),
+    LedgerError,
 }
 
 fn try_admit_transcription(
-    _sender: &mpsc::Sender<AudioChunk>,
-    _ledger: &QueueLedger,
-    _chunk: AudioChunk,
+    sender: &mpsc::Sender<AudioChunk>,
+    ledger: &QueueLedger,
+    chunk: AudioChunk,
 ) -> TranscriptionAdmission {
-    TranscriptionAdmission::Accepted
+    let work_id = transcription_work_id(chunk.chunk_id);
+    let admitted_at = std::time::Instant::now();
+    let duration_ms = ((chunk.data.len() as f64 / chunk.sample_rate.max(1) as f64) * 1000.0)
+        .max(0.0) as u64;
+    let audio_start_ms = (chunk.timestamp.max(0.0) * 1000.0) as u64;
+    let audio_end_ms = audio_start_ms.saturating_add(duration_ms);
+
+    match sender.try_reserve() {
+        Ok(permit) => match ledger.accept(work_id, admitted_at) {
+            Ok(_) => {
+                permit.send(chunk);
+                TranscriptionAdmission::Accepted
+            }
+            Err(error) => {
+                warn!("Transcription admission ledger rejected work: {:?}", error);
+                TranscriptionAdmission::LedgerError
+            }
+        },
+        Err(mpsc::error::TrySendError::Full(())) => record_rejection(
+            ledger,
+            work_id,
+            RejectionReason::Capacity,
+            admitted_at,
+            audio_start_ms,
+            audio_end_ms,
+        ),
+        Err(mpsc::error::TrySendError::Closed(())) => record_rejection(
+            ledger,
+            work_id,
+            RejectionReason::Closed,
+            admitted_at,
+            audio_start_ms,
+            audio_end_ms,
+        ),
+    }
+}
+
+fn record_rejection(
+    ledger: &QueueLedger,
+    work_id: String,
+    reason: RejectionReason,
+    rejected_at: std::time::Instant,
+    audio_start_ms: u64,
+    audio_end_ms: u64,
+) -> TranscriptionAdmission {
+    match ledger.reject_with_bounds(
+        work_id,
+        reason,
+        rejected_at,
+        Some(audio_start_ms),
+        Some(audio_end_ms),
+    ) {
+        Ok(_) => TranscriptionAdmission::Rejected(reason),
+        Err(QueueTransitionError::DuplicateWorkId(work_id)) => {
+            warn!("Duplicate transcription work ID rejected: {}", work_id);
+            TranscriptionAdmission::LedgerError
+        }
+        Err(error) => {
+            warn!("Could not record transcription rejection: {:?}", error);
+            TranscriptionAdmission::LedgerError
+        }
+    }
 }
 
 /// Ring buffer for synchronized audio mixing
@@ -707,7 +799,8 @@ impl AudioCapture {
 /// Uses Voice Activity Detection to segment speech in real-time and send only speech to Whisper
 pub struct AudioPipeline {
     receiver: mpsc::UnboundedReceiver<AudioChunk>,
-    transcription_sender: mpsc::UnboundedSender<AudioChunk>,
+    transcription_sender: mpsc::Sender<AudioChunk>,
+    transcription_ledger: Arc<QueueLedger>,
     state: Arc<RecordingState>,
     vad_processor: ContinuousVadProcessor,
     sample_rate: u32,
@@ -727,7 +820,7 @@ pub struct AudioPipeline {
 impl AudioPipeline {
     pub fn new(
         receiver: mpsc::UnboundedReceiver<AudioChunk>,
-        transcription_sender: mpsc::UnboundedSender<AudioChunk>,
+        transcription_sender: mpsc::Sender<AudioChunk>,
         state: Arc<RecordingState>,
         target_chunk_duration_ms: u32,
         sample_rate: u32,
@@ -784,9 +877,14 @@ impl AudioPipeline {
         // Note: target_chunk_duration_ms is ignored - VAD controls segmentation now
         let _ = target_chunk_duration_ms;
 
+        let transcription_ledger = state
+            .queue_ledger()
+            .ok_or_else(|| anyhow::anyhow!("transcription queue ledger is not initialized"))?;
+
         Ok(Self {
             receiver,
             transcription_sender,
+            transcription_ledger,
             state,
             vad_processor,
             sample_rate,
@@ -889,10 +987,14 @@ impl AudioPipeline {
                                                 device_type: DeviceType::Microphone,  // Mixed audio
                                             };
 
-                                            if let Err(e) = self.transcription_sender.send(transcription_chunk) {
-                                                warn!("Failed to send VAD segment: {}", e);
-                                            } else {
-                                                self.chunk_id_counter += 1;
+                                            let admission = try_admit_transcription(
+                                                &self.transcription_sender,
+                                                &self.transcription_ledger,
+                                                transcription_chunk,
+                                            );
+                                            self.chunk_id_counter += 1;
+                                            if admission != TranscriptionAdmission::Accepted {
+                                                warn!("VAD transcription segment was not accepted: {:?}", admission);
                                             }
                                         } else {
                                             debug!("⏭️ Dropping short VAD segment: {:.1}ms ({} samples < 800)",
@@ -959,10 +1061,14 @@ impl AudioPipeline {
                             device_type: DeviceType::Microphone,
                         };
 
-                        if let Err(e) = self.transcription_sender.send(transcription_chunk) {
-                            warn!("Failed to send final VAD segment: {}", e);
-                        } else {
-                            self.chunk_id_counter += 1;
+                        let admission = try_admit_transcription(
+                            &self.transcription_sender,
+                            &self.transcription_ledger,
+                            transcription_chunk,
+                        );
+                        self.chunk_id_counter += 1;
+                        if admission != TranscriptionAdmission::Accepted {
+                            warn!("Final VAD transcription segment was not accepted: {:?}", admission);
                         }
                     } else {
                         info!("⏭️ Skipping short final segment: {:.1}ms ({} samples < 800)",
@@ -998,7 +1104,7 @@ impl AudioPipelineManager {
     pub fn start(
         &mut self,
         state: Arc<RecordingState>,
-        transcription_sender: mpsc::UnboundedSender<AudioChunk>,
+        transcription_sender: mpsc::Sender<AudioChunk>,
         target_chunk_duration_ms: u32,
         sample_rate: u32,
         recording_sender: Option<mpsc::UnboundedSender<AudioChunk>>,
@@ -1155,6 +1261,9 @@ mod tests {
         assert_eq!(full_snapshot.rejected, 1);
         assert_eq!(full_ledger.gaps().len(), 1);
         assert_eq!(full_ledger.gaps()[0].reason, RejectionReason::Capacity);
+        assert_eq!(full_ledger.gaps()[0].work_id, "mixed:chunk-1");
+        assert_eq!(full_ledger.gaps()[0].audio_start_ms, Some(1_000));
+        assert_eq!(full_ledger.gaps()[0].audio_end_ms, Some(1_050));
 
         let closed_ledger = QueueLedger::new("meeting-closed", 1).expect("closed ledger");
         let (closed_sender, closed_receiver) = mpsc::channel(1);
@@ -1163,5 +1272,6 @@ mod tests {
         assert_eq!(closed, TranscriptionAdmission::Rejected(RejectionReason::Closed));
         assert_eq!(closed_ledger.snapshot(Instant::now()).rejected, 1);
         assert_eq!(closed_ledger.gaps()[0].reason, RejectionReason::Closed);
+        assert_eq!(closed_ledger.gaps()[0].work_id, "mixed:chunk-2");
     }
 }
