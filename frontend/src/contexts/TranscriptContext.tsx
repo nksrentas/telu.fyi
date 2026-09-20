@@ -1,16 +1,32 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode, MutableRefObject } from 'react';
-import { Transcript, TranscriptUpdate } from '@/types';
+import { Transcript } from '@/types';
 import { toast } from 'sonner';
 import { useRecordingState } from './RecordingStateContext';
-import { transcriptService } from '@/services/transcriptService';
+import {
+  CaptureCompleteness,
+  isCanonicalFinalTranscript,
+  transcriptService,
+  TranscriptUpdate,
+} from '@/services/transcriptService';
 import { recordingService, StartMeetingResult } from '@/services/recordingService';
 import { indexedDBService } from '@/services/indexedDBService';
 
+type EvidenceAwareTranscript = Transcript & {
+  meeting_id: string;
+  evidence_id?: string;
+  source: string;
+  source_segment_key: string;
+  is_final: boolean;
+  is_canonical: boolean;
+  capture_completeness?: CaptureCompleteness;
+  delivery_token?: string;
+};
+
 interface TranscriptContextType {
-  transcripts: Transcript[];
-  transcriptsRef: MutableRefObject<Transcript[]>
+  transcripts: EvidenceAwareTranscript[];
+  transcriptsRef: MutableRefObject<EvidenceAwareTranscript[]>
   addTranscript: (update: TranscriptUpdate) => void;
   copyTranscript: () => void;
   flushBuffer: () => void;
@@ -25,8 +41,42 @@ interface TranscriptContextType {
 const TranscriptContext = createContext<TranscriptContextType | undefined>(undefined);
 const MEETING_IDENTITY_CONFLICT = 'MEETING_IDENTITY_CONFLICT';
 
+function toDisplayTranscript(update: TranscriptUpdate): EvidenceAwareTranscript {
+  const common = {
+    text: update.text,
+    timestamp: update.timestamp,
+    sequence_id: update.sequence_id,
+    chunk_start_time: update.chunk_start_time,
+    is_partial: update.is_partial,
+    confidence: update.confidence,
+    audio_start_time: update.audio_start_time,
+    audio_end_time: update.audio_end_time,
+    duration: update.duration,
+    meeting_id: update.meeting_id,
+    source: update.source,
+    source_segment_key: update.source_segment_key,
+    is_final: update.is_final,
+    is_canonical: update.is_canonical,
+  };
+
+  if (isCanonicalFinalTranscript(update)) {
+    return {
+      ...common,
+      id: update.evidence_id,
+      evidence_id: update.evidence_id,
+      capture_completeness: update.capture_completeness,
+      delivery_token: update.delivery_token,
+    };
+  }
+
+  return {
+    ...common,
+    id: `provisional:${update.meeting_id}:${update.source_segment_key}:${update.sequence_id}`,
+  };
+}
+
 export function TranscriptProvider({ children }: { children: ReactNode }) {
-  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const [transcripts, setTranscripts] = useState<EvidenceAwareTranscript[]>([]);
   const [meetingTitle, setMeetingTitle] = useState('+ New Call');
   const [currentMeetingId, setCurrentMeetingId] = useState<string | null>(null);
 
@@ -34,7 +84,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   const recordingState = useRecordingState();
 
   // Refs for transcript management
-  const transcriptsRef = useRef<Transcript[]>(transcripts);
+  const transcriptsRef = useRef<EvidenceAwareTranscript[]>(transcripts);
   const isUserAtBottomRef = useRef<boolean>(true);
   const transcriptContainerRef = useRef<HTMLDivElement>(null);
   const finalFlushRef = useRef<(() => void) | null>(null);
@@ -209,13 +259,12 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   // Main transcript buffering logic with sequence_id ordering
   useEffect(() => {
     let unlistenFn: (() => void) | undefined;
-    let transcriptCounter = 0;
-    let transcriptBuffer = new Map<number, Transcript>();
+    let transcriptBuffer = new Map<number, EvidenceAwareTranscript>();
     let lastProcessedSequence = 0;
     let processingTimer: NodeJS.Timeout | undefined;
 
     const processBufferedTranscripts = (forceFlush = false) => {
-      const sortedTranscripts: Transcript[] = [];
+      const sortedTranscripts: EvidenceAwareTranscript[] = [];
 
       // Process all available sequential transcripts
       let nextSequence = lastProcessedSequence + 1;
@@ -231,9 +280,9 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       const staleThreshold = 100;  // 100ms safety net only (serial workers = sequential order)
       const recentThreshold = 0;    // Show immediately - no delay needed with serial processing
-      const staleTranscripts: Transcript[] = [];
-      const recentTranscripts: Transcript[] = [];
-      const forceFlushTranscripts: Transcript[] = [];
+      const staleTranscripts: EvidenceAwareTranscript[] = [];
+      const recentTranscripts: EvidenceAwareTranscript[] = [];
+      const forceFlushTranscripts: EvidenceAwareTranscript[] = [];
 
       for (const [sequenceId, transcript] of transcriptBuffer.entries()) {
         if (forceFlush) {
@@ -257,7 +306,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
       }
 
       // Sort both stale and recent transcripts by chunk_start_time, then by sequence_id
-      const sortTranscripts = (transcripts: Transcript[]) => {
+      const sortTranscripts = (transcripts: EvidenceAwareTranscript[]) => {
         return transcripts.sort((a, b) => {
           const chunkTimeDiff = (a.chunk_start_time || 0) - (b.chunk_start_time || 0);
           if (chunkTimeDiff !== 0) return chunkTimeDiff;
@@ -273,24 +322,33 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
 
       if (allNewTranscripts.length > 0) {
         setTranscripts(prev => {
-          // Create a set of existing sequence_ids for deduplication
-          const existingSequenceIds = new Set(prev.map(t => t.sequence_id).filter(id => id !== undefined));
+          const finalSourceKeys = new Set(
+            allNewTranscripts
+              .filter(transcript => transcript.is_canonical)
+              .map(transcript => transcript.source_segment_key),
+          );
+          const retained = prev.filter(transcript => !(
+            !transcript.is_canonical
+            && finalSourceKeys.has(transcript.source_segment_key)
+          ));
+          const existingIds = new Set(retained.map(transcript => transcript.id));
 
-          // Filter out any new transcripts that already exist
-          const uniqueNewTranscripts = allNewTranscripts.filter(transcript =>
-            transcript.sequence_id !== undefined && !existingSequenceIds.has(transcript.sequence_id)
+          // Canonical redelivery is idempotent by Rust evidence identity. The
+          // deterministic provisional key only deduplicates display updates.
+          const uniqueNewTranscripts = allNewTranscripts.filter(
+            transcript => !existingIds.has(transcript.id),
           );
 
           // Only combine if we have unique new transcripts
           if (uniqueNewTranscripts.length === 0) {
             console.log('No unique transcripts to add - all were duplicates');
-            return prev; // No new unique transcripts to add
+            return retained;
           }
 
           console.log(`Adding ${uniqueNewTranscripts.length} unique transcripts out of ${allNewTranscripts.length} received`);
 
           // Merge with existing transcripts, maintaining chronological order
-          const combined = [...prev, ...uniqueNewTranscripts];
+          const combined = [...retained, ...uniqueNewTranscripts];
 
           // Sort by chunk_start_time first, then by sequence_id
           return combined.sort((a, b) => {
@@ -318,9 +376,10 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
           const now = Date.now();
           console.log('🎯 MAIN LISTENER: Received transcript update:', {
             sequence_id: update.sequence_id,
-            text: update.text.substring(0, 50) + '...',
-            timestamp: update.timestamp,
             is_partial: update.is_partial,
+            is_canonical: update.is_canonical,
+            evidence_id: update.evidence_id,
+            transcript_length: update.text.length,
             received_at: new Date(now).toISOString(),
             buffer_size_before: transcriptBuffer.size
           });
@@ -331,28 +390,21 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
             return;
           }
 
-          // Create transcript for buffer with NEW timestamp fields
-          const newTranscript: Transcript = {
-            id: `${Date.now()}-${transcriptCounter++}`,
-            text: update.text,
-            timestamp: update.timestamp,
-            sequence_id: update.sequence_id,
-            chunk_start_time: update.chunk_start_time,
-            is_partial: update.is_partial,
-            confidence: update.confidence,
-            // NEW: Recording-relative timestamps for playback sync
-            audio_start_time: update.audio_start_time,
-            audio_end_time: update.audio_end_time,
-            duration: update.duration,
-          };
+          const newTranscript = toDisplayTranscript(update);
 
           // Add to buffer
           transcriptBuffer.set(update.sequence_id, newTranscript);
           console.log(`✅ MAIN LISTENER: Buffered transcript with sequence_id ${update.sequence_id}. Buffer size: ${transcriptBuffer.size}, Last processed: ${lastProcessedSequence}`);
 
-          // Save to IndexedDB (non-blocking)
-          if (currentMeetingId) {
-            indexedDBService.saveTranscript(currentMeetingId, update)
+          // SQLite has already committed canonical finals before publication.
+          // IndexedDB mirrors only that final evidence and cannot promote a
+          // provisional event into recovery state.
+          const activeMeetingId = currentMeetingIdRef.current;
+          if (
+            activeMeetingId === update.meeting_id
+            && isCanonicalFinalTranscript(update)
+          ) {
+            indexedDBService.saveFinalTranscript(update)
               .catch(err => console.warn('IndexedDB save failed:', err));
           }
 
@@ -385,7 +437,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         console.log('🧹 CLEANUP: MAIN transcript listener cleaned up');
       }
     };
-  }, [currentMeetingId]); // Add currentMeetingId dependency
+  }, []);
 
   // Sync transcript history and meeting name from backend on reload
   // This fixes the issue where reloading during active recording causes state desync
@@ -417,23 +469,38 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         try {
           console.log('[Reload Sync] Recording active after reload, syncing transcript history...');
 
-          // Fetch transcript history from backend
-          const history = await transcriptService.getTranscriptHistory();
-          console.log(`[Reload Sync] Retrieved ${history.length} transcript segments from backend`);
+          const meetingId = currentMeetingIdRef.current;
+          const finalEvidence = meetingId
+            ? await indexedDBService.getFinalTranscripts(meetingId)
+            : [];
+          console.log(`[Reload Sync] Retrieved ${finalEvidence.length} canonical evidence segments from recovery cache`);
 
-          // Convert backend format to frontend Transcript format
-          const formattedTranscripts: Transcript[] = history.map((segment: any) => ({
-            id: segment.id,
-            text: segment.text,
-            timestamp: segment.display_time, // Use display_time for UI
-            sequence_id: segment.sequence_id,
-            chunk_start_time: segment.audio_start_time,
-            is_partial: false, // History segments are always final
-            confidence: segment.confidence,
-            audio_start_time: segment.audio_start_time,
-            audio_end_time: segment.audio_end_time,
-            duration: segment.duration,
-          }));
+          const formattedTranscripts: EvidenceAwareTranscript[] = finalEvidence.map(storedSegment => {
+            const segment = {
+              ...storedSegment,
+              evidence_id: storedSegment.evidenceId,
+              capture_completeness: storedSegment.captureCompleteness,
+            };
+            return {
+              id: segment.evidence_id,
+              evidence_id: segment.evidence_id,
+              meeting_id: segment.meetingId,
+              source: segment.source,
+              source_segment_key: segment.sourceSegmentKey,
+              text: segment.text,
+              timestamp: segment.timestamp,
+              sequence_id: segment.sequenceId,
+              chunk_start_time: segment.audio_start_time,
+              is_partial: false,
+              is_final: true,
+              is_canonical: true,
+              capture_completeness: segment.capture_completeness,
+              confidence: segment.confidence,
+              audio_start_time: segment.audio_start_time,
+              audio_end_time: segment.audio_end_time,
+              duration: segment.duration,
+            };
+          });
 
           setTranscripts(formattedTranscripts);
           console.log('[Reload Sync] ✅ Transcript history synced successfully');
@@ -458,33 +525,20 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
   const addTranscript = useCallback((update: TranscriptUpdate) => {
     console.log('🎯 addTranscript called with:', {
       sequence_id: update.sequence_id,
-      text: update.text.substring(0, 50) + '...',
-      timestamp: update.timestamp,
-      is_partial: update.is_partial
+      is_partial: update.is_partial,
+      is_canonical: update.is_canonical,
+      transcript_length: update.text.length,
     });
 
-    const newTranscript: Transcript = {
-      id: update.sequence_id ? update.sequence_id.toString() : Date.now().toString(),
-      text: update.text,
-      timestamp: update.timestamp,
-      sequence_id: update.sequence_id || 0,
-      chunk_start_time: update.chunk_start_time,
-      is_partial: update.is_partial,
-      confidence: update.confidence,
-      audio_start_time: update.audio_start_time,
-      audio_end_time: update.audio_end_time,
-      duration: update.duration,
-    };
+    const newTranscript = toDisplayTranscript(update);
 
     setTranscripts(prev => {
       console.log('📊 Current transcripts count before update:', prev.length);
 
       // Check if this transcript already exists
-      const exists = prev.some(
-        t => t.text === update.text && t.timestamp === update.timestamp
-      );
+      const exists = prev.some(t => t.id === newTranscript.id);
       if (exists) {
-        console.log('🚫 Duplicate transcript detected, skipping:', update.text.substring(0, 30) + '...');
+        console.log('🚫 Duplicate transcript identity detected, skipping:', newTranscript.id);
         return prev;
       }
 
@@ -495,7 +549,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
       console.log('✅ Added new transcript. New count:', sorted.length);
       console.log('📝 Latest transcript:', {
         id: newTranscript.id,
-        text: newTranscript.text.substring(0, 30) + '...',
+        transcript_length: newTranscript.text.length,
         sequence_id: newTranscript.sequence_id
       });
 

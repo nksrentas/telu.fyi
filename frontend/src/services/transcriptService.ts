@@ -7,7 +7,54 @@
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { TranscriptUpdate, Transcript } from '@/types';
+import { TranscriptUpdate as LegacyTranscriptUpdate, Transcript } from '@/types';
+
+export type CaptureCompleteness = 'complete' | 'incomplete';
+
+interface TranscriptUpdateBase extends Omit<LegacyTranscriptUpdate, 'is_partial'> {
+  meeting_id: string;
+  source_segment_key: string;
+}
+
+export interface ProvisionalTranscriptUpdate extends TranscriptUpdateBase {
+  evidence_id: null;
+  is_partial: true;
+  is_final: false;
+  is_canonical: false;
+  capture_completeness: null;
+  delivery_token?: null;
+}
+
+export interface FinalTranscriptUpdate extends TranscriptUpdateBase {
+  evidence_id: string;
+  is_partial: false;
+  is_final: true;
+  is_canonical: true;
+  capture_completeness: CaptureCompleteness;
+  delivery_token?: string;
+}
+
+export type TranscriptUpdate = ProvisionalTranscriptUpdate | FinalTranscriptUpdate;
+
+export function isCanonicalFinalTranscript(
+  update: TranscriptUpdate,
+): update is FinalTranscriptUpdate {
+  return update.is_canonical === true
+    && update.is_final === true
+    && update.is_partial === false
+    && typeof update.meeting_id === 'string'
+    && update.meeting_id.length > 0
+    && typeof update.evidence_id === 'string'
+    && update.evidence_id.length > 0
+    && typeof update.source === 'string'
+    && update.source.length > 0
+    && typeof update.source_segment_key === 'string'
+    && update.source_segment_key.length > 0
+    && Number.isFinite(update.audio_start_time)
+    && Number.isFinite(update.audio_end_time)
+    && (update.capture_completeness === 'complete'
+      || update.capture_completeness === 'incomplete');
+}
 
 export interface TranscriptionStatus {
   chunks_in_queue: number;

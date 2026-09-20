@@ -5,6 +5,7 @@
  */
 
 import type { MeetingLifecycle } from './recordingService';
+import type { CaptureCompleteness, FinalTranscriptUpdate } from './transcriptService';
 
 export type MeetingCompleteness =
   | 'pending'
@@ -27,24 +28,45 @@ export interface MeetingMetadata {
   completenessReason?: string;
 }
 
-export interface StoredTranscript {
-  id?: number;                // Auto-increment primary key
+export interface CanonicalStoredTranscript {
+  id?: string | number;       // Compatibility projection for recovery consumers
+  evidenceId: string;         // Primary key: canonical Rust evidence UUID
   meetingId: string;          // Foreign key to meetings store
+  source: string;             // Stable Rust source/track identity
+  sourceSegmentKey: string;   // Stable source-local segment identity
   text: string;               // Transcript text
   timestamp: string;          // ISO 8601 timestamp
   confidence: number;         // Whisper confidence score
   sequenceId: number;         // Sequence number for ordering
   storedAt: number;           // Unix timestamp when saved
-  audio_start_time?: number;  // Recording-relative start time in seconds
-  audio_end_time?: number;    // Recording-relative end time in seconds
-  duration?: number;          // Duration in seconds
-  [key: string]: any;         // Allow additional fields from TranscriptUpdate
+  audio_start_time: number;   // Recording-relative start time in seconds
+  audio_end_time: number;     // Recording-relative end time in seconds
+  duration: number;           // Duration in seconds
+  captureCompleteness: CaptureCompleteness;
+  isFinal: true;
+  isCanonical: true;
 }
+
+export interface LegacyStoredTranscript {
+  id?: number;
+  meetingId: string;
+  text: string;
+  timestamp: string;
+  confidence: number;
+  sequenceId: number;
+  storedAt: number;
+  audio_start_time?: number;
+  audio_end_time?: number;
+  duration?: number;
+  [key: string]: unknown;
+}
+
+export type StoredTranscript = CanonicalStoredTranscript | LegacyStoredTranscript;
 
 class IndexedDBService {
   private db: IDBDatabase | null = null;
   private readonly DB_NAME = 'MeetilyRecoveryDB';
-  private readonly DB_VERSION = 2;
+  private readonly DB_VERSION = 3;
   private initPromise: Promise<void> | null = null;
 
   /**
@@ -93,6 +115,16 @@ class IndexedDBService {
             });
             transcriptsStore.createIndex('meetingId', 'meetingId', { unique: false });
             transcriptsStore.createIndex('storedAt', 'storedAt', { unique: false });
+          }
+
+          // Canonical final evidence is separate from the legacy auto-increment
+          // transcript cache. Legacy rows cannot be promoted because they do not
+          // carry a Rust evidence identity or a verified finality contract.
+          if (!db.objectStoreNames.contains('transcriptEvidence')) {
+            const transcriptEvidenceStore = db.createObjectStore('transcriptEvidence', { keyPath: 'evidenceId' });
+            transcriptEvidenceStore.createIndex('meetingId', 'meetingId', { unique: false });
+            transcriptEvidenceStore.createIndex('meetingSourceSegment', ['meetingId', 'source', 'sourceSegmentKey'], { unique: true });
+            transcriptEvidenceStore.createIndex('storedAt', 'storedAt', { unique: false });
           }
 
           // Version 2 adds an honest durable-state projection without changing
@@ -240,12 +272,17 @@ class IndexedDBService {
     try {
       if (!this.db) await this.init();
 
-      const transaction = this.db!.transaction(['meetings', 'transcripts'], 'readwrite');
+      const transaction = this.db!.transaction(
+        ['meetings', 'transcripts', 'transcriptEvidence'],
+        'readwrite',
+      );
       const meetingsStore = transaction.objectStore('meetings');
       const transcriptsStore = transaction.objectStore('transcripts');
+      const transcriptEvidenceStore = transaction.objectStore('transcriptEvidence');
 
       // Delete transcripts
       await this.deleteTranscriptsForMeetingInternal(transcriptsStore, meetingId);
+      await this.deleteTranscriptsForMeetingInternal(transcriptEvidenceStore, meetingId);
 
       // Delete meeting
       await new Promise<void>((resolve, reject) => {
@@ -262,39 +299,57 @@ class IndexedDBService {
   // Transcript operations
 
   /**
-   * Save a transcript segment
+   * Mirror one already-durable final evidence segment for crash recovery.
+   * Provisional updates are deliberately not accepted by this API.
    */
-  async saveTranscript(meetingId: string, transcript: any): Promise<void> {
+  async saveFinalTranscript(transcript: FinalTranscriptUpdate): Promise<void> {
     try {
       if (!this.db) await this.init();
 
-      const storedTranscript: StoredTranscript = {
-        ...transcript,
-        meetingId,
-        storedAt: Date.now()
+      const storedTranscript: CanonicalStoredTranscript = {
+        id: transcript.evidence_id,
+        evidenceId: transcript.evidence_id,
+        meetingId: transcript.meeting_id,
+        source: transcript.source,
+        sourceSegmentKey: transcript.source_segment_key,
+        text: transcript.text,
+        timestamp: transcript.timestamp,
+        confidence: transcript.confidence,
+        sequenceId: transcript.sequence_id,
+        storedAt: Date.now(),
+        audio_start_time: transcript.audio_start_time,
+        audio_end_time: transcript.audio_end_time,
+        duration: transcript.duration,
+        captureCompleteness: transcript.capture_completeness,
+        isFinal: true,
+        isCanonical: true,
       };
 
-      const transaction = this.db!.transaction(['transcripts', 'meetings'], 'readwrite');
-      const transcriptsStore = transaction.objectStore('transcripts');
+      const transaction = this.db!.transaction(['transcriptEvidence', 'meetings'], 'readwrite');
+      const transcriptEvidenceStore = transaction.objectStore('transcriptEvidence');
       const meetingsStore = transaction.objectStore('meetings');
 
-      // Save transcript
+      // Stable Rust evidence identity makes event redelivery an update/no-op.
       await new Promise<void>((resolve, reject) => {
-        const request = transcriptsStore.add(storedTranscript);
+        const request = transcriptEvidenceStore.put(storedTranscript);
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
       });
 
       // Update meeting metadata
       const meeting = await new Promise<MeetingMetadata | null>((resolve, reject) => {
-        const request = meetingsStore.get(meetingId);
+        const request = meetingsStore.get(transcript.meeting_id);
         request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => reject(request.error);
       });
 
       if (meeting) {
         meeting.lastUpdated = Date.now();
-        meeting.transcriptCount += 1;
+        meeting.transcriptCount = await new Promise<number>((resolve, reject) => {
+          const request = transcriptEvidenceStore.index('meetingId').count(transcript.meeting_id);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
         await new Promise<void>((resolve, reject) => {
           const request = meetingsStore.put(meeting);
           request.onsuccess = () => resolve();
@@ -308,20 +363,20 @@ class IndexedDBService {
   }
 
   /**
-   * Get all transcripts for a meeting
+   * Get all canonical final evidence for a meeting.
    */
-  async getTranscripts(meetingId: string): Promise<StoredTranscript[]> {
+  async getFinalTranscripts(meetingId: string): Promise<CanonicalStoredTranscript[]> {
     try {
       if (!this.db) await this.init();
 
-      const transaction = this.db!.transaction(['transcripts'], 'readonly');
-      const store = transaction.objectStore('transcripts');
+      const transaction = this.db!.transaction(['transcriptEvidence'], 'readonly');
+      const store = transaction.objectStore('transcriptEvidence');
       const index = store.index('meetingId');
 
       return new Promise((resolve, reject) => {
         const request = index.getAll(meetingId);
         request.onsuccess = () => {
-          const transcripts = request.result as StoredTranscript[];
+          const transcripts = request.result as CanonicalStoredTranscript[];
           // Sort by sequence ID
           transcripts.sort((a, b) => a.sequenceId - b.sequenceId);
           resolve(transcripts);
@@ -330,6 +385,33 @@ class IndexedDBService {
       });
     } catch (error) {
       console.error('Failed to get transcripts from IndexedDB:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Recovery callers prefer canonical evidence. Historical version-1 cache
+   * rows remain available only for meetings that have no canonical mirror.
+   */
+  async getTranscripts(meetingId: string): Promise<StoredTranscript[]> {
+    const finalEvidence = await this.getFinalTranscripts(meetingId);
+    if (finalEvidence.length > 0) return finalEvidence;
+
+    try {
+      if (!this.db) await this.init();
+      const transaction = this.db!.transaction(['transcripts'], 'readonly');
+      const index = transaction.objectStore('transcripts').index('meetingId');
+      return new Promise((resolve, reject) => {
+        const request = index.getAll(meetingId);
+        request.onsuccess = () => {
+          const transcripts = request.result as LegacyStoredTranscript[];
+          transcripts.sort((a, b) => a.sequenceId - b.sequenceId);
+          resolve(transcripts);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (error) {
+      console.error('Failed to get legacy transcripts from IndexedDB:', error);
       return [];
     }
   }
@@ -368,9 +450,13 @@ class IndexedDBService {
       if (!this.db) await this.init();
 
       const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
-      const transaction = this.db!.transaction(['meetings', 'transcripts'], 'readwrite');
+      const transaction = this.db!.transaction(
+        ['meetings', 'transcripts', 'transcriptEvidence'],
+        'readwrite',
+      );
       const meetingsStore = transaction.objectStore('meetings');
       const transcriptsStore = transaction.objectStore('transcripts');
+      const transcriptEvidenceStore = transaction.objectStore('transcriptEvidence');
 
       // Get all meetings
       const allMeetings = await new Promise<MeetingMetadata[]>((resolve, reject) => {
@@ -385,6 +471,7 @@ class IndexedDBService {
         if (meeting.lastUpdated < cutoffTime) {
           // Delete transcripts
           await this.deleteTranscriptsForMeetingInternal(transcriptsStore, meeting.meetingId);
+          await this.deleteTranscriptsForMeetingInternal(transcriptEvidenceStore, meeting.meetingId);
 
           // Delete meeting
           await new Promise<void>((resolve, reject) => {
@@ -415,9 +502,13 @@ class IndexedDBService {
       if (!this.db) await this.init();
 
       const cutoffTime = Date.now() - (hoursOld * 60 * 60 * 1000);
-      const transaction = this.db!.transaction(['meetings', 'transcripts'], 'readwrite');
+      const transaction = this.db!.transaction(
+        ['meetings', 'transcripts', 'transcriptEvidence'],
+        'readwrite',
+      );
       const meetingsStore = transaction.objectStore('meetings');
       const transcriptsStore = transaction.objectStore('transcripts');
+      const transcriptEvidenceStore = transaction.objectStore('transcriptEvidence');
 
       // Get all meetings and filter for saved ones
       const allMeetings = await new Promise<MeetingMetadata[]>((resolve, reject) => {
@@ -435,6 +526,7 @@ class IndexedDBService {
         if (meeting.lastUpdated < cutoffTime) {
           // Delete transcripts
           await this.deleteTranscriptsForMeetingInternal(transcriptsStore, meeting.meetingId);
+          await this.deleteTranscriptsForMeetingInternal(transcriptEvidenceStore, meeting.meetingId);
 
           // Delete meeting
           await new Promise<void>((resolve, reject) => {
