@@ -1,10 +1,13 @@
 use crate::api::{MeetingDetails, MeetingTranscript};
 use crate::audio::transcription::QueueSnapshot;
 pub use crate::database::models::{MeetingCompleteness, MeetingLifecycle};
-use crate::database::models::{MeetingModel, RecoveryRequest, RecoveryResult, Transcript};
+use crate::database::models::{
+    GapFact, MeetingModel, RecoveryRequest, RecoveryResult, Transcript, TranscriptEvidenceInput,
+};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqliteRow, Connection, Error as SqlxError, Row, SqliteConnection, SqlitePool};
+use std::collections::BTreeMap;
 use tracing::{error, info};
 use uuid::Uuid;
 
@@ -70,13 +73,32 @@ pub enum RecoveryRepositoryError {
 
 impl MeetingsRepository {
     /// Reconcile crash-staged final evidence and gap facts into one canonical
-    /// meeting. The RED-phase contract intentionally fails until the
-    /// transactional implementation is supplied.
+    /// meeting. `BEGIN IMMEDIATE` serializes same-database recovery attempts
+    /// before either caller can observe and mutate durable state.
     pub async fn reconcile_meeting(
-        _pool: &SqlitePool,
-        _request: &RecoveryRequest,
+        pool: &SqlitePool,
+        request: &RecoveryRequest,
     ) -> Result<RecoveryResult, RecoveryRepositoryError> {
-        Err(RecoveryRepositoryError::InvalidRequest)
+        let (evidence, gaps) = validate_and_normalize_recovery_request(request)?;
+        let mut transaction = pool.begin_with("BEGIN IMMEDIATE").await?;
+        let result = reconcile_meeting_transaction(
+            &mut transaction,
+            request,
+            evidence.into_values().collect(),
+            gaps.into_values().collect(),
+        )
+        .await;
+
+        match result {
+            Ok(result) => {
+                transaction.commit().await?;
+                Ok(result)
+            }
+            Err(error) => {
+                let _ = transaction.rollback().await;
+                Err(error)
+            }
+        }
     }
 
     /// Create the canonical meeting row before native capture is allowed to start.
@@ -548,6 +570,382 @@ impl MeetingsRepository {
     }
 }
 
+fn validate_and_normalize_recovery_request(
+    request: &RecoveryRequest,
+) -> Result<
+    (
+        BTreeMap<String, TranscriptEvidenceInput>,
+        BTreeMap<String, GapFact>,
+    ),
+    RecoveryRepositoryError,
+> {
+    if Uuid::parse_str(&request.meeting_id).is_err() {
+        return Err(RecoveryRepositoryError::InvalidRequest);
+    }
+
+    let mut evidence_by_id = BTreeMap::new();
+    let mut source_identity_to_id = BTreeMap::new();
+    for evidence in &request.evidence {
+        validate_recovery_evidence(evidence)?;
+        if evidence.meeting_id != request.meeting_id {
+            return Err(RecoveryRepositoryError::CrossMeetingScope);
+        }
+        let source_identity = (
+            evidence.source_track.clone(),
+            evidence.source_segment_key.clone(),
+        );
+        if let Some(existing_id) = source_identity_to_id.insert(
+            source_identity,
+            evidence.evidence_id.clone(),
+        ) {
+            if existing_id != evidence.evidence_id {
+                return Err(RecoveryRepositoryError::IdentityConflict);
+            }
+        }
+        if let Some(existing) = evidence_by_id.insert(
+            evidence.evidence_id.clone(),
+            evidence.clone(),
+        ) {
+            if existing != *evidence {
+                return Err(RecoveryRepositoryError::IdentityConflict);
+            }
+        }
+    }
+
+    let mut gaps_by_id = BTreeMap::new();
+    for gap in &request.gaps {
+        validate_recovery_gap(gap)?;
+        if gap.meeting_id != request.meeting_id {
+            return Err(RecoveryRepositoryError::CrossMeetingScope);
+        }
+        if let Some(existing) = gaps_by_id.insert(gap.gap_id.clone(), gap.clone()) {
+            if existing != *gap {
+                return Err(RecoveryRepositoryError::IdentityConflict);
+            }
+        }
+    }
+
+    Ok((evidence_by_id, gaps_by_id))
+}
+
+fn validate_recovery_evidence(
+    evidence: &TranscriptEvidenceInput,
+) -> Result<(), RecoveryRepositoryError> {
+    if Uuid::parse_str(&evidence.evidence_id).is_err()
+        || Uuid::parse_str(&evidence.meeting_id).is_err()
+        || evidence.source_track.trim().is_empty()
+        || evidence.source_segment_key.trim().is_empty()
+        || evidence.sequence < 0
+        || evidence.transcript.trim().is_empty()
+        || !evidence.audio_start_time.is_finite()
+        || !evidence.audio_end_time.is_finite()
+        || evidence.audio_start_time < 0.0
+        || evidence.audio_end_time < evidence.audio_start_time
+    {
+        return Err(RecoveryRepositoryError::InvalidRequest);
+    }
+    Ok(())
+}
+
+fn validate_recovery_gap(gap: &GapFact) -> Result<(), RecoveryRepositoryError> {
+    if Uuid::parse_str(&gap.meeting_id).is_err()
+        || gap.gap_id.trim().is_empty()
+        || gap.gap_kind.trim().is_empty()
+        || gap.reason_code.trim().is_empty()
+        || matches!(
+            (gap.audio_start_ms, gap.audio_end_ms),
+            (Some(start), Some(end)) if end < start
+        )
+    {
+        return Err(RecoveryRepositoryError::InvalidRequest);
+    }
+    Ok(())
+}
+
+async fn reconcile_meeting_transaction(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    request: &RecoveryRequest,
+    evidence: Vec<TranscriptEvidenceInput>,
+    mut gaps: Vec<GapFact>,
+) -> Result<RecoveryResult, RecoveryRepositoryError> {
+    let meeting = sqlx::query_as::<_, MeetingModel>("SELECT * FROM meetings WHERE id = ?")
+        .bind(&request.meeting_id)
+        .fetch_optional(&mut **transaction)
+        .await?
+        .ok_or(RecoveryRepositoryError::MeetingNotFound)?;
+
+    match meeting.lifecycle {
+        MeetingLifecycle::Complete | MeetingLifecycle::Legacy => {
+            return Err(RecoveryRepositoryError::StaleMeeting)
+        }
+        MeetingLifecycle::Preparing
+        | MeetingLifecycle::Recording
+        | MeetingLifecycle::Finalizing
+        | MeetingLifecycle::Incomplete
+        | MeetingLifecycle::Recovered => {}
+    }
+
+    let has_terminal_finalization: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM meeting_finalizations WHERE meeting_id = ?)",
+    )
+    .bind(&request.meeting_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    if matches!(
+        meeting.lifecycle,
+        MeetingLifecycle::Preparing | MeetingLifecycle::Recording | MeetingLifecycle::Finalizing
+    ) && !has_terminal_finalization
+    {
+        gaps.push(GapFact {
+            gap_id: "recovery:uncertain-tail".to_string(),
+            meeting_id: request.meeting_id.clone(),
+            gap_kind: "uncertain_tail".to_string(),
+            reason_code: "interrupted_without_terminal_finalization".to_string(),
+            audio_start_ms: None,
+            audio_end_ms: None,
+        });
+    }
+
+    let mut changed = false;
+    for evidence in evidence {
+        let existing_identity = sqlx::query(
+            "SELECT meeting_id, source_track, source_segment_key
+             FROM transcript_evidence WHERE evidence_id = ?",
+        )
+        .bind(&evidence.evidence_id)
+        .fetch_optional(&mut **transaction)
+        .await?;
+        if let Some(row) = existing_identity {
+            if row.try_get::<String, _>("meeting_id")? != evidence.meeting_id {
+                return Err(RecoveryRepositoryError::CrossMeetingScope);
+            }
+            if row.try_get::<String, _>("source_track")? != evidence.source_track
+                || row.try_get::<String, _>("source_segment_key")?
+                    != evidence.source_segment_key
+            {
+                return Err(RecoveryRepositoryError::IdentityConflict);
+            }
+        }
+
+        let existing_source_id: Option<String> = sqlx::query_scalar(
+            "SELECT evidence_id FROM transcript_evidence
+             WHERE meeting_id = ? AND source_track = ? AND source_segment_key = ?",
+        )
+        .bind(&evidence.meeting_id)
+        .bind(&evidence.source_track)
+        .bind(&evidence.source_segment_key)
+        .fetch_optional(&mut **transaction)
+        .await?;
+        if existing_source_id
+            .as_deref()
+            .is_some_and(|evidence_id| evidence_id != evidence.evidence_id)
+        {
+            return Err(RecoveryRepositoryError::IdentityConflict);
+        }
+
+        let now = Utc::now();
+        let persisted = sqlx::query(
+            "INSERT INTO transcript_evidence (
+                evidence_id, meeting_id, source_track, source_segment_key,
+                sequence, transcript, audio_start_time, audio_end_time,
+                is_final, capture_completeness, created_at, updated_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+             ON CONFLICT(evidence_id) DO UPDATE SET
+                sequence = excluded.sequence,
+                transcript = excluded.transcript,
+                audio_start_time = excluded.audio_start_time,
+                audio_end_time = excluded.audio_end_time,
+                capture_completeness = excluded.capture_completeness,
+                updated_at = excluded.updated_at
+             WHERE transcript_evidence.meeting_id = excluded.meeting_id
+               AND transcript_evidence.source_track = excluded.source_track
+               AND transcript_evidence.source_segment_key = excluded.source_segment_key
+               AND (
+                    transcript_evidence.sequence != excluded.sequence
+                 OR transcript_evidence.transcript != excluded.transcript
+                 OR transcript_evidence.audio_start_time != excluded.audio_start_time
+                 OR transcript_evidence.audio_end_time != excluded.audio_end_time
+                 OR transcript_evidence.capture_completeness != excluded.capture_completeness
+               )",
+        )
+        .bind(&evidence.evidence_id)
+        .bind(&evidence.meeting_id)
+        .bind(&evidence.source_track)
+        .bind(&evidence.source_segment_key)
+        .bind(evidence.sequence)
+        .bind(&evidence.transcript)
+        .bind(evidence.audio_start_time)
+        .bind(evidence.audio_end_time)
+        .bind(evidence.capture_completeness.as_str())
+        .bind(now)
+        .bind(now)
+        .execute(&mut **transaction)
+        .await?;
+        changed |= persisted.rows_affected() > 0;
+    }
+
+    let mut gaps_by_id = BTreeMap::new();
+    for gap in gaps {
+        if let Some(existing) = gaps_by_id.insert(gap.gap_id.clone(), gap.clone()) {
+            if existing != gap {
+                return Err(RecoveryRepositoryError::IdentityConflict);
+            }
+        }
+    }
+    for gap in gaps_by_id.into_values() {
+        let existing = sqlx::query(
+            "SELECT gap_kind, reason_code, audio_start_ms, audio_end_ms
+             FROM meeting_finalization_gaps
+             WHERE meeting_id = ? AND work_id = ?",
+        )
+        .bind(&request.meeting_id)
+        .bind(&gap.gap_id)
+        .fetch_all(&mut **transaction)
+        .await?;
+        for row in &existing {
+            if row.try_get::<String, _>("gap_kind")? != gap.gap_kind
+                || row.try_get::<String, _>("reason_code")? != gap.reason_code
+                || optional_i64_to_u64("audio_start_ms", row.try_get("audio_start_ms")?)?
+                    != gap.audio_start_ms
+                || optional_i64_to_u64("audio_end_ms", row.try_get("audio_end_ms")?)?
+                    != gap.audio_end_ms
+            {
+                return Err(RecoveryRepositoryError::IdentityConflict);
+            }
+        }
+        if existing.is_empty() {
+            let inserted = sqlx::query(
+                "INSERT INTO meeting_finalization_gaps (
+                    meeting_id, work_id, gap_kind, reason_code,
+                    audio_start_ms, audio_end_ms, created_at_utc
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(&request.meeting_id)
+            .bind(&gap.gap_id)
+            .bind(&gap.gap_kind)
+            .bind(&gap.reason_code)
+            .bind(optional_u64_to_i64("audio_start_ms", gap.audio_start_ms)?)
+            .bind(optional_u64_to_i64("audio_end_ms", gap.audio_end_ms)?)
+            .bind(Utc::now().to_rfc3339())
+            .execute(&mut **transaction)
+            .await?;
+            changed |= inserted.rows_affected() > 0;
+        }
+    }
+
+    let evidence_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM transcript_evidence WHERE meeting_id = ?",
+    )
+    .bind(&request.meeting_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    let has_incomplete_evidence: bool = sqlx::query_scalar(
+        "SELECT EXISTS(
+            SELECT 1 FROM transcript_evidence
+            WHERE meeting_id = ? AND capture_completeness = 'incomplete'
+         )",
+    )
+    .bind(&request.meeting_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    let projected_gaps = load_recovery_gaps(transaction, &request.meeting_id).await?;
+
+    let mut reasons = meeting
+        .completeness_reason
+        .as_deref()
+        .unwrap_or_default()
+        .split(',')
+        .filter(|reason| !reason.trim().is_empty())
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    reasons.extend(projected_gaps.iter().map(|gap| gap.reason_code.clone()));
+    if has_incomplete_evidence {
+        reasons.push("incomplete_evidence".to_string());
+    }
+    reasons.sort();
+    reasons.dedup();
+
+    let completeness = if projected_gaps.is_empty() && reasons.is_empty() {
+        MeetingCompleteness::Complete
+    } else {
+        MeetingCompleteness::RecoveredWithGaps
+    };
+    let completeness_reason = (!reasons.is_empty()).then(|| reasons.join(","));
+    let state_changed = meeting.lifecycle != MeetingLifecycle::Recovered
+        || meeting.completeness != completeness
+        || meeting.completeness_reason != completeness_reason;
+    let reconciled_at = if changed || state_changed {
+        let now = Utc::now();
+        let updated = sqlx::query(
+            "UPDATE meetings
+             SET lifecycle = 'recovered', completeness = ?,
+                 completeness_reason = ?, updated_at = ?
+             WHERE id = ?",
+        )
+        .bind(completeness.as_str())
+        .bind(&completeness_reason)
+        .bind(now)
+        .bind(&request.meeting_id)
+        .execute(&mut **transaction)
+        .await?;
+        if updated.rows_affected() != 1 {
+            return Err(RecoveryRepositoryError::MeetingNotFound);
+        }
+        now.to_rfc3339()
+    } else {
+        meeting.updated_at.0.to_rfc3339()
+    };
+
+    Ok(RecoveryResult {
+        meeting_id: request.meeting_id.clone(),
+        lifecycle: MeetingLifecycle::Recovered,
+        completeness,
+        evidence_count: i64_to_u64("evidence_count", evidence_count)?,
+        gap_count: projected_gaps.len() as u64,
+        gaps: projected_gaps,
+        reconciled_at_utc: reconciled_at,
+    })
+}
+
+async fn load_recovery_gaps(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    meeting_id: &str,
+) -> Result<Vec<GapFact>, RecoveryRepositoryError> {
+    let rows = sqlx::query(
+        "SELECT work_id, gap_kind, reason_code, audio_start_ms, audio_end_ms
+         FROM meeting_finalization_gaps
+         WHERE meeting_id = ?
+         ORDER BY
+            CASE WHEN audio_start_ms IS NULL THEN 1 ELSE 0 END,
+            audio_start_ms ASC,
+            work_id ASC,
+            gap_kind ASC,
+            reason_code ASC",
+    )
+    .bind(meeting_id)
+    .fetch_all(&mut **transaction)
+    .await?;
+
+    rows.into_iter()
+        .map(|row| {
+            Ok(GapFact {
+                gap_id: row.try_get("work_id")?,
+                meeting_id: meeting_id.to_string(),
+                gap_kind: row.try_get("gap_kind")?,
+                reason_code: row.try_get("reason_code")?,
+                audio_start_ms: optional_i64_to_u64(
+                    "audio_start_ms",
+                    row.try_get("audio_start_ms")?,
+                )?,
+                audio_end_ms: optional_i64_to_u64(
+                    "audio_end_ms",
+                    row.try_get("audio_end_ms")?,
+                )?,
+            })
+        })
+        .collect()
+}
+
 fn strict_complete_predicate(input: &FinalizeMeetingInput, reason_codes: &[String]) -> bool {
     input.capture_closed
         && input.durable_writes_succeeded
@@ -734,6 +1132,10 @@ fn u64_to_i64(label: &str, value: u64) -> Result<i64, SqlxError> {
 
 fn optional_u64_to_i64(label: &str, value: Option<u64>) -> Result<Option<i64>, SqlxError> {
     value.map(|value| u64_to_i64(label, value)).transpose()
+}
+
+fn optional_i64_to_u64(label: &str, value: Option<i64>) -> Result<Option<u64>, SqlxError> {
+    value.map(|value| i64_to_u64(label, value)).transpose()
 }
 
 fn i64_to_u64(label: &str, value: i64) -> Result<u64, SqlxError> {
@@ -1236,7 +1638,7 @@ mod meeting_recovery_repository_tests {
 
         assert_eq!(repeated, first);
         assert_eq!(repeated.evidence_count, 1);
-        assert_eq!(repeated.gap_count, 1);
+        assert_eq!(repeated.gap_count, 2);
         assert_eq!(repeated.gaps[0].gap_id, "gap-repeat");
         let meeting_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meetings")
             .fetch_one(&pool)
