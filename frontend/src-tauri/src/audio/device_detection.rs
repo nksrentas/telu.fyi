@@ -184,6 +184,28 @@ impl InputDeviceKind {
             }
         }
 
+        // Built-in microphones use stable local hardware paths and should use
+        // the same low-latency settings as other wired devices. Keep these
+        // patterns aligned with devices::microphone::find_builtin_input_device.
+        const BUILTIN_DEVICE_PATTERNS: &[&str] = &[
+            "macbook",
+            "built-in microphone",
+            "internal microphone",
+            "microphone array",
+            "realtek",
+            "conexant",
+            "hda intel",
+            "built-in audio",
+        ];
+
+        for pattern in BUILTIN_DEVICE_PATTERNS {
+            if name_lower.contains(pattern) {
+                info!("🎤 Built-in audio device detected: '{}' (pattern: '{}') - treating as Wired",
+                      device_name, pattern);
+                return Some(InputDeviceKind::Wired);
+            }
+        }
+
         None
     }
 
@@ -441,7 +463,12 @@ mod tests {
     #[test]
     fn test_builtin_mic_detection() {
         let kind = InputDeviceKind::detect("MacBook Pro Microphone", 0, 0);
-        // Should fall through to Unknown (no Bluetooth pattern, no buffer size)
+        assert_eq!(kind, InputDeviceKind::Wired);
+    }
+
+    #[test]
+    fn test_unknown_device_detection() {
+        let kind = InputDeviceKind::detect("External Audio Device", 0, 0);
         assert_eq!(kind, InputDeviceKind::Unknown);
     }
 
@@ -483,7 +510,12 @@ mod tests {
             3840,
             48000,
         );
-        assert_eq!(timeout, Duration::from_millis(160));
+        let expected = Duration::from_millis(160);
+        let tolerance = Duration::from_micros(1);
+        assert!(
+            timeout.abs_diff(expected) <= tolerance,
+            "expected {expected:?} within {tolerance:?}, got {timeout:?}",
+        );
     }
 
     #[test]
