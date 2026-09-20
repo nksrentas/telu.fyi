@@ -4,15 +4,27 @@
  * to enable recovery after app crashes or unexpected closures.
  */
 
+import type { MeetingLifecycle } from './recordingService';
+
+export type MeetingCompleteness =
+  | 'pending'
+  | 'complete'
+  | 'incomplete'
+  | 'recovered_with_gaps'
+  | 'completion_not_verified';
+
 // Database schema interfaces
 export interface MeetingMetadata {
-  meetingId: string;          // Primary key: "meeting-{timestamp}"
+  meetingId: string;          // Primary key: canonical Rust UUID
   title: string;              // Meeting title
   startTime: number;          // Unix timestamp (ms)
   lastUpdated: number;        // Unix timestamp (ms)
   transcriptCount: number;    // Number of transcript segments
   savedToSQLite: boolean;     // Flag: saved to backend DB
   folderPath?: string;        // Path to recording folder
+  lifecycle: MeetingLifecycle;
+  completeness: MeetingCompleteness;
+  completenessReason?: string;
 }
 
 export interface StoredTranscript {
@@ -32,7 +44,7 @@ export interface StoredTranscript {
 class IndexedDBService {
   private db: IDBDatabase | null = null;
   private readonly DB_NAME = 'MeetilyRecoveryDB';
-  private readonly DB_VERSION = 1;
+  private readonly DB_VERSION = 2;
   private initPromise: Promise<void> | null = null;
 
   /**
@@ -81,6 +93,31 @@ class IndexedDBService {
             });
             transcriptsStore.createIndex('meetingId', 'meetingId', { unique: false });
             transcriptsStore.createIndex('storedAt', 'storedAt', { unique: false });
+          }
+
+          // Version 2 adds an honest durable-state projection without changing
+          // the existing keyPath or rewriting any canonical meeting ID.
+          if (event.oldVersion < 2 && db.objectStoreNames.contains('meetings')) {
+            const transaction = (event.target as IDBOpenDBRequest).transaction;
+            if (!transaction) {
+              throw new Error('IndexedDB upgrade transaction is unavailable');
+            }
+
+            const meetingsStore = transaction.objectStore('meetings');
+            const cursorRequest = meetingsStore.openCursor();
+            cursorRequest.onsuccess = () => {
+              const cursor = cursorRequest.result;
+              if (!cursor) return;
+
+              const metadata = cursor.value as Partial<MeetingMetadata> & {
+                meetingId: string;
+              };
+              metadata.lifecycle ??= 'legacy';
+              metadata.completeness ??= 'completion_not_verified';
+              metadata.completenessReason ??= 'legacy_pre_phase1';
+              cursor.update(metadata);
+              cursor.continue();
+            };
           }
         };
       } catch (error) {

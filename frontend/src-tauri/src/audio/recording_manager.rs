@@ -276,7 +276,7 @@ impl RecordingManager {
             return Err(RecordingStartError::TranscriptionRuntime(error));
         }
 
-        self.recording_saver.start_accumulation(auto_save, recording_receiver);
+        self.recording_saver.start_accumulation(auto_save, recording_receiver)?;
         self.recording_saver.set_device_info(
             microphone_device.as_ref().map(|d| d.name.clone()),
             system_device.as_ref().map(|d| d.name.clone())
@@ -512,6 +512,23 @@ impl RecordingManager {
     /// Set the meeting name for this recording session
     pub fn set_meeting_name(&mut self, name: Option<String>) {
         self.recording_saver.set_meeting_name(name);
+    }
+
+    /// Pass the committed SQLite identity into the filesystem mirror before
+    /// capture can produce its first chunk.
+    pub fn set_meeting_identity(
+        &mut self,
+        meeting_id: String,
+        lifecycle: String,
+        completeness: String,
+        completeness_reason: Option<String>,
+    ) {
+        self.recording_saver.set_meeting_identity(
+            meeting_id,
+            lifecycle,
+            completeness,
+            completeness_reason,
+        );
     }
 
     /// Add a structured transcript segment to be saved later

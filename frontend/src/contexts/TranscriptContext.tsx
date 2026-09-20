@@ -75,6 +75,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
       await indexedDBService.saveMeetingMetadata({
         ...existingMetadata,
         title: payload.title,
+        lifecycle: payload.lifecycle,
         lastUpdated: Date.now(),
         transcriptCount: existingMetadata.transcriptCount,
       });
@@ -87,6 +88,9 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         transcriptCount: 0,
         savedToSQLite: false,
         folderPath: undefined,
+        lifecycle: payload.lifecycle,
+        completeness: 'pending',
+        completenessReason: undefined,
       });
     }
     setMeetingTitle(payload.title);

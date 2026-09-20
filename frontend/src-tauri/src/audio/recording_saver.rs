@@ -28,16 +28,17 @@ pub struct TranscriptSegment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeetingMetadata {
     pub version: String,
-    pub meeting_id: Option<String>,
+    pub meeting_id: String,
     pub meeting_name: Option<String>,
     pub created_at: String,
-    pub completed_at: Option<String>,
     pub duration_seconds: Option<f64>,
+    pub lifecycle: String,
+    pub completeness: String,
+    pub completeness_reason: Option<String>,
     pub devices: DeviceInfo,
     pub audio_file: String,
     pub transcript_file: String,
     pub sample_rate: u32,
-    pub status: String,  // "recording", "completed", "error"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,7 +51,11 @@ pub struct DeviceInfo {
 pub struct RecordingSaver {
     incremental_saver: Option<Arc<AsyncMutex<IncrementalAudioSaver>>>,
     meeting_folder: Option<PathBuf>,
+    meeting_id: Option<String>,
     meeting_name: Option<String>,
+    lifecycle: Option<String>,
+    completeness: Option<String>,
+    completeness_reason: Option<String>,
     metadata: Option<MeetingMetadata>,
     transcript_segments: Arc<Mutex<Vec<TranscriptSegment>>>,
     is_saving: Arc<Mutex<bool>>,
@@ -61,7 +66,11 @@ impl RecordingSaver {
         Self {
             incremental_saver: None,
             meeting_folder: None,
+            meeting_id: None,
             meeting_name: None,
+            lifecycle: None,
+            completeness: None,
+            completeness_reason: None,
             metadata: None,
             transcript_segments: Arc::new(Mutex::new(Vec::new())),
             is_saving: Arc::new(Mutex::new(false)),
@@ -71,6 +80,21 @@ impl RecordingSaver {
     /// Set the meeting name for this recording session
     pub fn set_meeting_name(&mut self, name: Option<String>) {
         self.meeting_name = name;
+    }
+
+    /// Attach the already committed SQLite identity and durable state projection.
+    /// Recording files mirror these values; they never mint or promote them.
+    pub fn set_meeting_identity(
+        &mut self,
+        meeting_id: String,
+        lifecycle: String,
+        completeness: String,
+        completeness_reason: Option<String>,
+    ) {
+        self.meeting_id = Some(meeting_id);
+        self.lifecycle = Some(lifecycle);
+        self.completeness = Some(completeness);
+        self.completeness_reason = completeness_reason;
     }
 
     /// Set device information in metadata
@@ -139,7 +163,7 @@ impl RecordingSaver {
         &mut self,
         auto_save: bool,
         mut receiver: mpsc::UnboundedReceiver<AudioChunk>,
-    ) {
+    ) -> Result<()> {
         if auto_save {
             info!("Initializing incremental audio saver for recording (auto-save ENABLED)");
         } else {
@@ -147,27 +171,21 @@ impl RecordingSaver {
         }
 
         // Initialize meeting folder and incremental saver ONLY if auto_save is enabled
+        let meeting_id = self
+            .meeting_id
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("canonical meeting identity is required before recording"))?;
+        let meeting_name = self
+            .meeting_name
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("meeting display title is required before recording"))?;
+
+        // Create metadata before the accumulation task accepts its first chunk.
+        self.initialize_meeting_folder(&meeting_id, &meeting_name, auto_save)?;
         if auto_save {
-            if let Some(name) = self.meeting_name.clone() {
-                match self.initialize_meeting_folder(&name, true) {
-                    Ok(()) => info!("Successfully initialized meeting folder with checkpoints"),
-                    Err(e) => {
-                        error!("Failed to initialize meeting folder: {}", e);
-                        // Continue anyway - will use fallback flat structure
-                    }
-                }
-            }
+            info!("Successfully initialized ID-owned meeting folder with checkpoints");
         } else {
-            // When auto_save is false, still create meeting folder for transcripts/metadata
-            // but skip .checkpoints directory
-            if let Some(name) = self.meeting_name.clone() {
-                match self.initialize_meeting_folder(&name, false) {
-                    Ok(()) => info!("Successfully initialized meeting folder (transcripts only)"),
-                    Err(e) => {
-                        error!("Failed to initialize meeting folder: {}", e);
-                    }
-                }
-            }
+            info!("Successfully initialized ID-owned meeting folder (transcripts only)");
         }
 
         // Start accumulation task
@@ -214,19 +232,27 @@ impl RecordingSaver {
         if let Ok(mut is_saving) = self.is_saving.lock() {
             *is_saving = true;
         }
+
+        Ok(())
     }
 
     /// Initialize meeting folder structure and metadata
     ///
     /// # Arguments
-    /// * `meeting_name` - Name of the meeting
+    /// * `meeting_id` - Canonical meeting UUID used as the path component
+    /// * `meeting_name` - Display-only meeting title stored in metadata
     /// * `create_checkpoints` - Whether to create .checkpoints/ directory and IncrementalAudioSaver
-    fn initialize_meeting_folder(&mut self, meeting_name: &str, create_checkpoints: bool) -> Result<()> {
+    fn initialize_meeting_folder(
+        &mut self,
+        meeting_id: &str,
+        meeting_name: &str,
+        create_checkpoints: bool,
+    ) -> Result<()> {
         // Load preferences to get base recordings folder
         let base_folder = super::recording_preferences::get_default_recordings_folder();
 
         // Create meeting folder structure (with or without .checkpoints/ subdirectory)
-        let meeting_folder = create_meeting_folder(&base_folder, meeting_name, create_checkpoints)?;
+        let meeting_folder = create_meeting_folder(&base_folder, meeting_id, create_checkpoints)?;
 
         // Only initialize incremental saver if checkpoints are needed (auto_save is true)
         if create_checkpoints {
@@ -238,22 +264,7 @@ impl RecordingSaver {
         }
 
         // Create initial metadata
-        let metadata = MeetingMetadata {
-            version: "1.0".to_string(),
-            meeting_id: None,  // Will be set by backend
-            meeting_name: Some(meeting_name.to_string()),
-            created_at: chrono::Utc::now().to_rfc3339(),
-            completed_at: None,
-            duration_seconds: None,
-            devices: DeviceInfo {
-                microphone: None,  // Could be enhanced to store actual device names
-                system_audio: None,
-            },
-            audio_file: if create_checkpoints { "audio.mp4".to_string() } else { "".to_string() },
-            transcript_file: "transcripts.json".to_string(),
-            sample_rate: 48000,
-            status: "recording".to_string(),
-        };
+        let metadata = self.build_initial_metadata(meeting_id, meeting_name, create_checkpoints)?;
 
         // Write initial metadata.json
         self.write_metadata(&meeting_folder, &metadata)?;
@@ -262,6 +273,37 @@ impl RecordingSaver {
         self.metadata = Some(metadata);
 
         Ok(())
+    }
+
+    fn build_initial_metadata(
+        &self,
+        meeting_id: &str,
+        meeting_name: &str,
+        create_checkpoints: bool,
+    ) -> Result<MeetingMetadata> {
+        Ok(MeetingMetadata {
+            version: "1.0".to_string(),
+            meeting_id: meeting_id.to_string(),
+            meeting_name: Some(meeting_name.to_string()),
+            created_at: chrono::Utc::now().to_rfc3339(),
+            duration_seconds: None,
+            lifecycle: self
+                .lifecycle
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("durable meeting lifecycle is required"))?,
+            completeness: self
+                .completeness
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("durable meeting completeness is required"))?,
+            completeness_reason: self.completeness_reason.clone(),
+            devices: DeviceInfo {
+                microphone: None,  // Could be enhanced to store actual device names
+                system_audio: None,
+            },
+            audio_file: if create_checkpoints { "audio.mp4".to_string() } else { "".to_string() },
+            transcript_file: "transcripts.json".to_string(),
+            sample_rate: 48000,
+        })
     }
 
     /// Write metadata.json to disk (atomic write with temp file)
@@ -407,11 +449,8 @@ impl RecordingSaver {
             info!("✅ Transcripts saved and verified at: {}", transcript_path.display());
         }
 
-        // Update metadata to completed status with actual recording duration
+        // Update recording duration without independently promoting durable lifecycle.
         if let (Some(folder), Some(mut metadata)) = (&self.meeting_folder, self.metadata.clone()) {
-            metadata.status = "completed".to_string();
-            metadata.completed_at = Some(chrono::Utc::now().to_rfc3339());
-
             // Use actual recording duration from RecordingState (more accurate than transcript segments)
             // Falls back to last transcript segment if duration not provided
             metadata.duration_seconds = recording_duration.or_else(|| {
@@ -423,11 +462,12 @@ impl RecordingSaver {
             });
 
             if let Err(e) = self.write_metadata(folder, &metadata) {
-                error!("❌ Failed to update metadata to completed: {}", e);
+                error!("❌ Failed to update recording metadata duration: {}", e);
                 return Err(format!("Failed to update metadata: {}", e));
             }
 
-            info!("✅ Metadata updated with duration: {:?}s", metadata.duration_seconds);
+            self.metadata = Some(metadata.clone());
+            info!("✅ Metadata duration updated without lifecycle promotion: {:?}s", metadata.duration_seconds);
         }
 
         // Emit save event with audio and transcript paths
@@ -480,6 +520,48 @@ impl Default for RecordingSaver {
 
 #[cfg(test)]
 mod meeting_identity_propagation_tests {
+    use super::{create_meeting_folder, RecordingSaver};
+
+    #[test]
+    fn meeting_identity_propagation_initial_metadata_contains_committed_state() {
+        let meeting_id = "018f5e27-2f68-7e27-9c90-7c72123141ae";
+        let mut saver = RecordingSaver::new();
+        saver.set_meeting_name(Some("Weekly sync".to_string()));
+        saver.set_meeting_identity(
+            meeting_id.to_string(),
+            "preparing".to_string(),
+            "pending".to_string(),
+            None,
+        );
+
+        let metadata = saver
+            .build_initial_metadata(meeting_id, "Weekly sync", false)
+            .expect("canonical metadata");
+
+        assert_eq!(metadata.meeting_id, meeting_id);
+        assert_eq!(metadata.meeting_name.as_deref(), Some("Weekly sync"));
+        assert_eq!(metadata.lifecycle, "preparing");
+        assert_eq!(metadata.completeness, "pending");
+        assert_eq!(metadata.completeness_reason, None);
+    }
+
+    #[test]
+    fn meeting_identity_propagation_same_title_ids_get_distinct_directories() {
+        let base = tempfile::tempdir().expect("temporary recordings folder");
+        let base_path = base.path().to_path_buf();
+        let first_id = "018f5e27-2f68-7e27-9c90-7c72123141ae";
+        let second_id = "018f5e27-2f68-7e27-9c90-7c72123141af";
+
+        let first = create_meeting_folder(&base_path, first_id, false)
+            .expect("first ID-owned directory");
+        let second = create_meeting_folder(&base_path, second_id, false)
+            .expect("second ID-owned directory");
+
+        assert_ne!(first, second);
+        assert_eq!(first.file_name().and_then(|name| name.to_str()), Some(first_id));
+        assert_eq!(second.file_name().and_then(|name| name.to_str()), Some(second_id));
+    }
+
     #[test]
     fn meeting_identity_propagation_metadata_starts_with_canonical_identity() {
         let source = include_str!("recording_saver.rs")

@@ -8,6 +8,7 @@ use rubato::{
 };
 use std::path::PathBuf;
 use nnnoiseless::DenoiseState;
+use uuid::Uuid;
 
 use super::encode::encode_single_audio; // Correct path to encode module
 
@@ -24,23 +25,23 @@ pub fn sanitize_filename(name: &str) -> String {
         .to_string()
 }
 
-/// Create a meeting folder with timestamp and return the path
-/// Creates structure: base_path/MeetingName_YYYY-MM-DD_HH-MM/
+/// Create a meeting folder owned by the canonical Rust meeting identity.
+/// Creates structure: base_path/<meeting-uuid>/
 ///                    ├── .checkpoints/  (for incremental saves, optional)
 ///
 /// # Arguments
 /// * `base_path` - Base directory for meetings
-/// * `meeting_name` - Name of the meeting
+/// * `meeting_id` - Canonical meeting UUID allocated and committed by Rust
 /// * `create_checkpoints_dir` - Whether to create .checkpoints/ subdirectory (only needed when auto_save is true)
 pub fn create_meeting_folder(
     base_path: &PathBuf,
-    meeting_name: &str,
+    meeting_id: &str,
     create_checkpoints_dir: bool,
 ) -> Result<PathBuf> {
-    let timestamp = Utc::now().format("%Y-%m-%d_%H-%M").to_string();
-    let sanitized_name = sanitize_filename(meeting_name);
-    let folder_name = format!("{}_{}", sanitized_name, timestamp);
-    let meeting_folder = base_path.join(folder_name);
+    let canonical_id = Uuid::parse_str(meeting_id)
+        .map_err(|error| anyhow::anyhow!("invalid canonical meeting ID: {error}"))?
+        .to_string();
+    let meeting_folder = base_path.join(canonical_id);
 
     // Create main meeting folder
     std::fs::create_dir_all(&meeting_folder)?;

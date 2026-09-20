@@ -15,7 +15,7 @@ use std::sync::{
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::task::JoinHandle;
 
-use crate::database::repositories::meeting::MeetingsRepository;
+use crate::database::repositories::meeting::{MeetingCompleteness, MeetingsRepository};
 pub use crate::database::repositories::meeting::StartMeetingResult;
 use crate::state::AppState;
 
@@ -153,13 +153,13 @@ async fn persist_session_before_capture<T, F, Fut>(
     start_capture: F,
 ) -> Result<(StartMeetingResult, T), StartMeetingFailure>
 where
-    F: FnOnce() -> Fut,
+    F: FnOnce(StartMeetingResult) -> Fut,
     Fut: Future<Output = Result<T, RecordingStartError>>,
 {
     let start_result = MeetingsRepository::create_session(pool, title)
         .await
         .map_err(StartMeetingFailure::IdentityPersistence)?;
-    let capture = start_capture()
+    let capture = start_capture(start_result.clone())
         .await
         .map_err(StartMeetingFailure::Capture)?;
     Ok((start_result, capture))
@@ -468,7 +468,13 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
 
     // Persist the canonical meeting before native capture can accept audio.
     let (start_result, (mut manager, transcription_receiver)) =
-        persist_session_before_capture(&database_pool, effective_meeting_name, move || async move {
+        persist_session_before_capture(&database_pool, effective_meeting_name, move |start_result| async move {
+            manager.set_meeting_identity(
+                start_result.meeting_id,
+                start_result.lifecycle.as_str().to_string(),
+                MeetingCompleteness::Pending.as_str().to_string(),
+                None,
+            );
             let transcription_receiver = manager
                 .start_recording(microphone_device, system_device, auto_save)
                 .await?;
@@ -662,7 +668,13 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
 
     // Persist the canonical meeting before native capture can accept audio.
     let (start_result, (mut manager, transcription_receiver)) =
-        persist_session_before_capture(&database_pool, effective_meeting_name, move || async move {
+        persist_session_before_capture(&database_pool, effective_meeting_name, move |start_result| async move {
+            manager.set_meeting_identity(
+                start_result.meeting_id,
+                start_result.lifecycle.as_str().to_string(),
+                MeetingCompleteness::Pending.as_str().to_string(),
+                None,
+            );
             let transcription_receiver = manager
                 .start_recording(mic_device, system_device, auto_save)
                 .await?;
@@ -1835,7 +1847,7 @@ mod meeting_identity_contract_tests {
         let result = persist_session_before_capture(
             &pool,
             "Failure injection".to_string(),
-            move || async move {
+            move |_| async move {
                 capture_probe.store(true, Ordering::SeqCst);
                 Ok(())
             },
