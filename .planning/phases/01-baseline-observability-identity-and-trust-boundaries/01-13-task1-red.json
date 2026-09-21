@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml canary_mode --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "running 3 tests\nnot ok 1 - trust::outbound::tests::canary_mode_is_run_scoped_queryable_and_restores_prior_behavior\nnot ok 2 - trust::outbound::tests::canary_mode_records_suppressed_and_permitted_background_policy_evidence\nnot ok 3 - trust::outbound::tests::canary_mode_start_stop_leaves_persistent_settings_byte_for_byte_unchanged\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0",
+  "targetTest": "trust::outbound::tests::canary_mode_is_run_scoped_queryable_and_restores_prior_behavior",
+  "expected": "Starting a canary installs a run-scoped outbound ledger, query returns suppressed or permitted background evidence for that run, stopping restores the prior ledger, and no persistent settings bytes change",
+  "actual": "The intentional RED stub returned a disabled state without installing a run ledger, allowed automatic background work without evidence, and could not stop or query the requested canary"
+}

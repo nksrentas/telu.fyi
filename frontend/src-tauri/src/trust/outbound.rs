@@ -11,6 +11,159 @@ use std::time::Instant;
 use url::Url;
 
 const DEFAULT_OUTBOUND_LEDGER_CAPACITY: usize = 4_096;
+const CANARY_PACKET_AUTHORITY: &str =
+    "The OS or proxy method selected in Plan 19 is authoritative for packets.";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CanaryBackgroundPolicy {
+    SuppressAutomatic,
+    PermitAttributed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CanaryBackgroundService {
+    Analytics,
+    Updater,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CanaryAttemptTrigger {
+    Automatic,
+    Manual,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanaryModeState {
+    pub run_id: String,
+    pub enabled: bool,
+    pub background_policy: CanaryBackgroundPolicy,
+    pub started_at_utc: DateTime<Utc>,
+    pub stopped_at_utc: Option<DateTime<Utc>>,
+    pub packet_blocker_authority: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanaryModeSnapshot {
+    pub state: CanaryModeState,
+    pub outbound: OutboundSnapshot,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CanaryBackgroundDecision {
+    pub run_id: Option<String>,
+    pub canary_enabled: bool,
+    pub service: CanaryBackgroundService,
+    pub trigger: CanaryAttemptTrigger,
+    pub allow_dispatch: bool,
+    pub sequence: Option<u64>,
+    pub disposition: Option<OutboundDisposition>,
+    pub redacted_code: Option<String>,
+    pub packet_blocker_authority: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CanaryModeError {
+    InvalidRunId,
+    AlreadyActive,
+    RunMismatch,
+    EvidenceMissing,
+    AttributionIncomplete,
+}
+
+impl CanaryModeError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidRunId => "CANARY_RUN_ID_INVALID",
+            Self::AlreadyActive => "CANARY_ALREADY_ACTIVE",
+            Self::RunMismatch => "CANARY_RUN_MISMATCH",
+            Self::EvidenceMissing => "CANARY_EVIDENCE_MISSING",
+            Self::AttributionIncomplete => "CANARY_ATTRIBUTION_INCOMPLETE",
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ActiveCanaryMode {
+    state: CanaryModeState,
+    ledger: Arc<OutboundLedger>,
+    previous_ledger: Arc<OutboundLedger>,
+}
+
+#[derive(Debug, Default)]
+struct CanaryRuntimeState {
+    active: Option<ActiveCanaryMode>,
+    completed: Option<CanaryModeSnapshot>,
+}
+
+#[derive(Debug)]
+struct CanaryRuntime {
+    outbound_slot: Arc<RwLock<Arc<OutboundLedger>>>,
+    state: Mutex<CanaryRuntimeState>,
+}
+
+impl CanaryRuntime {
+    fn new(outbound_slot: Arc<RwLock<Arc<OutboundLedger>>>) -> Self {
+        Self {
+            outbound_slot,
+            state: Mutex::new(CanaryRuntimeState::default()),
+        }
+    }
+
+    fn start(
+        &self,
+        run_id: &str,
+        background_policy: CanaryBackgroundPolicy,
+    ) -> Result<CanaryModeSnapshot, CanaryModeError> {
+        let ledger = self
+            .outbound_slot
+            .read()
+            .unwrap_or_else(|error| error.into_inner())
+            .clone();
+        Ok(CanaryModeSnapshot {
+            state: CanaryModeState {
+                run_id: run_id.to_string(),
+                enabled: false,
+                background_policy,
+                started_at_utc: Utc::now(),
+                stopped_at_utc: None,
+                packet_blocker_authority: CANARY_PACKET_AUTHORITY.to_string(),
+            },
+            outbound: ledger.snapshot(),
+        })
+    }
+
+    fn stop(&self, _run_id: &str) -> Result<CanaryModeSnapshot, CanaryModeError> {
+        Err(CanaryModeError::EvidenceMissing)
+    }
+
+    fn query(&self, _run_id: Option<&str>) -> Result<Option<CanaryModeSnapshot>, CanaryModeError> {
+        Err(CanaryModeError::EvidenceMissing)
+    }
+
+    fn record_background_decision(
+        &self,
+        service: CanaryBackgroundService,
+        trigger: CanaryAttemptTrigger,
+    ) -> Result<CanaryBackgroundDecision, CanaryModeError> {
+        Ok(CanaryBackgroundDecision {
+            run_id: None,
+            canary_enabled: false,
+            service,
+            trigger,
+            allow_dispatch: true,
+            sequence: None,
+            disposition: None,
+            redacted_code: None,
+            packet_blocker_authority: CANARY_PACKET_AUTHORITY.to_string(),
+        })
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -336,9 +489,9 @@ fn sanitize_network_route(route: &EffectiveRoute) -> Result<OutboundRoute, Outbo
 fn is_safe_identifier(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
 }
 
 fn is_safe_code(value: &str) -> bool {
@@ -358,6 +511,19 @@ mod tests {
     use std::sync::{Arc, Barrier};
     use std::thread;
     use std::time::Duration;
+
+    fn isolated_canary_runtime(run_id: &str) -> (CanaryRuntime, Arc<OutboundLedger>) {
+        let previous = Arc::new(
+            OutboundLedger::new(
+                format!("process-{run_id}"),
+                DEFAULT_OUTBOUND_LEDGER_CAPACITY,
+                Instant::now(),
+            )
+            .unwrap(),
+        );
+        let slot = Arc::new(RwLock::new(Arc::clone(&previous)));
+        (CanaryRuntime::new(slot), previous)
+    }
 
     fn remote_route(raw: &str) -> EffectiveRoute {
         resolve_route_from_addresses(
@@ -643,7 +809,10 @@ mod tests {
             .unwrap();
         let snapshot = ledger.snapshot();
         assert_eq!(snapshot.attempts.len(), 2);
-        assert_eq!(snapshot.attempts[1].disposition, OutboundDisposition::Failed);
+        assert_eq!(
+            snapshot.attempts[1].disposition,
+            OutboundDisposition::Failed
+        );
         assert_eq!(
             snapshot.attempts[1].redacted_code.as_deref(),
             Some("NETWORK_SEND_FAILED")
@@ -731,5 +900,115 @@ mod tests {
             !transcription.contains("record_network_attempt"),
             "device-internal transcription must not be mislabeled as network traffic"
         );
+    }
+
+    #[test]
+    fn canary_mode_is_run_scoped_queryable_and_restores_prior_behavior() {
+        let (runtime, previous) = isolated_canary_runtime("scope");
+
+        let started = runtime
+            .start("canary-scope", CanaryBackgroundPolicy::SuppressAutomatic)
+            .unwrap();
+        assert!(started.state.enabled, "the requested canary must be active");
+        assert_eq!(started.state.run_id, "canary-scope");
+        assert!(started.state.stopped_at_utc.is_none());
+        assert!(
+            !Arc::ptr_eq(
+                &runtime
+                    .outbound_slot
+                    .read()
+                    .unwrap_or_else(|error| error.into_inner()),
+                &previous,
+            ),
+            "the canary must own a run-scoped outbound ledger"
+        );
+
+        let decision = runtime
+            .record_background_decision(
+                CanaryBackgroundService::Analytics,
+                CanaryAttemptTrigger::Automatic,
+            )
+            .unwrap();
+        assert!(!decision.allow_dispatch);
+        assert_eq!(decision.run_id.as_deref(), Some("canary-scope"));
+
+        let active = runtime.query(Some("canary-scope")).unwrap().unwrap();
+        assert_eq!(active.outbound.attempts.len(), 1);
+        assert_eq!(
+            active.outbound.attempts[0].disposition,
+            OutboundDisposition::Suppressed
+        );
+
+        let stopped = runtime.stop("canary-scope").unwrap();
+        assert!(!stopped.state.enabled);
+        assert!(stopped.state.stopped_at_utc.is_some());
+        assert!(Arc::ptr_eq(
+            &runtime
+                .outbound_slot
+                .read()
+                .unwrap_or_else(|error| error.into_inner()),
+            &previous,
+        ));
+        let retained = runtime.query(Some("canary-scope")).unwrap().unwrap();
+        assert_eq!(retained.outbound, stopped.outbound);
+    }
+
+    #[test]
+    fn canary_mode_start_stop_leaves_persistent_settings_byte_for_byte_unchanged() {
+        let (runtime, _) = isolated_canary_runtime("settings");
+        let persistent_settings = br#"{"analyticsOptedIn":true,"updates":true}"#.to_vec();
+        let before = persistent_settings.clone();
+
+        runtime
+            .start("canary-settings", CanaryBackgroundPolicy::SuppressAutomatic)
+            .unwrap();
+        runtime.stop("canary-settings").unwrap();
+
+        assert_eq!(persistent_settings, before);
+    }
+
+    #[test]
+    fn canary_mode_records_suppressed_and_permitted_background_policy_evidence() {
+        let (runtime, _) = isolated_canary_runtime("policy");
+        runtime
+            .start(
+                "canary-suppressed",
+                CanaryBackgroundPolicy::SuppressAutomatic,
+            )
+            .unwrap();
+        let suppressed = runtime
+            .record_background_decision(
+                CanaryBackgroundService::Updater,
+                CanaryAttemptTrigger::Automatic,
+            )
+            .unwrap();
+        assert!(!suppressed.allow_dispatch);
+        assert_eq!(
+            suppressed.disposition,
+            Some(OutboundDisposition::Suppressed)
+        );
+        assert_eq!(
+            suppressed.redacted_code.as_deref(),
+            Some("CANARY_SUPPRESSED")
+        );
+        runtime.stop("canary-suppressed").unwrap();
+
+        runtime
+            .start("canary-permitted", CanaryBackgroundPolicy::PermitAttributed)
+            .unwrap();
+        let permitted = runtime
+            .record_background_decision(
+                CanaryBackgroundService::Updater,
+                CanaryAttemptTrigger::Automatic,
+            )
+            .unwrap();
+        assert!(permitted.allow_dispatch);
+        assert_eq!(permitted.disposition, Some(OutboundDisposition::Permitted));
+        assert_eq!(permitted.redacted_code.as_deref(), Some("CANARY_PERMITTED"));
+
+        let evidence = runtime.query(Some("canary-permitted")).unwrap().unwrap();
+        assert_eq!(evidence.outbound.attempts.len(), 1);
+        assert_eq!(evidence.outbound.run_id, "canary-permitted");
+        assert!(evidence.outbound.attribution_complete);
     }
 }
