@@ -870,7 +870,7 @@ export function ModelSettingsModal({
                 }
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger id="summary-provider-control">
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
               <SelectContent className="max-h-64 overflow-y-auto">

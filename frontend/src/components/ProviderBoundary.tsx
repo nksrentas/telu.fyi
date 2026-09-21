@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Cloud, Laptop, LoaderCircle, Network } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   AvailableEffectiveRoute,
@@ -29,7 +30,42 @@ interface ProviderBoundaryProps {
   refreshKey?: string | number;
   className?: string;
   onRouteStateChange?: (state: ProviderRouteViewState) => void;
+  showUnavailableAlert?: boolean;
 }
+
+type ActionCapability = Extract<ProviderCapability, 'transcription' | 'summary'>;
+type RecordingCaptureOutcome = 'continues_locally' | 'stopped';
+
+interface ProviderRouteFailureAlertProps {
+  capability: ActionCapability;
+  failure: ProviderRouteFailure;
+  isRetrying: boolean;
+  onRetry: () => void;
+  onChangeProvider: () => void;
+  onCancel: () => void;
+  captureOutcome?: RecordingCaptureOutcome | null;
+  className?: string;
+}
+
+const recoveryActionCopy: Record<ActionCapability, {
+  retry: string;
+  retrying: string;
+  change: string;
+  cancel: string;
+}> = {
+  transcription: {
+    retry: 'Retry transcription',
+    retrying: 'Retrying transcription…',
+    change: 'Change transcription provider',
+    cancel: 'Cancel transcription',
+  },
+  summary: {
+    retry: 'Retry summary',
+    retrying: 'Retrying summary…',
+    change: 'Change summary provider',
+    cancel: 'Cancel summary',
+  },
+};
 
 const locationPresentation: Record<LocationClass, {
   label: 'Local' | 'LAN' | 'Remote';
@@ -66,6 +102,7 @@ export function ProviderBoundary({
   refreshKey,
   className,
   onRouteStateChange,
+  showUnavailableAlert = true,
 }: ProviderBoundaryProps) {
   const [state, setState] = useState<ProviderRouteViewState>({
     status: 'loading',
@@ -163,6 +200,7 @@ export function ProviderBoundary({
   }
 
   if (state.status !== 'validated' || !display) {
+    if (!showUnavailableAlert) return null;
     const title = `${capabilityLabel(capability)} provider unavailable`;
     return (
       <Alert variant="destructive" className={cn('bg-card', className)}>
@@ -222,5 +260,67 @@ export function ProviderBoundary({
         </div>
       )}
     </div>
+  );
+}
+
+export function ProviderRouteFailureAlert({
+  capability,
+  failure,
+  isRetrying,
+  onRetry,
+  onChangeProvider,
+  onCancel,
+  captureOutcome,
+  className,
+}: ProviderRouteFailureAlertProps) {
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const copy = recoveryActionCopy[capability];
+  const destination = failure.sanitizedOrigin ?? 'the selected destination';
+  const detailId = `${capability}-provider-route-error-details`;
+
+  return (
+    <Alert variant="destructive" className={cn('bg-card', className)}>
+      <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+      <AlertTitle>{capabilityLabel(capability)} provider unavailable</AlertTitle>
+      <AlertDescription>
+        <p>
+          Telu couldn’t reach {destination}. {failure.providerId} is still selected, and no data was sent to another provider.
+        </p>
+        {captureOutcome && (
+          <p className="mt-2 font-semibold">
+            {captureOutcome === 'continues_locally'
+              ? 'Recording continues locally'
+              : 'Recording stopped'}
+          </p>
+        )}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button type="button" size="sm" className="min-h-11" onClick={onRetry} disabled={isRetrying}>
+            {isRetrying ? copy.retrying : copy.retry}
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="min-h-11" onClick={onChangeProvider}>
+            {copy.change}
+          </Button>
+          <Button type="button" size="sm" variant="ghost" className="min-h-11" onClick={onCancel}>
+            {copy.cancel}
+          </Button>
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="link"
+          className="mt-2 min-h-11 px-0 text-destructive"
+          aria-expanded={showTechnicalDetails}
+          aria-controls={detailId}
+          onClick={() => setShowTechnicalDetails((current) => !current)}
+        >
+          Show technical details
+        </Button>
+        {showTechnicalDetails && (
+          <p id={detailId} className="select-text break-all text-xs">
+            {failure.code}
+          </p>
+        )}
+      </AlertDescription>
+    </Alert>
   );
 }

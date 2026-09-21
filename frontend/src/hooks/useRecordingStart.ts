@@ -68,13 +68,13 @@ export function useRecordingStart(
     return `Meeting ${day}_${month}_${year}_${hours}_${minutes}_${seconds}`;
   }, []);
 
-  const getTranscriptionProvider = useCallback(async (): Promise<string> => {
+  const getTranscriptionProvider = useCallback(async (): Promise<string | null> => {
     try {
       const config = await invoke<TranscriptConfig | null>('api_get_transcript_config');
-      return config?.provider || 'parakeet';
+      return config?.provider ?? null;
     } catch (error) {
       console.error('Failed to load transcription provider:', error);
-      return 'parakeet';
+      return null;
     }
   }, []);
 
@@ -82,6 +82,10 @@ export function useRecordingStart(
   const checkTranscriptionModelReady = useCallback(async (): Promise<boolean> => {
     try {
       const provider = await getTranscriptionProvider();
+      if (!provider) {
+        console.error('No transcription provider is selected');
+        return false;
+      }
       const commands = getProviderCommands(provider);
 
       if (commands) {
@@ -101,6 +105,7 @@ export function useRecordingStart(
   const checkIfModelDownloading = useCallback(async (): Promise<boolean> => {
     try {
       const provider = await getTranscriptionProvider();
+      if (!provider) return false;
       const commands = getProviderCommands(provider);
       if (!commands) return false;
 

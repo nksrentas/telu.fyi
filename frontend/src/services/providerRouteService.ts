@@ -55,6 +55,39 @@ export async function validateProviderRoute(
   return invoke<EffectiveRoute>('validate_provider_route', { expectedRoute });
 }
 
+function routeErrorRecord(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return routeErrorRecord(error.message);
+  }
+  if (typeof error === 'object' && error !== null) {
+    return error as Record<string, unknown>;
+  }
+
+  const message = String(error ?? '');
+  try {
+    const parsed = JSON.parse(message);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Tauri can also return a stable error code as a plain string.
+  }
+
+  if (message.includes('PROVIDER_ROUTE_MATERIALLY_CHANGED')) {
+    return { code: 'PROVIDER_ROUTE_MATERIALLY_CHANGED' };
+  }
+  if (message.includes('PROVIDER_ROUTE_UNAVAILABLE')) {
+    return { code: 'PROVIDER_ROUTE_UNAVAILABLE' };
+  }
+  return {};
+}
+
+export function isProviderRouteFailureError(error: unknown): boolean {
+  const code = routeErrorRecord(error).code;
+  return typeof code === 'string'
+    && ROUTE_ERROR_CODES.has(code as ProviderRouteFailure['code']);
+}
+
 export function isRouteAvailable(
   route: EffectiveRoute | null,
 ): route is AvailableEffectiveRoute {
@@ -69,10 +102,9 @@ export function isRouteAvailable(
 export function normalizeProviderRouteFailure(
   error: unknown,
   capability: ProviderCapability,
+  expectedRoute?: EffectiveRoute | null,
 ): ProviderRouteFailure {
-  const record = typeof error === 'object' && error !== null
-    ? error as Record<string, unknown>
-    : {};
+  const record = routeErrorRecord(error);
   const rawCode = typeof record.code === 'string' ? record.code : '';
   const code = ROUTE_ERROR_CODES.has(rawCode as ProviderRouteFailure['code'])
     ? rawCode as ProviderRouteFailure['code']
@@ -83,10 +115,12 @@ export function normalizeProviderRouteFailure(
     capability,
     providerId: typeof record.providerId === 'string'
       ? record.providerId
-      : 'Selected provider',
-    modelId: typeof record.modelId === 'string' ? record.modelId : 'Unavailable',
+      : expectedRoute?.providerId ?? 'Selected provider',
+    modelId: typeof record.modelId === 'string'
+      ? record.modelId
+      : expectedRoute?.modelId ?? 'Unavailable',
     sanitizedOrigin: typeof record.sanitizedOrigin === 'string'
       ? record.sanitizedOrigin
-      : null,
+      : expectedRoute?.sanitizedOrigin ?? null,
   };
 }

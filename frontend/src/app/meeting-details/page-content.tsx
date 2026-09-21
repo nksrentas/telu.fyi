@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { MeetingSummary, SummaryProcessResponse } from '@/types';
 import { useSidebar } from '@/components/Sidebar/SidebarProvider';
@@ -19,6 +19,17 @@ import { useTemplates } from '@/hooks/meeting-details/useTemplates';
 import { useCopyOperations } from '@/hooks/meeting-details/useCopyOperations';
 import { useMeetingOperations } from '@/hooks/meeting-details/useMeetingOperations';
 import { useConfig } from '@/contexts/ConfigContext';
+import {
+  ProviderBoundary,
+  ProviderRouteFailureAlert,
+  type ProviderRouteViewState,
+} from '@/components/ProviderBoundary';
+import {
+  isRouteAvailable,
+  normalizeProviderRouteFailure,
+  validateProviderRoute,
+  type ProviderRouteFailure,
+} from '@/services/providerRouteService';
 
 export default function PageContent({
   meeting,
@@ -61,12 +72,25 @@ export default function PageContent({
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const isRecording = false;
   const [activeTab, setActiveTab] = useState<MeetingDetailsTab>('transcript');
+  const [summaryRouteState, setSummaryRouteState] = useState<ProviderRouteViewState>({
+    status: 'loading',
+    route: null,
+    failure: null,
+  });
+  const [summaryRouteFailure, setSummaryRouteFailure] = useState<ProviderRouteFailure | null>(null);
+  const [isSummaryRouteRetrying, setIsSummaryRouteRetrying] = useState(false);
+  const [summaryRouteRefreshKey, setSummaryRouteRefreshKey] = useState(0);
 
   // Ref to store the modal open function from SummaryGeneratorButtonGroup
   const openModelSettingsRef = useRef<(() => void) | null>(null);
   const autoSwitchedSummaryMeetingIdsRef = useRef(new Set<string>());
   const manuallySelectedTabMeetingIdsRef = useRef(new Set<string>());
   const autoGenerationStartedMeetingIdRef = useRef<string | null>(null);
+  const pendingSummaryActionRef = useRef<{ kind: 'generate' | 'regenerate'; prompt: string }>({
+    kind: 'generate',
+    prompt: '',
+  });
+  const retrySummaryAfterRefreshRef = useRef(false);
 
   // Sidebar context
   const { serverAddress } = useSidebar();
@@ -130,6 +154,82 @@ export default function PageContent({
     onOpenModelSettings: handleOpenModelSettings,
   });
 
+  const handleSummaryRouteStateChange = useCallback((state: ProviderRouteViewState) => {
+    setSummaryRouteState(state);
+    if (state.status === 'validated') {
+      setSummaryRouteFailure(null);
+      setIsSummaryRouteRetrying(false);
+    } else if (state.status !== 'loading') {
+      setSummaryRouteFailure(state.failure);
+      setIsSummaryRouteRetrying(false);
+    }
+  }, []);
+
+  const executeSummaryAction = useCallback(async (
+    kind: 'generate' | 'regenerate',
+    prompt: string,
+  ): Promise<boolean> => {
+    pendingSummaryActionRef.current = { kind, prompt };
+    if (summaryRouteState.status !== 'validated') {
+      if (summaryRouteState.failure) {
+        setSummaryRouteFailure(summaryRouteState.failure);
+      }
+      return false;
+    }
+
+    setIsSummaryRouteRetrying(true);
+    try {
+      const currentRoute = await validateProviderRoute(summaryRouteState.route);
+      if (!isRouteAvailable(currentRoute)) {
+        throw currentRoute;
+      }
+      setSummaryRouteState({ status: 'validated', route: currentRoute, failure: null });
+      setSummaryRouteFailure(null);
+    } catch (error) {
+      setSummaryRouteFailure(normalizeProviderRouteFailure(
+        error,
+        'summary',
+        summaryRouteState.route,
+      ));
+      return false;
+    } finally {
+      setIsSummaryRouteRetrying(false);
+    }
+
+    if (kind === 'regenerate') {
+      await summaryGeneration.handleRegenerateSummary();
+    } else {
+      await summaryGeneration.handleGenerateSummary(prompt);
+    }
+    return true;
+  }, [summaryGeneration, summaryRouteState]);
+
+  const handleGenerateSummaryWithRoute = useCallback(async (prompt: string) => {
+    await executeSummaryAction('generate', prompt);
+  }, [executeSummaryAction]);
+
+  const handleRegenerateSummaryWithRoute = useCallback(async () => {
+    await executeSummaryAction('regenerate', '');
+  }, [executeSummaryAction]);
+
+  const handleRetrySummary = useCallback(() => {
+    if (summaryRouteState.status === 'validated') {
+      const pending = pendingSummaryActionRef.current;
+      void executeSummaryAction(pending.kind, pending.prompt);
+      return;
+    }
+    retrySummaryAfterRefreshRef.current = true;
+    setIsSummaryRouteRetrying(true);
+    setSummaryRouteRefreshKey((current) => current + 1);
+  }, [executeSummaryAction, summaryRouteState.status]);
+
+  useEffect(() => {
+    if (!retrySummaryAfterRefreshRef.current || summaryRouteState.status !== 'validated') return;
+    retrySummaryAfterRefreshRef.current = false;
+    const pending = pendingSummaryActionRef.current;
+    void executeSummaryAction(pending.kind, pending.prompt);
+  }, [executeSummaryAction, summaryRouteState.status]);
+
   const copyOperations = useCopyOperations({
     meeting,
     transcripts: meetingData.transcripts,
@@ -170,10 +270,17 @@ export default function PageContent({
       return;
     }
 
+    if (summaryRouteState.status !== 'validated') return;
+
     autoGenerationStartedMeetingIdRef.current = meeting.id;
     console.log(`🤖 Auto-generating summary with ${modelConfig.provider}/${modelConfig.model}...`);
-    onAutoGenerateComplete?.();
-    void summaryGeneration.handleGenerateSummary('');
+    void executeSummaryAction('generate', '').then((started) => {
+      if (started) {
+        onAutoGenerateComplete?.();
+      } else {
+        autoGenerationStartedMeetingIdRef.current = null;
+      }
+    });
   }, [
     shouldAutoGenerate,
     meeting.id,
@@ -181,8 +288,9 @@ export default function PageContent({
     isModelConfigLoading,
     modelConfig.provider,
     modelConfig.model,
-    summaryGeneration.handleGenerateSummary,
+    executeSummaryAction,
     summaryGeneration.summaryStatus,
+    summaryRouteState.status,
     onAutoGenerateComplete,
   ]);
 
@@ -244,35 +352,63 @@ export default function PageContent({
             />
           }
           summary={
-            <SummaryPanel
-              meeting={meeting}
-              meetingTitle={meetingData.meetingTitle}
-              summaryRef={meetingData.blockNoteSummaryRef}
-              isSaving={meetingData.isSaving}
-              isSummaryDirty={meetingData.isSummaryDirty}
-              onSaveAll={meetingData.saveAllChanges}
-              onCopySummary={copyOperations.handleCopySummary}
-              aiSummary={meetingData.aiSummary}
-              summaryStatus={summaryGeneration.summaryStatus}
-              transcripts={meetingData.transcripts}
-              modelConfig={modelConfig}
-              setModelConfig={setModelConfig}
-              onSaveModelConfig={handleSaveModelConfig}
-              onGenerateSummary={summaryGeneration.handleGenerateSummary}
-              onStopGeneration={summaryGeneration.handleStopGeneration}
-              customPrompt={customPrompt}
-              onSaveSummary={meetingData.handleSaveSummary}
-              onSummaryChange={meetingData.handleSummaryChange}
-              onDirtyChange={meetingData.setIsSummaryDirty}
-              summaryError={summaryGeneration.summaryError}
-              onRegenerateSummary={summaryGeneration.handleRegenerateSummary}
-              getSummaryStatusMessage={summaryGeneration.getSummaryStatusMessage}
-              availableTemplates={templates.availableTemplates}
-              selectedTemplate={templates.selectedTemplate}
-              onTemplateSelect={templates.handleTemplateSelection}
-              isModelConfigLoading={isModelConfigLoading}
-              onOpenModelSettings={handleRegisterModalOpen}
-            />
+            <div className="flex h-full min-w-0 flex-1 flex-col">
+              <div className="space-y-2 border-b bg-background p-3">
+                <ProviderBoundary
+                  capability="summary"
+                  refreshKey={`${modelConfig.provider}:${modelConfig.model}:${summaryRouteRefreshKey}`}
+                  showUnavailableAlert={false}
+                  onRouteStateChange={handleSummaryRouteStateChange}
+                />
+                {summaryRouteFailure && (
+                  <ProviderRouteFailureAlert
+                    capability="summary"
+                    failure={summaryRouteFailure}
+                    isRetrying={isSummaryRouteRetrying}
+                    onRetry={handleRetrySummary}
+                    onChangeProvider={() => {
+                      handleOpenModelSettings();
+                      window.setTimeout(() => {
+                        document.getElementById('summary-provider-control')?.focus();
+                      }, 0);
+                    }}
+                    onCancel={() => {
+                      retrySummaryAfterRefreshRef.current = false;
+                      setSummaryRouteFailure(null);
+                    }}
+                  />
+                )}
+              </div>
+              <SummaryPanel
+                meeting={meeting}
+                meetingTitle={meetingData.meetingTitle}
+                summaryRef={meetingData.blockNoteSummaryRef}
+                isSaving={meetingData.isSaving}
+                isSummaryDirty={meetingData.isSummaryDirty}
+                onSaveAll={meetingData.saveAllChanges}
+                onCopySummary={copyOperations.handleCopySummary}
+                aiSummary={meetingData.aiSummary}
+                summaryStatus={summaryGeneration.summaryStatus}
+                transcripts={meetingData.transcripts}
+                modelConfig={modelConfig}
+                setModelConfig={setModelConfig}
+                onSaveModelConfig={handleSaveModelConfig}
+                onGenerateSummary={handleGenerateSummaryWithRoute}
+                onStopGeneration={summaryGeneration.handleStopGeneration}
+                customPrompt={customPrompt}
+                onSaveSummary={meetingData.handleSaveSummary}
+                onSummaryChange={meetingData.handleSummaryChange}
+                onDirtyChange={meetingData.setIsSummaryDirty}
+                summaryError={summaryGeneration.summaryError}
+                onRegenerateSummary={handleRegenerateSummaryWithRoute}
+                getSummaryStatusMessage={summaryGeneration.getSummaryStatusMessage}
+                availableTemplates={templates.availableTemplates}
+                selectedTemplate={templates.selectedTemplate}
+                onTemplateSelect={templates.handleTemplateSelection}
+                isModelConfigLoading={isModelConfigLoading || isSummaryRouteRetrying || summaryRouteState.status !== 'validated'}
+                onOpenModelSettings={handleRegisterModalOpen}
+              />
+            </div>
           }
         />
       </div>

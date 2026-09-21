@@ -192,7 +192,7 @@ export default function Home() {
                 }}
               >
                 <div className="w-2/3 max-w-[750px] flex justify-center">
-                  <div className="bg-white rounded-full shadow-lg flex items-center">
+                  <div className="w-full">
                     <RecordingControls
                       isRecording={recordingState.isRecording}
                       onRecordingStop={(callApi = true) => handleRecordingStop(callApi)}
@@ -207,6 +207,12 @@ export default function Home() {
                       isParentProcessing={isProcessingStop}
                       selectedDevices={selectedDevices}
                       meetingName={meetingTitle}
+                      onChangeTranscriptionProvider={() => {
+                        showModal('modelSelector', 'Transcription model settings');
+                        window.setTimeout(() => {
+                          document.getElementById('transcription-provider-control')?.focus();
+                        }, 0);
+                      }}
                     />
                   </div>
                 </div>

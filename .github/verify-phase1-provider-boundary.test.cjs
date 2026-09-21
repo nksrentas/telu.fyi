@@ -71,7 +71,7 @@ test('recording and summary actions expose then freshly validate the Rust route'
 
 test('route failures use the exact no-fallback recovery copy and ordered actions', () => {
   assert.match(boundary, /\{Capability\} provider unavailable|provider unavailable/);
-  assert.match(boundary, /Telu couldn.t reach \$\{destination\}\. \$\{failure\.providerId\} is still selected, and no data was sent to another provider\./);
+  assert.match(boundary, /Telu couldn’t reach \{destination\}\. \{failure\.providerId\} is still selected, and no data was sent to another provider\./);
 
   const retryIndex = boundary.indexOf('Retry transcription');
   const changeIndex = boundary.indexOf('Change transcription provider');

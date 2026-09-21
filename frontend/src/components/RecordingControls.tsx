@@ -15,12 +15,24 @@ import {
   type FinalizationSnapshot,
   type TranscriptionErrorPayload,
 } from '@/services/transcriptService';
+import {
+  ProviderBoundary,
+  ProviderRouteFailureAlert,
+  type ProviderRouteViewState,
+} from '@/components/ProviderBoundary';
+import {
+  isProviderRouteFailureError,
+  isRouteAvailable,
+  normalizeProviderRouteFailure,
+  validateProviderRoute,
+  type ProviderRouteFailure,
+} from '@/services/providerRouteService';
 
 interface RecordingControlsProps {
   isRecording: boolean;
   barHeights: string[];
   onRecordingStop: (callApi?: boolean) => void;
-  onRecordingStart: () => void;
+  onRecordingStart: () => void | Promise<void>;
   onTranscriptReceived: (summary: SummaryResponse) => void;
   onTranscriptionError?: (message: string) => void;
   onStopInitiated?: () => void; // Called immediately when stop button is clicked
@@ -31,6 +43,7 @@ interface RecordingControlsProps {
     systemDevice: string | null;
   };
   meetingName?: string;
+  onChangeTranscriptionProvider?: () => void;
 }
 
 export const RecordingControls: React.FC<RecordingControlsProps> = ({
@@ -45,6 +58,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   isParentProcessing,
   selectedDevices,
   meetingName,
+  onChangeTranscriptionProvider,
 }) => {
   // Use global recording state context for pause state (syncs with tray operations)
   const recordingState = useRecordingState();
@@ -65,6 +79,16 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   const [speechDetected, setSpeechDetected] = useState(false);
   const [deviceError, setDeviceError] = useState<{ title: string, message: string } | null>(null);
   const [awaitingTerminalFinalization, setAwaitingTerminalFinalization] = useState(false);
+  const [transcriptionRouteState, setTranscriptionRouteState] = useState<ProviderRouteViewState>({
+    status: 'loading',
+    route: null,
+    failure: null,
+  });
+  const [routeFailure, setRouteFailure] = useState<ProviderRouteFailure | null>(null);
+  const [routeCaptureOutcome, setRouteCaptureOutcome] = useState<'continues_locally' | 'stopped' | null>(null);
+  const [isRetryingRoute, setIsRetryingRoute] = useState(false);
+  const [routeRefreshKey, setRouteRefreshKey] = useState(0);
+  const retryAfterRefreshRef = useRef(false);
 
   const currentTime = 0;
   const duration = 0;
@@ -90,8 +114,49 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
     checkTauri();
   }, []);
 
+  const handleTranscriptionRouteStateChange = useCallback((state: ProviderRouteViewState) => {
+    setTranscriptionRouteState(state);
+    if (state.status === 'validated') {
+      setRouteFailure(null);
+      setRouteCaptureOutcome(null);
+      setIsRetryingRoute(false);
+    } else if (state.status !== 'loading') {
+      setRouteFailure(state.failure);
+      setRouteCaptureOutcome(null);
+      setIsRetryingRoute(false);
+    }
+  }, []);
+
   const handleStartRecording = useCallback(async () => {
     if (isStarting || isValidatingModel || isStartingRecording || awaitingTerminalFinalization) return;
+    if (transcriptionRouteState.status !== 'validated') {
+      if (transcriptionRouteState.failure) {
+        setRouteFailure(transcriptionRouteState.failure);
+      }
+      return;
+    }
+
+    setIsRetryingRoute(true);
+    try {
+      const currentRoute = await validateProviderRoute(transcriptionRouteState.route);
+      if (!isRouteAvailable(currentRoute)) {
+        throw currentRoute;
+      }
+      setTranscriptionRouteState({ status: 'validated', route: currentRoute, failure: null });
+      setRouteFailure(null);
+      setRouteCaptureOutcome(null);
+    } catch (error) {
+      setRouteFailure(normalizeProviderRouteFailure(
+        error,
+        'transcription',
+        transcriptionRouteState.route,
+      ));
+      setRouteCaptureOutcome(recordingState.isRecording ? 'continues_locally' : null);
+      return;
+    } finally {
+      setIsRetryingRoute(false);
+    }
+
     console.log('Starting recording...');
     console.log('Selected devices:', selectedDevices);
     console.log('Meeting name:', meetingName);
@@ -109,6 +174,15 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
       // 4. Update UI state
       await onRecordingStart();
     } catch (error) {
+      if (isProviderRouteFailureError(error)) {
+        setRouteFailure(normalizeProviderRouteFailure(
+          error,
+          'transcription',
+          transcriptionRouteState.route,
+        ));
+        setRouteCaptureOutcome(recordingState.isRecording ? 'continues_locally' : 'stopped');
+        return;
+      }
       console.error('Failed to start recording:', error);
       console.error('Error details:', {
         message: error instanceof Error ? error.message : String(error),
@@ -150,8 +224,32 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
     isValidatingModel,
     meetingName,
     onRecordingStart,
+    recordingState.isRecording,
     selectedDevices,
+    transcriptionRouteState,
   ]);
+
+  const handleRetryTranscription = useCallback(() => {
+    if (transcriptionRouteState.status === 'validated') {
+      void handleStartRecording();
+      return;
+    }
+    retryAfterRefreshRef.current = true;
+    setIsRetryingRoute(true);
+    setRouteRefreshKey((current) => current + 1);
+  }, [handleStartRecording, transcriptionRouteState.status]);
+
+  useEffect(() => {
+    if (!retryAfterRefreshRef.current || transcriptionRouteState.status !== 'validated') return;
+    retryAfterRefreshRef.current = false;
+    void handleStartRecording();
+  }, [handleStartRecording, transcriptionRouteState.status]);
+
+  useEffect(() => {
+    if (routeCaptureOutcome === 'continues_locally' && !recordingState.isRecording) {
+      setRouteCaptureOutcome('stopped');
+    }
+  }, [recordingState.isRecording, routeCaptureOutcome]);
 
   const stopRecordingAction = useCallback(async () => {
     console.log('Executing stop recording...');
@@ -335,6 +433,20 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
           });
           setIsProcessing(false);
 
+          if (isProviderRouteFailureError(event.payload.error)) {
+            const expectedRoute = transcriptionRouteState.route;
+            setRouteFailure(normalizeProviderRouteFailure(
+              event.payload.error,
+              'transcription',
+              expectedRoute,
+            ));
+            setRouteCaptureOutcome(recordingState.isRecording ? 'continues_locally' : 'stopped');
+            if (!recordingState.isRecording && event.payload.phase === 'active') {
+              onRecordingStop(false);
+            }
+            return;
+          }
+
           if (event.payload.phase === 'active') {
             console.log('Calling onRecordingStop(false) due to active transcription error');
             onRecordingStop(false);
@@ -374,7 +486,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
         }
       });
     };
-  }, [onRecordingStop, onTranscriptionError]);
+  }, [onRecordingStop, onTranscriptionError, recordingState.isRecording, transcriptionRouteState.route]);
 
   if (isStopping) {
     return null;
@@ -387,6 +499,27 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   return (
     <TooltipProvider>
       <div className="flex flex-col space-y-2">
+        <ProviderBoundary
+          capability="transcription"
+          refreshKey={routeRefreshKey}
+          showUnavailableAlert={false}
+          onRouteStateChange={handleTranscriptionRouteStateChange}
+        />
+        {routeFailure && (
+          <ProviderRouteFailureAlert
+            capability="transcription"
+            failure={routeFailure}
+            isRetrying={isRetryingRoute}
+            onRetry={handleRetryTranscription}
+            onChangeProvider={() => onChangeTranscriptionProvider?.()}
+            onCancel={() => {
+              retryAfterRefreshRef.current = false;
+              setRouteFailure(null);
+              setRouteCaptureOutcome(null);
+            }}
+            captureOutcome={routeCaptureOutcome}
+          />
+        )}
         <div className="flex items-center space-x-2 bg-white rounded-full shadow-lg px-4 py-2">
           {isProcessing && !isParentProcessing ? (
             <div className="flex items-center space-x-2">
@@ -441,8 +574,9 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
                             Analytics.trackButtonClick('start_recording', 'recording_controls');
                             handleStartRecording();
                           }}
-                          disabled={isStarting || isProcessing || isRecordingDisabled || isValidatingModel || isStartingRecording || awaitingTerminalFinalization}
-                          className={`w-12 h-12 flex items-center justify-center ${isStarting || isProcessing || isValidatingModel || isStartingRecording || awaitingTerminalFinalization ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
+                          disabled={isStarting || isProcessing || isRecordingDisabled || isValidatingModel || isStartingRecording || awaitingTerminalFinalization || isRetryingRoute || transcriptionRouteState.status !== 'validated'}
+                          aria-label="Start recording"
+                          className={`w-12 h-12 flex items-center justify-center ${isStarting || isProcessing || isValidatingModel || isStartingRecording || awaitingTerminalFinalization || isRetryingRoute || transcriptionRouteState.status !== 'validated' ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
                             } rounded-full text-white transition-colors relative`}
                         >
                           {isValidatingModel || isStartingRecording ? (
