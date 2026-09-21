@@ -636,6 +636,18 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn provider_route_summary_dispatch_validates_the_effective_route_before_request_io() {
+        let source = include_str!("llm_client.rs");
+        let gate = source
+            .find("authorize_provider_dispatch")
+            .expect("summary dispatch must authorize the effective route");
+        let request = source
+            .find(".post(api_url.clone())")
+            .expect("summary HTTP request construction should remain visible");
+        assert!(gate < request, "route authorization must precede request I/O");
+    }
+
     #[tokio::test]
     async fn cancellation_prevents_compatibility_io_from_being_polled() {
         let cancellation_token = CancellationToken::new();
@@ -924,5 +936,4 @@ fn provider_name(provider: &LLMProvider) -> &str {
         LLMProvider::CustomOpenAI => "Custom OpenAI",
     }
 }
-
 

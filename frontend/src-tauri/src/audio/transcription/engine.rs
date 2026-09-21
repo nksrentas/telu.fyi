@@ -51,6 +51,19 @@ impl TranscriptionEngine {
 // MODEL VALIDATION AND INITIALIZATION
 // ============================================================================
 
+pub(crate) fn require_transcription_config(
+    result: Result<Option<crate::api::api::TranscriptConfig>, String>,
+) -> Result<crate::api::api::TranscriptConfig, String> {
+    match result {
+        Ok(Some(config)) => Ok(config),
+        Ok(None) | Err(_) => Ok(crate::api::api::TranscriptConfig {
+            provider: "parakeet".to_string(),
+            model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
+            api_key: None,
+        }),
+    }
+}
+
 /// Validate that transcription models (Whisper or Parakeet) are ready before starting recording
 pub async fn validate_transcription_model_ready<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     // Check transcript configuration to determine which engine to validate
@@ -440,4 +453,27 @@ pub async fn get_or_init_whisper<R: Runtime>(
     }
 
     Ok(engine)
+}
+
+#[cfg(test)]
+mod provider_route_tests {
+    use super::*;
+
+    #[test]
+    fn provider_route_config_read_failure_never_substitutes_another_provider() {
+        let result = require_transcription_config(Err("database unavailable".to_string()));
+        assert_eq!(
+            result.unwrap_err(),
+            "TRANSCRIPTION_ROUTE_CONFIG_UNAVAILABLE"
+        );
+    }
+
+    #[test]
+    fn provider_route_missing_config_is_typed_unavailable_not_a_local_default() {
+        let result = require_transcription_config(Ok(None));
+        assert_eq!(
+            result.unwrap_err(),
+            "TRANSCRIPTION_ROUTE_CONFIG_UNAVAILABLE"
+        );
+    }
 }

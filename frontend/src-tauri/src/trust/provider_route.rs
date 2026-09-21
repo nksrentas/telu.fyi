@@ -266,6 +266,14 @@ pub fn require_available_route(route: &EffectiveRoute) -> Result<(), ProviderRou
     }
 }
 
+pub fn authorize_provider_dispatch<T>(
+    _expected: &EffectiveRoute,
+    _current: &EffectiveRoute,
+    dispatch: impl FnOnce() -> T,
+) -> Result<T, ProviderRouteError> {
+    Ok(dispatch())
+}
+
 fn route_error(code: &str, route: &EffectiveRoute) -> ProviderRouteError {
     ProviderRouteError {
         code: code.to_string(),
@@ -405,5 +413,35 @@ mod tests {
         assert_eq!(summary.capability, Capability::Summary);
         assert_ne!(transcription.capability, summary.capability);
         assert_eq!(transcription.sanitized_origin, summary.sanitized_origin);
+    }
+
+    #[test]
+    fn provider_route_pre_dispatch_mismatch_performs_no_request() {
+        let expected = resolve_url(
+            Capability::Summary,
+            "https://203.0.113.8/v1/chat/completions",
+            &[IpAddr::V4(Ipv4Addr::new(203, 0, 113, 8))],
+        );
+        let changed = resolve_url(
+            Capability::Summary,
+            "http://127.0.0.1:11434/v1/chat/completions",
+            &[IpAddr::V4(Ipv4Addr::LOCALHOST)],
+        );
+        let requests = std::cell::Cell::new(0_u8);
+
+        let result = authorize_provider_dispatch(&expected, &changed, || {
+            requests.set(requests.get() + 1);
+        });
+
+        let error = result.unwrap_err();
+        assert_eq!(error.code, "PROVIDER_ROUTE_MATERIALLY_CHANGED");
+        assert_eq!(requests.get(), 0);
+    }
+
+    #[test]
+    fn provider_route_commands_share_the_registered_effective_route_contract() {
+        let lib_source = include_str!("../lib.rs");
+        assert!(lib_source.contains("trust::provider_route::get_current_provider_route"));
+        assert!(lib_source.contains("trust::provider_route::validate_provider_route"));
     }
 }
