@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sqlx::SqlitePool;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -99,6 +100,23 @@ impl fmt::Display for ProviderRouteError {
 }
 
 impl std::error::Error for ProviderRouteError {}
+
+impl ProviderRouteError {
+    fn unavailable(
+        capability: Capability,
+        provider_id: impl Into<String>,
+        model_id: impl Into<String>,
+        sanitized_origin: Option<String>,
+    ) -> Self {
+        Self {
+            code: "PROVIDER_ROUTE_UNAVAILABLE".to_string(),
+            capability,
+            provider_id: provider_id.into(),
+            model_id: model_id.into(),
+            sanitized_origin,
+        }
+    }
+}
 
 pub fn resolve_route_from_addresses(
     capability: Capability,
@@ -267,10 +285,11 @@ pub fn require_available_route(route: &EffectiveRoute) -> Result<(), ProviderRou
 }
 
 pub fn authorize_provider_dispatch<T>(
-    _expected: &EffectiveRoute,
-    _current: &EffectiveRoute,
+    expected: &EffectiveRoute,
+    current: &EffectiveRoute,
     dispatch: impl FnOnce() -> T,
 ) -> Result<T, ProviderRouteError> {
+    validate_route_contract(expected, current)?;
     Ok(dispatch())
 }
 
@@ -282,6 +301,123 @@ fn route_error(code: &str, route: &EffectiveRoute) -> ProviderRouteError {
         model_id: route.model_id.clone(),
         sanitized_origin: route.sanitized_origin.clone(),
     }
+}
+
+async fn configured_route(
+    pool: &SqlitePool,
+    capability: Capability,
+) -> Result<EffectiveRoute, ProviderRouteError> {
+    use crate::database::repositories::setting::SettingsRepository;
+
+    let (provider_id, model_id, destination) = match capability {
+        Capability::Transcription => {
+            let config = SettingsRepository::get_transcript_config(pool)
+                .await
+                .map_err(|_| {
+                    ProviderRouteError::unavailable(capability, "unavailable", "unavailable", None)
+                })?
+                .ok_or_else(|| {
+                    ProviderRouteError::unavailable(capability, "unavailable", "unavailable", None)
+                })?;
+            let destination = match config.provider.as_str() {
+                "localWhisper" | "parakeet" => None,
+                "deepgram" => Some("https://api.deepgram.com".to_string()),
+                "elevenLabs" => Some("https://api.elevenlabs.io".to_string()),
+                "groq" => Some("https://api.groq.com".to_string()),
+                "openai" => Some("https://api.openai.com".to_string()),
+                _ => {
+                    return Err(ProviderRouteError::unavailable(
+                        capability,
+                        config.provider,
+                        config.model,
+                        None,
+                    ));
+                }
+            };
+            (config.provider, config.model, destination)
+        }
+        Capability::Summary => {
+            let config = SettingsRepository::get_model_config(pool)
+                .await
+                .map_err(|_| {
+                    ProviderRouteError::unavailable(capability, "unavailable", "unavailable", None)
+                })?
+                .ok_or_else(|| {
+                    ProviderRouteError::unavailable(capability, "unavailable", "unavailable", None)
+                })?;
+            let destination = match config.provider.as_str() {
+                "builtin-ai" | "local-llama" | "localllama" => None,
+                "openai" => Some("https://api.openai.com".to_string()),
+                "claude" => Some("https://api.anthropic.com".to_string()),
+                "groq" => Some("https://api.groq.com".to_string()),
+                "openrouter" => Some("https://openrouter.ai".to_string()),
+                "ollama" => config.ollama_endpoint.clone(),
+                "custom-openai" => config
+                    .get_custom_openai_config()
+                    .map(|custom| custom.endpoint),
+                _ => {
+                    return Err(ProviderRouteError::unavailable(
+                        capability,
+                        config.provider,
+                        config.model,
+                        None,
+                    ));
+                }
+            };
+            (config.provider, config.model, destination)
+        }
+        Capability::DocumentProcessing | Capability::Generation => {
+            return Err(ProviderRouteError::unavailable(
+                capability,
+                "not_configured",
+                "not_configured",
+                None,
+            ));
+        }
+    };
+
+    let route = if destination.is_none()
+        && matches!(
+            provider_id.as_str(),
+            "localWhisper" | "parakeet" | "builtin-ai" | "local-llama" | "localllama"
+        ) {
+        resolve_provider_route(
+            capability,
+            &provider_id,
+            &model_id,
+            RouteDestination::Device,
+        )
+        .await
+    } else {
+        resolve_provider_route(
+            capability,
+            &provider_id,
+            &model_id,
+            RouteDestination::Url(destination.as_deref()),
+        )
+        .await
+    };
+    require_available_route(&route)?;
+    Ok(route)
+}
+
+#[tauri::command]
+pub async fn get_current_provider_route(
+    state: tauri::State<'_, crate::state::AppState>,
+    capability: Capability,
+) -> Result<EffectiveRoute, ProviderRouteError> {
+    configured_route(state.db_manager.pool(), capability).await
+}
+
+#[tauri::command]
+pub async fn validate_provider_route(
+    state: tauri::State<'_, crate::state::AppState>,
+    expected_route: EffectiveRoute,
+) -> Result<EffectiveRoute, ProviderRouteError> {
+    let current_route =
+        configured_route(state.db_manager.pool(), expected_route.capability).await?;
+    validate_route_contract(&expected_route, &current_route)?;
+    Ok(current_route)
 }
 
 #[cfg(test)]

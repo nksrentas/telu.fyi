@@ -651,12 +651,8 @@ pub async fn api_get_transcript_config<R: Runtime>(
             }
         }
         Ok(None) => {
-            log_info!("No transcript config found, returning default.");
-            Ok(Some(TranscriptConfig {
-                provider: "parakeet".to_string(),
-                model: crate::config::DEFAULT_PARAKEET_MODEL.to_string(),
-                api_key: None,
-            }))
+            log_info!("No transcript config found; selected route is unavailable.");
+            Ok(None)
         }
         Err(e) => {
             log_error!("Failed to get transcript config: {}", e);

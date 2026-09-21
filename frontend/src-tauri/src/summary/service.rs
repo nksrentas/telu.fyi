@@ -10,6 +10,9 @@ use crate::summary::processor::{
 };
 use crate::summary::templates::{self, Template};
 use crate::ollama::metadata::ModelMetadataCache;
+use crate::trust::provider_route::{
+    require_available_route, resolve_provider_route, Capability, RouteDestination,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -384,9 +387,10 @@ impl SummaryService {
             match SettingsRepository::get_model_config(&pool).await {
                 Ok(Some(config)) => config.ollama_endpoint,
                 Ok(None) => None,
-                Err(e) => {
-                    info!("Failed to retrieve Ollama endpoint: {}, using default", e);
-                    None
+                Err(_) => {
+                    let err_msg = "PROVIDER_ROUTE_CONFIG_UNAVAILABLE";
+                    Self::fail_and_cleanup(&pool, &meeting_id, started_at, err_msg).await;
+                    return;
                 }
             }
         } else {
@@ -398,7 +402,7 @@ impl SummaryService {
             if provider == LLMProvider::CustomOpenAI {
                 match SettingsRepository::get_custom_openai_config(&pool).await {
                     Ok(Some(config)) => {
-                        info!("✓ Using custom OpenAI endpoint: {}", config.endpoint);
+                        info!("✓ Using configured custom OpenAI endpoint");
                         (
                             Some(config.endpoint),
                             config.api_key,
@@ -428,6 +432,37 @@ impl SummaryService {
         } else {
             api_key
         };
+
+        let route_destination = match &provider {
+            LLMProvider::BuiltInAI => None,
+            LLMProvider::OpenAI => Some("https://api.openai.com".to_string()),
+            LLMProvider::Claude => Some("https://api.anthropic.com".to_string()),
+            LLMProvider::Groq => Some("https://api.groq.com".to_string()),
+            LLMProvider::OpenRouter => Some("https://openrouter.ai".to_string()),
+            LLMProvider::Ollama => ollama_endpoint.clone(),
+            LLMProvider::CustomOpenAI => custom_openai_endpoint.clone(),
+        };
+        let summary_route = if provider == LLMProvider::BuiltInAI {
+            resolve_provider_route(
+                Capability::Summary,
+                &model_provider,
+                &model_name,
+                RouteDestination::Device,
+            )
+            .await
+        } else {
+            resolve_provider_route(
+                Capability::Summary,
+                &model_provider,
+                &model_name,
+                RouteDestination::Url(route_destination.as_deref()),
+            )
+            .await
+        };
+        if let Err(route_error) = require_available_route(&summary_route) {
+            Self::fail_and_cleanup(&pool, &meeting_id, started_at, &route_error.code).await;
+            return;
+        }
 
         // Dynamically fetch context size based on provider and model
         let token_threshold = if provider == LLMProvider::Ollama {

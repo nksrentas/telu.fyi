@@ -767,6 +767,8 @@ pub fn run() {
             summary::summary_engine::commands::builtin_ai_is_model_ready,
             summary::summary_engine::commands::builtin_ai_get_available_summary_model,
             summary::summary_engine::commands::builtin_ai_get_recommended_model,
+            trust::provider_route::get_current_provider_route,
+            trust::provider_route::validate_provider_route,
             openrouter::get_openrouter_models,
             audio::recording_preferences::get_recording_preferences,
             audio::recording_preferences::set_recording_preferences,

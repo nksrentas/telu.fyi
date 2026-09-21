@@ -1,3 +1,4 @@
+use crate::trust::provider_route::{resolve_provider_route, Capability, RouteDestination};
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -280,6 +281,22 @@ pub(crate) async fn generate_summary(
 
     // Handle BuiltInAI provider separately (uses local sidecar, no HTTP API)
     if provider == &LLMProvider::BuiltInAI {
+        let route = resolve_provider_route(
+            Capability::Summary,
+            provider_route_id(provider),
+            model_name,
+            RouteDestination::Device,
+        )
+        .await;
+        let current_route = resolve_provider_route(
+            Capability::Summary,
+            provider_route_id(provider),
+            model_name,
+            RouteDestination::Device,
+        )
+        .await;
+        crate::trust::provider_route::authorize_provider_dispatch(&route, &current_route, || ())
+            .map_err(|error| error.code)?;
         let app_data_dir = app_data_dir
             .ok_or_else(|| "app_data_dir is required for BuiltInAI provider".to_string())?;
 
@@ -314,7 +331,7 @@ pub(crate) async fn generate_summary(
         LLMProvider::Ollama => {
             let host = ollama_endpoint
                 .map(|s| s.to_string())
-                .unwrap_or_else(|| "http://localhost:11434".to_string());
+                .ok_or_else(|| "PROVIDER_ROUTE_UNAVAILABLE".to_string())?;
             (
                 format!("{}/v1/chat/completions", host),
                 header::HeaderMap::new(),
@@ -349,6 +366,23 @@ pub(crate) async fn generate_summary(
             unreachable!("BuiltInAI is handled before this match statement")
         }
     };
+
+    let route = resolve_provider_route(
+        Capability::Summary,
+        provider_route_id(provider),
+        model_name,
+        RouteDestination::Url(Some(&api_url)),
+    )
+    .await;
+    let current_route = resolve_provider_route(
+        Capability::Summary,
+        provider_route_id(provider),
+        model_name,
+        RouteDestination::Url(Some(&api_url)),
+    )
+    .await;
+    crate::trust::provider_route::authorize_provider_dispatch(&route, &current_route, || ())
+        .map_err(|error| error.code)?;
 
     // Add authorization header for non-Claude providers
     if provider != &LLMProvider::Claude {
@@ -937,3 +971,14 @@ fn provider_name(provider: &LLMProvider) -> &str {
     }
 }
 
+fn provider_route_id(provider: &LLMProvider) -> &'static str {
+    match provider {
+        LLMProvider::OpenAI => "openai",
+        LLMProvider::Claude => "claude",
+        LLMProvider::Groq => "groq",
+        LLMProvider::Ollama => "ollama",
+        LLMProvider::BuiltInAI => "builtin-ai",
+        LLMProvider::OpenRouter => "openrouter",
+        LLMProvider::CustomOpenAI => "custom-openai",
+    }
+}
