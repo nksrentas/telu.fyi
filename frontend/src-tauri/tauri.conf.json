@@ -43,15 +43,10 @@
                         "main"
                     ],
                     "permissions": [
-                        "fs:default",
                         "fs:allow-read-file",
-                        "fs:read-all",
-                        "fs:write-all",
-                        "fs:allow-app-read",
-                        "fs:allow-app-write",
-                        "fs:allow-download-write",
-                        "fs:allow-download-read",
-                        "fs:scope-download",
+                        "fs:allow-write-file",
+                        "dialog:allow-open",
+                        "dialog:allow-save",
                         "core:path:default",
                         "core:event:default",
                         "core:window:default",
@@ -69,7 +64,10 @@
                             "identifier": "fs:scope",
                             "allow": [
                                 {
-                                    "path": "$APPDATA/*"
+                                    "path": "$APPDATA"
+                                },
+                                {
+                                    "path": "$APPDATA/**"
                                 }
                             ]
                         }
