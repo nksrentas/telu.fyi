@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-17-PLAN.md
-last_updated: "2026-09-21T10:49:55.636Z"
+stopped_at: Completed 01-18-PLAN.md
+last_updated: "2026-09-21T11:20:14.959Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: e606bb7290f1f5ca9217a209d3dd70b44686815c
+state_head: b8624c42041936afb80186a9add48709209d1564
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 17
+  completed_plans: 18
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 18 of 19
+Plan: 19 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -75,6 +75,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P15 | 27m | 2 tasks | 10 files |
 | Phase 01 P16 | 31m | 2 tasks | 7 files |
 | Phase 01 P17 | 30m | 2 tasks | 7 files |
+| Phase 01 P18 | 20m | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -147,6 +148,9 @@ Recent decisions affecting current work:
 - [Phase 01]: Plan 01-17: Keep bundle access local and narrow: finalize, redacted list metadata, and validated summary reads only.
 - [Phase 01]: Plan 01-17: Preserve threshold-free outcomes, optional evidence gaps, outliers, limitations, and interrupted writes as explicit unknown or invalid states.
 - [Phase 01]: Plan 01-17: Disqualify malformed timestamps, reserved stages, order/conservation violations, unsafe identities, and sensitive content.
+- [Phase 01]: Diagnostics IPC revalidates local bundles and returns only typed allowlisted evidence; raw artifacts and filesystem paths remain native-side.
+- [Phase 01]: Diagnostic export folder authority stays in Rust behind opaque tokens, and every copy is reserialized, revalidated, and atomically published under a generated child.
+- [Phase 01]: Transcript and audio export choices reset independently off and record requested versus actually included content in the export manifest.
 
 ### Pending Todos
 
@@ -170,6 +174,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-21T10:49:55.617Z
-Stopped at: Completed 01-17-PLAN.md
+Last session: 2026-09-21T11:20:14.944Z
+Stopped at: Completed 01-18-PLAN.md
 Resume file: None

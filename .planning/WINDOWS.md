@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 17
+open_count: 18
 waived_count: 0
 fixed_count: 0
-total_count: 17
-last_updated: 2026-09-21T09:39:25.826Z
+total_count: 18
+last_updated: 2026-09-21T11:18:14.457Z
 ---
 
 # Broken Windows Ledger
@@ -32,6 +32,7 @@ last_updated: 2026-09-21T09:39:25.826Z
 | 15 | 01 | deviation | frontend/src-tauri/src/lib.rs |  | Registered canary commands in the active Tauri invoke handler | open |  | 2026-09-21T08:44:06.214Z |  |
 | 16 | 01 | deviation | frontend/src/components/AnalyticsProvider.tsx |  | Loaded canary state before analytics store migration to prevent canary-time settings writes | open |  | 2026-09-21T08:44:06.281Z |  |
 | 17 | 01 | deviation | frontend/src-tauri/src/audio/transcription/queue_ledger.rs |  | Adjacent queue-ledger and acknowledgement seams were required to correlate the complete actual Phase 1 path | open |  | 2026-09-21T09:39:25.826Z |  |
+| 18 | 01 | deviation | frontend/src/app/settings/page.tsx |  | Diagnostics was added to the active settings route and shared settings tabs in addition to the legacy SettingsModal named by the plan. | open |  | 2026-09-21T11:18:14.457Z |  |
 
 ````json
 [
@@ -237,6 +238,18 @@ last_updated: 2026-09-21T09:39:25.826Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-21T09:39:25.826Z",
+    "resolved_at": null
+  },
+  {
+    "id": 18,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src/app/settings/page.tsx",
+    "line": null,
+    "description": "Diagnostics was added to the active settings route and shared settings tabs in addition to the legacy SettingsModal named by the plan.",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T11:18:14.457Z",
     "resolved_at": null
   }
 ]
