@@ -1258,4 +1258,56 @@ mod tests {
         assert_eq!(evidence.outbound.run_id, "canary-permitted");
         assert!(evidence.outbound.attribution_complete);
     }
+
+    #[test]
+    fn canary_background_analytics_policy_precedes_initialization() {
+        let analytics_provider = include_str!("../../../src/components/AnalyticsProvider.tsx");
+        let policy_gate = analytics_provider
+            .find("evaluateCanaryBackgroundAttempt('analytics', 'automatic')")
+            .expect("analytics startup must evaluate the active canary first");
+        let initialization = analytics_provider
+            .find("await Analytics.init()")
+            .expect("the analytics initialization seam must remain visible");
+
+        assert!(
+            policy_gate < initialization,
+            "canary policy must be known before analytics initialization"
+        );
+        assert!(analytics_provider.contains("if (!canaryDecision.allowDispatch)"));
+        assert!(analytics_provider.contains("CANARY_SUPPRESSED"));
+    }
+
+    #[test]
+    fn canary_background_updater_policy_precedes_plugin_check() {
+        let update_service = include_str!("../../../src/services/updateService.ts");
+        let policy_gate = update_service
+            .find("evaluateCanaryBackgroundAttempt('updater'")
+            .expect("updater startup must evaluate the active canary first");
+        let plugin_check = update_service
+            .find("await check()")
+            .expect("the updater plugin check seam must remain visible");
+
+        assert!(
+            policy_gate < plugin_check,
+            "canary policy evidence must exist before updater dispatch"
+        );
+        assert!(update_service.contains("force ? 'manual' : 'automatic'"));
+        assert!(update_service.contains("if (!canaryDecision.allowDispatch)"));
+    }
+
+    #[test]
+    fn canary_background_copy_names_packet_authority_and_preserves_normal_behavior() {
+        let provider_service = include_str!("../../../src/services/providerRouteService.ts");
+        let analytics_provider = include_str!("../../../src/components/AnalyticsProvider.tsx");
+        let update_service = include_str!("../../../src/services/updateService.ts");
+
+        assert!(provider_service.contains("packetBlockerAuthority"));
+        assert!(provider_service.contains("OS or proxy"));
+        assert!(analytics_provider.contains("canaryDecision.canaryEnabled"));
+        assert!(update_service.contains("canaryDecision.canaryEnabled"));
+        assert!(
+            !analytics_provider.contains("store.set('analyticsOptedIn', false) // canary"),
+            "canary gating must not overwrite analytics consent"
+        );
+    }
 }
