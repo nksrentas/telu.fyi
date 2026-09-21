@@ -468,6 +468,50 @@ impl MeetingsRepository {
         Ok(meeting)
     }
 
+    /// Load the durable gap facts that explain a meeting's authoritative
+    /// completeness. Unknown audio bounds remain `None` and are sorted after
+    /// recording-relative gaps so every renderer sees the same order.
+    pub async fn get_meeting_gaps(
+        pool: &SqlitePool,
+        meeting_id: &str,
+    ) -> Result<Vec<GapFact>, SqlxError> {
+        validate_identifier("meeting_id", meeting_id)?;
+
+        let rows = sqlx::query(
+            "SELECT work_id, gap_kind, reason_code, audio_start_ms, audio_end_ms
+             FROM meeting_finalization_gaps
+             WHERE meeting_id = ?
+             ORDER BY
+                CASE WHEN audio_start_ms IS NULL THEN 1 ELSE 0 END,
+                audio_start_ms ASC,
+                work_id ASC,
+                gap_kind ASC,
+                reason_code ASC",
+        )
+        .bind(meeting_id)
+        .fetch_all(pool)
+        .await?;
+
+        rows.into_iter()
+            .map(|row| {
+                Ok(GapFact {
+                    gap_id: row.try_get("work_id")?,
+                    meeting_id: meeting_id.to_string(),
+                    gap_kind: row.try_get("gap_kind")?,
+                    reason_code: row.try_get("reason_code")?,
+                    audio_start_ms: optional_i64_to_u64(
+                        "audio_start_ms",
+                        row.try_get("audio_start_ms")?,
+                    )?,
+                    audio_end_ms: optional_i64_to_u64(
+                        "audio_end_ms",
+                        row.try_get("audio_end_ms")?,
+                    )?,
+                })
+            })
+            .collect()
+    }
+
     /// Get meeting transcripts with pagination support
     pub async fn get_meeting_transcripts_paginated(
         pool: &SqlitePool,

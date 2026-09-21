@@ -126,6 +126,37 @@ export interface MeetingMetadata {
   created_at: string;
   updated_at: string;
   folder_path?: string;
+  lifecycle: MeetingLifecycle;
+  completeness: MeetingCompleteness;
+  completeness_reason?: string;
+  gap_count: number;
+  gaps: MeetingGap[];
+}
+
+export type MeetingLifecycle =
+  | 'preparing'
+  | 'recording'
+  | 'finalizing'
+  | 'complete'
+  | 'incomplete'
+  | 'recovered'
+  | 'legacy';
+
+export type MeetingCompleteness =
+  | 'pending'
+  | 'complete'
+  | 'incomplete'
+  | 'recovered_with_gaps'
+  | 'completion_not_verified';
+
+export interface MeetingGap {
+  gap_id: string;
+  meeting_id: string;
+  gap_kind: string;
+  reason_code: string;
+  audio_start_ms: number | null;
+  audio_end_ms: number | null;
+  source?: string | null;
 }
 
 export interface PaginatedTranscriptsResponse {

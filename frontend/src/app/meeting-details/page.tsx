@@ -1,7 +1,14 @@
 "use client"
 import { useSidebar } from "@/components/Sidebar/SidebarProvider";
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { MeetingSummary, SummaryProcessResponse, Transcript } from "@/types";
+import {
+  MeetingCompleteness,
+  MeetingGap,
+  MeetingLifecycle,
+  MeetingSummary,
+  SummaryProcessResponse,
+  Transcript,
+} from "@/types";
 import PageContent from "./page-content";
 import { useRouter, useSearchParams } from "next/navigation";
 import Analytics from "@/lib/analytics";
@@ -18,6 +25,11 @@ interface MeetingDetailsResponse {
   updated_at: string;
   transcripts: Transcript[];
   folder_path?: string;
+  lifecycle: MeetingLifecycle;
+  completeness: MeetingCompleteness;
+  completeness_reason?: string;
+  gap_count: number;
+  gaps: MeetingGap[];
 }
 
 function MeetingDetailsContent() {
@@ -136,10 +148,21 @@ function MeetingDetailsContent() {
         updated_at: metadata.updated_at,
         transcripts: transcripts, // Paginated transcripts from hook
         folder_path: metadata.folder_path, // For retranscription feature
+        lifecycle: metadata.lifecycle,
+        completeness: metadata.completeness,
+        completeness_reason: metadata.completeness_reason,
+        gap_count: metadata.gap_count,
+        gaps: metadata.gaps,
       });
 
       // Sync with sidebar context
-      setCurrentMeeting({ id: metadata.id, title: metadata.title });
+      setCurrentMeeting({
+        id: metadata.id,
+        title: metadata.title,
+        lifecycle: metadata.lifecycle,
+        completeness: metadata.completeness,
+        gapCount: metadata.gap_count,
+      });
     }
   }, [metadata, transcripts, meetingId, isLoadingTranscripts, setCurrentMeeting]);
 

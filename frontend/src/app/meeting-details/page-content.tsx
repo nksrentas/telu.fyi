@@ -10,6 +10,7 @@ import { TranscriptPanel } from '@/components/MeetingDetails/TranscriptPanel';
 import { SummaryPanel } from '@/components/MeetingDetails/SummaryPanel';
 import { MeetingDetailsSplitView, type MeetingDetailsTab } from '@/components/MeetingDetails/MeetingDetailsSplitView';
 import { ModelConfig } from '@/components/ModelSettingsModal';
+import { MeetingCompleteness } from '@/components/MeetingCompleteness';
 
 // Custom hooks
 import { useMeetingData } from '@/hooks/meeting-details/useMeetingData';
@@ -190,8 +191,30 @@ export default function PageContent({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="flex flex-col h-screen min-w-0 bg-gray-50"
+      className="flex h-screen min-w-0 flex-col bg-background"
     >
+      <header className="shrink-0 border-b bg-card px-6 py-4">
+        <div className="flex flex-wrap items-start gap-3">
+          <h1 className="line-clamp-2 min-w-0 flex-1 text-lg font-semibold text-foreground">
+            {meetingData.meetingTitle}
+          </h1>
+          <MeetingCompleteness
+            lifecycle={meeting.lifecycle}
+            completeness={meeting.completeness}
+            gapCount={meeting.gap_count}
+            variant="compact"
+          />
+        </div>
+        <MeetingCompleteness
+          className="mt-3"
+          lifecycle={meeting.lifecycle}
+          completeness={meeting.completeness}
+          gapCount={meeting.gap_count}
+          gaps={meeting.gaps}
+          variant="detail"
+          showStatus={false}
+        />
+      </header>
       <div className="flex flex-1 min-w-0 overflow-hidden">
         <MeetingDetailsSplitView
           activeTab={activeTab}

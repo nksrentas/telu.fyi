@@ -27,7 +27,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { MeetingMetadata, RecoveryGap, StoredTranscript } from '@/services/indexedDBService';
+import type { MeetingMetadata, StoredTranscript } from '@/services/indexedDBService';
+import { MeetingCompleteness, MeetingGapList } from '@/components/MeetingCompleteness';
 import type { RecoveryOutcome } from '@/hooks/useTranscriptRecovery';
 import { cn } from '@/lib/utils';
 
@@ -38,13 +39,6 @@ interface TranscriptRecoveryProps {
   onRecover: (meetingId: string) => Promise<RecoveryOutcome>;
   onDelete: (meetingId: string) => Promise<void>;
   onLoadPreview: (meetingId: string) => Promise<StoredTranscript[]>;
-}
-
-function formatGapRange(gap: RecoveryGap): string {
-  if (gap.audio_start_ms === null || gap.audio_end_ms === null) return 'Unknown';
-  const start = (gap.audio_start_ms / 1000).toFixed(1);
-  const end = (gap.audio_end_ms / 1000).toFixed(1);
-  return `${start}s–${end}s`;
 }
 
 export function TranscriptRecovery({
@@ -207,6 +201,13 @@ export function TranscriptRecovery({
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
                             <p className="line-clamp-2 text-sm font-semibold">{meeting.title}</p>
+                            <MeetingCompleteness
+                              className="mt-2"
+                              lifecycle={meeting.lifecycle}
+                              completeness={meeting.completeness}
+                              gapCount={meeting.gapCount}
+                              variant="compact"
+                            />
                             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                               <Clock className="h-3 w-3" aria-hidden="true" />
                               {formatDistanceToNow(new Date(meeting.lastUpdated), { addSuffix: true })}
@@ -238,6 +239,13 @@ export function TranscriptRecovery({
                     <>
                       <div className="border-b bg-muted/50 p-4">
                         <h4 className="line-clamp-2 font-semibold">{selectedMeeting.title}</h4>
+                        <MeetingCompleteness
+                          className="mt-2"
+                          lifecycle={selectedMeeting.lifecycle}
+                          completeness={selectedMeeting.completeness}
+                          gapCount={selectedMeeting.gapCount}
+                          variant="compact"
+                        />
                         <p className="mt-1 text-sm text-muted-foreground">
                           Started {new Date(selectedMeeting.startTime).toLocaleString()}
                         </p>
@@ -286,16 +294,15 @@ export function TranscriptRecovery({
                               ? 'Meeting recovered. No recorded gaps remain.'
                               : `Meeting recovered with ${gapCount} ${gapCount === 1 ? 'gap' : 'gaps'}.`}
                           </p>
+                          <MeetingCompleteness
+                            lifecycle={authoritativeResult.lifecycle}
+                            completeness={authoritativeResult.completeness}
+                            gapCount={authoritativeResult.gap_count}
+                            variant="compact"
+                          />
                           {showGaps && (
-                            <div className="space-y-2 rounded-md border p-3">
-                              {authoritativeResult.gaps.map(gap => (
-                                <div key={gap.gap_id} className="text-xs">
-                                  <p className="font-semibold">{gap.gap_kind || 'Unknown'}</p>
-                                  <p className="text-muted-foreground">
-                                    {formatGapRange(gap)} · {gap.reason_code || 'Unknown'}
-                                  </p>
-                                </div>
-                              ))}
+                            <div className="max-h-64 overflow-y-auto rounded-md border p-3">
+                              <MeetingGapList gaps={authoritativeResult.gaps} />
                             </div>
                           )}
                         </div>

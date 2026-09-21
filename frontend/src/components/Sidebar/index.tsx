@@ -31,11 +31,16 @@ import Info from '../Info';
 import { ComplianceNotification } from '../ComplianceNotification';
 import { Input } from '../ui/input';
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '../ui/input-group';
+import { MeetingCompleteness } from '../MeetingCompleteness';
+import type { MeetingCompleteness as MeetingCompletenessValue, MeetingLifecycle } from '@/types';
 
 interface SidebarItem {
   id: string;
   title: string;
   type: 'folder' | 'file';
+  lifecycle?: MeetingLifecycle;
+  completeness?: MeetingCompletenessValue;
+  gapCount?: number;
   children?: SidebarItem[];
 }
 
@@ -577,7 +582,13 @@ const Sidebar: React.FC = () => {
             if (item.type === 'folder') {
               toggleFolder(item.id);
             } else {
-              setCurrentMeeting({ id: item.id, title: item.title });
+              setCurrentMeeting({
+                id: item.id,
+                title: item.title,
+                lifecycle: item.lifecycle,
+                completeness: item.completeness,
+                gapCount: item.gapCount,
+              });
               const basePath = item.id.startsWith('intro-call') ? '/' :
                 item.id.includes('-') ? `/meeting-details?id=${item.id}` : `/notes/${item.id}`;
               router.push(basePath);
@@ -615,7 +626,18 @@ const Sidebar: React.FC = () => {
                     <Plus className="w-3.5 h-3.5 text-blue-600" />
                   </div>
                 )}
-                <span className="flex-1 break-words">{item.title}</span>
+                <div className="min-w-0 flex-1">
+                  <span className="line-clamp-2 break-words">{item.title}</span>
+                  {item.completeness && item.lifecycle && (
+                    <MeetingCompleteness
+                      className="mt-1"
+                      lifecycle={item.lifecycle}
+                      completeness={item.completeness}
+                      gapCount={item.gapCount}
+                      variant="compact"
+                    />
+                  )}
+                </div>
                 {isMeetingItem && (
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                     <button

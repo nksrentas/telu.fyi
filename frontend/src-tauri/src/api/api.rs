@@ -6,7 +6,7 @@ use tauri_plugin_store::StoreExt;
 
 use crate::{
     database::{
-        models::MeetingModel,
+        models::{GapFact, MeetingCompleteness, MeetingLifecycle, MeetingModel},
         repositories::{
             meeting::MeetingsRepository, setting::SettingsRepository,
             transcript::TranscriptsRepository,
@@ -30,6 +30,9 @@ pub struct ApiResponse<T> {
 pub struct Meeting {
     pub id: String,
     pub title: String,
+    pub lifecycle: MeetingLifecycle,
+    pub completeness: MeetingCompleteness,
+    pub gap_count: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -148,6 +151,12 @@ pub struct MeetingMetadata {
     pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub folder_path: Option<String>,
+    pub lifecycle: MeetingLifecycle,
+    pub completeness: MeetingCompleteness,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub completeness_reason: Option<String>,
+    pub gap_count: u64,
+    pub gaps: Vec<GapFact>,
 }
 
 /// Paginated transcripts response with total count
@@ -336,13 +345,23 @@ pub async fn api_get_meetings<R: Runtime>(
         Ok(meeting_models) => {
             log_info!("Successfully got {} meetings", meeting_models.len());
 
-            let result: Vec<Meeting> = meeting_models
-                .into_iter()
-                .map(|m| Meeting {
-                    id: m.id,
-                    title: m.title,
-                })
-                .collect();
+            let mut result = Vec::with_capacity(meeting_models.len());
+            for meeting in meeting_models {
+                let gap_count = MeetingsRepository::get_meeting_gaps(pool, &meeting.id)
+                    .await
+                    .map_err(|error| {
+                        log_error!("Failed to project meeting gap count: {}", error);
+                        "Failed to retrieve meeting completeness".to_string()
+                    })?
+                    .len() as u64;
+                result.push(Meeting {
+                    id: meeting.id,
+                    title: meeting.title,
+                    lifecycle: meeting.lifecycle,
+                    completeness: meeting.completeness,
+                    gap_count,
+                });
+            }
             Ok(result)
         }
         Err(e) => {
@@ -822,12 +841,23 @@ pub async fn api_get_meeting_metadata<R: Runtime>(
     match MeetingsRepository::get_meeting_metadata(pool, &meeting_id).await {
         Ok(Some(meeting)) => {
             log_info!("Successfully retrieved meeting metadata {}", meeting_id);
+            let gaps = MeetingsRepository::get_meeting_gaps(pool, &meeting_id)
+                .await
+                .map_err(|error| {
+                    log_error!("Failed to retrieve meeting gaps: {}", error);
+                    "Failed to retrieve meeting completeness".to_string()
+                })?;
             Ok(MeetingMetadata {
                 id: meeting.id,
                 title: meeting.title,
                 created_at: meeting.created_at.0.to_rfc3339(),
                 updated_at: meeting.updated_at.0.to_rfc3339(),
                 folder_path: meeting.folder_path,
+                lifecycle: meeting.lifecycle,
+                completeness: meeting.completeness,
+                completeness_reason: meeting.completeness_reason,
+                gap_count: gaps.len() as u64,
+                gaps,
             })
         }
         Ok(None) => {

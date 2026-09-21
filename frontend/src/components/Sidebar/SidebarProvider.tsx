@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Analytics from '@/lib/analytics';
 import { invoke } from '@tauri-apps/api/core';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
-import type { SummaryProcessResponse } from '@/types';
+import type { MeetingCompleteness, MeetingLifecycle, SummaryProcessResponse } from '@/types';
 
 
 
@@ -13,12 +13,18 @@ interface SidebarItem {
   id: string;
   title: string;
   type: 'folder' | 'file';
+  lifecycle?: MeetingLifecycle;
+  completeness?: MeetingCompleteness;
+  gapCount?: number;
   children?: SidebarItem[];
 }
 
 export interface CurrentMeeting {
   id: string;
   title: string;
+  lifecycle?: MeetingLifecycle;
+  completeness?: MeetingCompleteness;
+  gapCount?: number;
 }
 
 // Search result type for transcript search
@@ -97,10 +103,19 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   const fetchMeetings = React.useCallback(async () => {
     if (serverAddress) {
       try {
-        const meetings = await invoke('api_get_meetings') as Array<{ id: string, title: string }>;
-        const transformedMeetings = meetings.map((meeting: any) => ({
+        const meetings = await invoke('api_get_meetings') as Array<{
+          id: string;
+          title: string;
+          lifecycle: MeetingLifecycle;
+          completeness: MeetingCompleteness;
+          gap_count: number;
+        }>;
+        const transformedMeetings = meetings.map(meeting => ({
           id: meeting.id,
-          title: meeting.title
+          title: meeting.title,
+          lifecycle: meeting.lifecycle,
+          completeness: meeting.completeness,
+          gapCount: meeting.gap_count,
         }));
         setMeetings(transformedMeetings);
         Analytics.trackBackendConnection(true);
@@ -130,7 +145,14 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
       title: 'Meeting Notes',
       type: 'folder' as const,
       children: [
-        ...meetings.map(meeting => ({ id: meeting.id, title: meeting.title, type: 'file' as const }))
+        ...meetings.map(meeting => ({
+          id: meeting.id,
+          title: meeting.title,
+          type: 'file' as const,
+          lifecycle: meeting.lifecycle,
+          completeness: meeting.completeness,
+          gapCount: meeting.gapCount,
+        }))
       ]
     },
   ];

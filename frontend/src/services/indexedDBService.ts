@@ -45,6 +45,7 @@ export interface MeetingMetadata {
   lifecycle: MeetingLifecycle;
   completeness: MeetingCompleteness;
   completenessReason?: string;
+  gapCount?: number;
 }
 
 export interface CanonicalStoredTranscript {
@@ -308,6 +309,7 @@ class IndexedDBService {
       meeting.lifecycle = result.lifecycle;
       meeting.completeness = result.completeness;
       meeting.transcriptCount = result.evidence_count;
+      meeting.gapCount = result.gap_count;
       meeting.lastUpdated = Number.isFinite(reconciledAt) ? reconciledAt : meeting.lastUpdated;
       const reasonCodes = result.gaps.map(gap => gap.reason_code);
       if (reasonCodes.length > 0) {
