@@ -151,3 +151,88 @@ fn proposed_profile_and_unrun_platforms_remain_unknown_or_unverified() {
         json!(["macos", "windows", "linux"])
     );
 }
+
+#[test]
+fn aggregate_rejects_invalid_bundles_through_the_plan_17_validator() {
+    let root = tempfile::tempdir().expect("aggregate tempdir");
+    let plan_path = root.path().join("matrix-plan.json");
+    let plan_output = run(&[
+        "plan",
+        fixture().to_str().expect("fixture path"),
+        plan_path.to_str().expect("plan path"),
+    ]);
+    assert!(plan_output.status.success());
+    let plan: Value =
+        serde_json::from_slice(&fs::read(&plan_path).expect("read plan")).expect("plan JSON");
+    let run_id = plan["runs"][0]["runId"].as_str().expect("first run ID");
+    let bundle_root = root.path().join("bundles");
+    let invalid_bundle = bundle_root.join(format!("run-{run_id}"));
+    fs::create_dir_all(&invalid_bundle).expect("invalid bundle directory");
+    fs::write(invalid_bundle.join("manifest.json"), "{}").expect("invalid manifest");
+    let report_path = root.path().join("aggregate.json");
+
+    let output = run(&[
+        "aggregate",
+        fixture().to_str().expect("fixture path"),
+        plan_path.to_str().expect("plan path"),
+        bundle_root.to_str().expect("bundle root"),
+        report_path.to_str().expect("report path"),
+    ]);
+    assert!(!output.status.success(), "invalid bundle was aggregated");
+    assert!(!report_path.exists(), "invalid evidence published a report");
+}
+
+#[test]
+fn aggregate_preserves_missing_runs_as_unknown_and_never_overwrites_inputs() {
+    let root = tempfile::tempdir().expect("aggregate tempdir");
+    let plan_path = root.path().join("matrix-plan.json");
+    let plan_output = run(&[
+        "plan",
+        fixture().to_str().expect("fixture path"),
+        plan_path.to_str().expect("plan path"),
+    ]);
+    assert!(plan_output.status.success());
+    let bundle_root = root.path().join("bundles");
+    fs::create_dir(&bundle_root).expect("empty bundle root");
+    let report_path = root.path().join("aggregate.json");
+
+    let before = fs::read_dir(&bundle_root)
+        .expect("bundle root before")
+        .count();
+    let output = run(&[
+        "aggregate",
+        fixture().to_str().expect("fixture path"),
+        plan_path.to_str().expect("plan path"),
+        bundle_root.to_str().expect("bundle root"),
+        report_path.to_str().expect("report path"),
+    ]);
+    assert!(
+        output.status.success(),
+        "missing evidence must remain unknown: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        fs::read_dir(&bundle_root)
+            .expect("bundle root after")
+            .count(),
+        before,
+        "aggregation modified raw bundle storage"
+    );
+    let report: Value = serde_json::from_slice(&fs::read(&report_path).expect("aggregate report"))
+        .expect("aggregate JSON");
+    assert_eq!(report["outcome"], "unknown");
+    assert!(report["runs"]
+        .as_array()
+        .expect("aggregate runs")
+        .iter()
+        .all(|run| run["status"] == "unknown" && run["reason"] == "bundle_missing"));
+
+    let second = run(&[
+        "aggregate",
+        fixture().to_str().expect("fixture path"),
+        plan_path.to_str().expect("plan path"),
+        bundle_root.to_str().expect("bundle root"),
+        report_path.to_str().expect("report path"),
+    ]);
+    assert!(!second.status.success(), "aggregate report was overwritten");
+}
