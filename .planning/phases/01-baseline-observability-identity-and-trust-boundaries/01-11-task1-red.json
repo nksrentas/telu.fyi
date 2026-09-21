@@ -1,0 +1,8 @@
+{
+  "command": "node --test .github/verify-phase1-provider-boundary.test.cjs",
+  "exitCode": 1,
+  "output": "TAP version 13\nnot ok 1 - settings refresh and render the Rust-owned route contract after selection\nnot ok 2 - boundary renders neutral Local LAN Remote icon and text plus explicit transport state\nnot ok 3 - long sanitized origins expand to a selectable full value without tooltip-only disclosure\nnot ok 4 - loading or changed routes remain visible and unavailable before data-bearing action enablement\n1..4\n# tests 4\n# pass 0\n# fail 4\n# cancelled 0",
+  "targetTest": "settings refresh and render the Rust-owned route contract after selection",
+  "expected": "Transcription and summary settings invoke the Rust route command and render its capability, location, sanitized destination, provider, model, encryption, and validation state through one accessible shared boundary",
+  "actual": "Four named assertions failed because the typed route service and shared boundary did not exist and neither settings surface rendered the Rust-owned route contract"
+}
