@@ -11,6 +11,9 @@ use std::time::Instant;
 use url::Url;
 
 const DEFAULT_OUTBOUND_LEDGER_CAPACITY: usize = 4_096;
+const DEFAULT_ANALYTICS_ORIGIN: &str = "https://us.i.posthog.com";
+const DEFAULT_UPDATER_ENDPOINT: &str =
+    "https://github.com/Zackriya-Solutions/meeting-minutes/releases/latest/download/latest.json";
 const CANARY_PACKET_AUTHORITY: &str =
     "The OS or proxy method selected in Plan 19 is authoritative for packets.";
 
@@ -120,30 +123,102 @@ impl CanaryRuntime {
         run_id: &str,
         background_policy: CanaryBackgroundPolicy,
     ) -> Result<CanaryModeSnapshot, CanaryModeError> {
-        let ledger = self
-            .outbound_slot
-            .read()
-            .unwrap_or_else(|error| error.into_inner())
-            .clone();
-        Ok(CanaryModeSnapshot {
+        if !is_safe_identifier(run_id) {
+            return Err(CanaryModeError::InvalidRunId);
+        }
+
+        let mut runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        if let Some(active) = runtime.active.as_ref() {
+            if active.state.run_id == run_id && active.state.background_policy == background_policy
+            {
+                return Ok(snapshot_active_canary(active));
+            }
+            return Err(CanaryModeError::AlreadyActive);
+        }
+
+        let ledger = Arc::new(
+            OutboundLedger::new(run_id, DEFAULT_OUTBOUND_LEDGER_CAPACITY, Instant::now())
+                .map_err(|_| CanaryModeError::InvalidRunId)?,
+        );
+        let previous_ledger = {
+            let mut outbound = self
+                .outbound_slot
+                .write()
+                .unwrap_or_else(|error| error.into_inner());
+            std::mem::replace(&mut *outbound, Arc::clone(&ledger))
+        };
+        let active = ActiveCanaryMode {
             state: CanaryModeState {
                 run_id: run_id.to_string(),
-                enabled: false,
+                enabled: true,
                 background_policy,
                 started_at_utc: Utc::now(),
                 stopped_at_utc: None,
                 packet_blocker_authority: CANARY_PACKET_AUTHORITY.to_string(),
             },
-            outbound: ledger.snapshot(),
-        })
+            ledger,
+            previous_ledger,
+        };
+        let snapshot = snapshot_active_canary(&active);
+        runtime.active = Some(active);
+        Ok(snapshot)
     }
 
-    fn stop(&self, _run_id: &str) -> Result<CanaryModeSnapshot, CanaryModeError> {
-        Err(CanaryModeError::EvidenceMissing)
+    fn stop(&self, run_id: &str) -> Result<CanaryModeSnapshot, CanaryModeError> {
+        let mut runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = runtime.active.as_ref() else {
+            return Err(CanaryModeError::EvidenceMissing);
+        };
+        if active.state.run_id != run_id {
+            return Err(CanaryModeError::RunMismatch);
+        }
+        let active = runtime
+            .active
+            .take()
+            .expect("the active canary was checked before take");
+        {
+            let mut outbound = self
+                .outbound_slot
+                .write()
+                .unwrap_or_else(|error| error.into_inner());
+            *outbound = active.previous_ledger;
+        }
+
+        let snapshot = CanaryModeSnapshot {
+            state: CanaryModeState {
+                enabled: false,
+                stopped_at_utc: Some(Utc::now()),
+                ..active.state
+            },
+            outbound: active.ledger.snapshot(),
+        };
+        let attribution_complete = snapshot.outbound.attribution_complete;
+        runtime.completed = Some(snapshot.clone());
+        if attribution_complete {
+            Ok(snapshot)
+        } else {
+            Err(CanaryModeError::AttributionIncomplete)
+        }
     }
 
-    fn query(&self, _run_id: Option<&str>) -> Result<Option<CanaryModeSnapshot>, CanaryModeError> {
-        Err(CanaryModeError::EvidenceMissing)
+    fn query(&self, run_id: Option<&str>) -> Result<Option<CanaryModeSnapshot>, CanaryModeError> {
+        let runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        match run_id {
+            None => Ok(runtime.active.as_ref().map(snapshot_active_canary)),
+            Some(run_id) => {
+                if let Some(active) = runtime.active.as_ref() {
+                    if active.state.run_id == run_id {
+                        return Ok(Some(snapshot_active_canary(active)));
+                    }
+                }
+                if let Some(completed) = runtime.completed.as_ref() {
+                    if completed.state.run_id == run_id {
+                        return Ok(Some(completed.clone()));
+                    }
+                }
+                Err(CanaryModeError::EvidenceMissing)
+            }
+        }
     }
 
     fn record_background_decision(
@@ -151,17 +226,110 @@ impl CanaryRuntime {
         service: CanaryBackgroundService,
         trigger: CanaryAttemptTrigger,
     ) -> Result<CanaryBackgroundDecision, CanaryModeError> {
+        let active = {
+            let runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
+            runtime
+                .active
+                .as_ref()
+                .map(|active| (active.state.clone(), Arc::clone(&active.ledger)))
+        };
+        let Some((state, ledger)) = active else {
+            return Ok(CanaryBackgroundDecision {
+                run_id: None,
+                canary_enabled: false,
+                service,
+                trigger,
+                allow_dispatch: true,
+                sequence: None,
+                disposition: None,
+                redacted_code: None,
+                packet_blocker_authority: CANARY_PACKET_AUTHORITY.to_string(),
+            });
+        };
+
+        let allow_dispatch = trigger == CanaryAttemptTrigger::Manual
+            || state.background_policy == CanaryBackgroundPolicy::PermitAttributed;
+        let disposition = if allow_dispatch {
+            OutboundDisposition::Permitted
+        } else {
+            OutboundDisposition::Suppressed
+        };
+        let redacted_code = if allow_dispatch {
+            "CANARY_PERMITTED"
+        } else {
+            "CANARY_SUPPRESSED"
+        };
+        let route = canary_background_route(service);
+
+        let current_run_matches = {
+            let runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
+            runtime
+                .active
+                .as_ref()
+                .is_some_and(|active| active.state.run_id == state.run_id)
+        };
+        if !current_run_matches {
+            return Err(CanaryModeError::EvidenceMissing);
+        }
+
+        let sequence = ledger
+            .record_canary_background_decision(&route, disposition, redacted_code)
+            .map_err(|_| CanaryModeError::AttributionIncomplete)?;
         Ok(CanaryBackgroundDecision {
-            run_id: None,
-            canary_enabled: false,
+            run_id: Some(state.run_id),
+            canary_enabled: true,
             service,
             trigger,
-            allow_dispatch: true,
-            sequence: None,
-            disposition: None,
-            redacted_code: None,
+            allow_dispatch,
+            sequence: Some(sequence),
+            disposition: Some(disposition),
+            redacted_code: Some(redacted_code.to_string()),
             packet_blocker_authority: CANARY_PACKET_AUTHORITY.to_string(),
         })
+    }
+}
+
+fn snapshot_active_canary(active: &ActiveCanaryMode) -> CanaryModeSnapshot {
+    CanaryModeSnapshot {
+        state: active.state.clone(),
+        outbound: active.ledger.snapshot(),
+    }
+}
+
+fn background_route_identity(
+    service: CanaryBackgroundService,
+) -> (Capability, &'static str, &'static str, &'static str) {
+    match service {
+        CanaryBackgroundService::Analytics => (
+            Capability::Analytics,
+            "posthog",
+            "events",
+            DEFAULT_ANALYTICS_ORIGIN,
+        ),
+        CanaryBackgroundService::Updater => (
+            Capability::Updater,
+            "tauri-updater",
+            "release-manifest",
+            DEFAULT_UPDATER_ENDPOINT,
+        ),
+    }
+}
+
+fn canary_background_route(service: CanaryBackgroundService) -> EffectiveRoute {
+    let (capability, provider_id, model_id, destination) = background_route_identity(service);
+    let origin = Url::parse(destination)
+        .expect("fixed canary background destinations must be valid URLs")
+        .origin()
+        .ascii_serialization();
+    EffectiveRoute {
+        capability,
+        provider_id: provider_id.to_string(),
+        model_id: model_id.to_string(),
+        location_class: Some(LocationClass::Remote),
+        sanitized_origin: Some(origin),
+        encrypted: true,
+        validation_state: RouteValidationState::Validated,
+        resolved_addresses: Vec::new(),
     }
 }
 
@@ -290,6 +458,45 @@ impl OutboundLedger {
         observed_at: Instant,
         observed_at_utc: DateTime<Utc>,
     ) -> Result<u64, OutboundLedgerError> {
+        self.record_attempt(
+            meeting_id,
+            route,
+            disposition,
+            redacted_code,
+            observed_at,
+            observed_at_utc,
+            false,
+        )
+    }
+
+    fn record_canary_background_decision(
+        &self,
+        route: &EffectiveRoute,
+        disposition: OutboundDisposition,
+        redacted_code: &str,
+    ) -> Result<u64, OutboundLedgerError> {
+        self.record_attempt(
+            None,
+            route,
+            disposition,
+            Some(redacted_code),
+            Instant::now(),
+            Utc::now(),
+            true,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn record_attempt(
+        &self,
+        meeting_id: Option<&str>,
+        route: &EffectiveRoute,
+        disposition: OutboundDisposition,
+        redacted_code: Option<&str>,
+        observed_at: Instant,
+        observed_at_utc: DateTime<Utc>,
+        allow_unresolved_route: bool,
+    ) -> Result<u64, OutboundLedgerError> {
         let meeting_id = meeting_id
             .map(|meeting_id| {
                 if is_safe_identifier(meeting_id) {
@@ -308,7 +515,7 @@ impl OutboundLedger {
                 }
             })
             .transpose()?;
-        let route = sanitize_network_route(route)?;
+        let route = sanitize_network_route(route, allow_unresolved_route)?;
         let monotonic_offset_ns = observed_at
             .saturating_duration_since(self.origin)
             .as_nanos()
@@ -419,12 +626,15 @@ pub fn authorize_and_record_dispatch<T>(
     })
 }
 
-static ACTIVE_OUTBOUND_LEDGER: LazyLock<RwLock<Arc<OutboundLedger>>> = LazyLock::new(|| {
+static ACTIVE_OUTBOUND_LEDGER: LazyLock<Arc<RwLock<Arc<OutboundLedger>>>> = LazyLock::new(|| {
     let run_id = format!("process-{}", uuid::Uuid::new_v4());
     let ledger = OutboundLedger::new(run_id, DEFAULT_OUTBOUND_LEDGER_CAPACITY, Instant::now())
         .expect("the process outbound ledger configuration must be valid");
-    RwLock::new(Arc::new(ledger))
+    Arc::new(RwLock::new(Arc::new(ledger)))
 });
+
+static ACTIVE_CANARY_RUNTIME: LazyLock<CanaryRuntime> =
+    LazyLock::new(|| CanaryRuntime::new(Arc::clone(&ACTIVE_OUTBOUND_LEDGER)));
 
 pub fn active_outbound_ledger() -> Arc<OutboundLedger> {
     ACTIVE_OUTBOUND_LEDGER
@@ -440,7 +650,44 @@ pub fn replace_active_outbound_ledger(ledger: Arc<OutboundLedger>) -> Arc<Outbou
     std::mem::replace(&mut *active, ledger)
 }
 
-fn sanitize_network_route(route: &EffectiveRoute) -> Result<OutboundRoute, OutboundLedgerError> {
+#[tauri::command]
+pub fn start_canary_mode(
+    run_id: String,
+    background_policy: CanaryBackgroundPolicy,
+) -> Result<CanaryModeSnapshot, String> {
+    ACTIVE_CANARY_RUNTIME
+        .start(&run_id, background_policy)
+        .map_err(|error| error.code().to_string())
+}
+
+#[tauri::command]
+pub fn stop_canary_mode(run_id: String) -> Result<CanaryModeSnapshot, String> {
+    ACTIVE_CANARY_RUNTIME
+        .stop(&run_id)
+        .map_err(|error| error.code().to_string())
+}
+
+#[tauri::command]
+pub fn get_canary_mode(run_id: Option<String>) -> Result<Option<CanaryModeSnapshot>, String> {
+    ACTIVE_CANARY_RUNTIME
+        .query(run_id.as_deref())
+        .map_err(|error| error.code().to_string())
+}
+
+#[tauri::command]
+pub fn evaluate_canary_background_attempt(
+    service: CanaryBackgroundService,
+    trigger: CanaryAttemptTrigger,
+) -> Result<CanaryBackgroundDecision, String> {
+    ACTIVE_CANARY_RUNTIME
+        .record_background_decision(service, trigger)
+        .map_err(|error| error.code().to_string())
+}
+
+fn sanitize_network_route(
+    route: &EffectiveRoute,
+    allow_unresolved_route: bool,
+) -> Result<OutboundRoute, OutboundLedgerError> {
     let location_class = route
         .location_class
         .ok_or(OutboundLedgerError::InvalidRoute)?;
@@ -470,7 +717,7 @@ fn sanitize_network_route(route: &EffectiveRoute) -> Result<OutboundRoute, Outbo
                 .map_err(|_| OutboundLedgerError::InvalidRoute)
         })
         .collect::<Result<Vec<_>, _>>()?;
-    if resolved_addresses.is_empty() {
+    if resolved_addresses.is_empty() && !allow_unresolved_route {
         return Err(OutboundLedgerError::InvalidRoute);
     }
 

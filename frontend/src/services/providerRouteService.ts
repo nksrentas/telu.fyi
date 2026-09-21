@@ -4,7 +4,9 @@ export type ProviderCapability =
   | 'transcription'
   | 'summary'
   | 'document_processing'
-  | 'generation';
+  | 'generation'
+  | 'analytics'
+  | 'updater';
 
 export type LocationClass = 'local' | 'lan' | 'remote';
 
@@ -38,6 +40,59 @@ export interface ProviderRouteFailure {
   sanitizedOrigin: string | null;
 }
 
+export type CanaryBackgroundPolicy =
+  | 'suppress_automatic'
+  | 'permit_attributed';
+
+export type CanaryBackgroundService = 'analytics' | 'updater';
+export type CanaryAttemptTrigger = 'automatic' | 'manual';
+export type OutboundDisposition = 'permitted' | 'blocked' | 'failed' | 'suppressed';
+
+export interface CanaryModeState {
+  runId: string;
+  enabled: boolean;
+  backgroundPolicy: CanaryBackgroundPolicy;
+  startedAtUtc: string;
+  stoppedAtUtc: string | null;
+  packetBlockerAuthority: string;
+}
+
+export interface CanaryOutboundAttempt {
+  runId: string;
+  meetingId: string | null;
+  sequence: number;
+  monotonicOffsetNs: number;
+  observedAtUtc: string;
+  route: AvailableEffectiveRoute;
+  disposition: OutboundDisposition;
+  redactedCode: string | null;
+}
+
+export interface CanaryOutboundSnapshot {
+  runId: string;
+  capacity: number;
+  attempts: CanaryOutboundAttempt[];
+  overflowCount: number;
+  attributionComplete: boolean;
+}
+
+export interface CanaryModeSnapshot {
+  state: CanaryModeState;
+  outbound: CanaryOutboundSnapshot;
+}
+
+export interface CanaryBackgroundDecision {
+  runId: string | null;
+  canaryEnabled: boolean;
+  service: CanaryBackgroundService;
+  trigger: CanaryAttemptTrigger;
+  allowDispatch: boolean;
+  sequence: number | null;
+  disposition: OutboundDisposition | null;
+  redactedCode: string | null;
+  packetBlockerAuthority: string;
+}
+
 const ROUTE_ERROR_CODES = new Set<ProviderRouteFailure['code']>([
   'PROVIDER_ROUTE_UNAVAILABLE',
   'PROVIDER_ROUTE_MATERIALLY_CHANGED',
@@ -53,6 +108,40 @@ export async function validateProviderRoute(
   expectedRoute: EffectiveRoute,
 ): Promise<EffectiveRoute> {
   return invoke<EffectiveRoute>('validate_provider_route', { expectedRoute });
+}
+
+export async function startCanaryMode(
+  runId: string,
+  backgroundPolicy: CanaryBackgroundPolicy = 'suppress_automatic',
+): Promise<CanaryModeSnapshot> {
+  return invoke<CanaryModeSnapshot>('start_canary_mode', {
+    runId,
+    backgroundPolicy,
+  });
+}
+
+export async function stopCanaryMode(
+  runId: string,
+): Promise<CanaryModeSnapshot> {
+  return invoke<CanaryModeSnapshot>('stop_canary_mode', { runId });
+}
+
+export async function getCanaryMode(
+  runId?: string,
+): Promise<CanaryModeSnapshot | null> {
+  return invoke<CanaryModeSnapshot | null>('get_canary_mode', {
+    runId: runId ?? null,
+  });
+}
+
+export async function evaluateCanaryBackgroundAttempt(
+  service: CanaryBackgroundService,
+  trigger: CanaryAttemptTrigger,
+): Promise<CanaryBackgroundDecision> {
+  return invoke<CanaryBackgroundDecision>('evaluate_canary_background_attempt', {
+    service,
+    trigger,
+  });
 }
 
 function routeErrorRecord(error: unknown): Record<string, unknown> {
