@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml provider_route_resolution --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - trust::provider_route::tests::provider_route_resolution_classifies_device_loopback_private_and_public_destinations\nnot ok 2 - trust::provider_route::tests::provider_route_resolution_redacts_credentials_query_fragment_and_sensitive_path\nnot ok 3 - trust::provider_route::tests::provider_route_resolution_rejects_missing_invalid_and_materially_changed_routes\nok 4 - trust::provider_route::tests::provider_route_resolution_keeps_capability_identity_for_shared_destination\n1..4\n# tests 4\n# pass 1\n# fail 3\n# cancelled 0",
+  "targetTest": "trust::provider_route::tests::provider_route_resolution_classifies_device_loopback_private_and_public_destinations",
+  "expected": "Device and loopback destinations classify Local, private addresses classify LAN, public addresses classify Remote, serialized routes expose only sanitized origins, and material address/class changes return a redacted route-contract error",
+  "actual": "The intentional resolver stub returned an unavailable route with no location or sanitized origin and reported only the generic unavailable error for a material route change"
+}

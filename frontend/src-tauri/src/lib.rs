@@ -51,6 +51,7 @@ pub mod openrouter;
 pub mod parakeet_engine;
 pub mod state;
 pub mod summary;
+pub mod trust;
 pub mod tray;
 pub mod utils;
 pub mod whisper_engine;
