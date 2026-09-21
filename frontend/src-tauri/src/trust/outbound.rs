@@ -5,8 +5,10 @@ use super::provider_route::{
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::net::IpAddr;
 use std::sync::Mutex;
 use std::time::Instant;
+use url::Url;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -57,6 +59,8 @@ pub struct OutboundSnapshot {
 pub enum OutboundLedgerError {
     InvalidCapacity,
     InvalidRunId,
+    InvalidMeetingId,
+    InvalidRoute,
     InProcessRoute,
     InvalidRedactedCode,
     CapacityExceeded { sequence: u64 },
@@ -85,7 +89,7 @@ impl OutboundLedger {
         origin: Instant,
     ) -> Result<Self, OutboundLedgerError> {
         let run_id = run_id.into();
-        if run_id.trim().is_empty() {
+        if !is_safe_identifier(&run_id) {
             return Err(OutboundLedgerError::InvalidRunId);
         }
         if capacity == 0 {
@@ -101,28 +105,134 @@ impl OutboundLedger {
 
     pub fn record_network_attempt(
         &self,
-        _meeting_id: Option<&str>,
-        _route: &EffectiveRoute,
-        _disposition: OutboundDisposition,
-        _redacted_code: Option<&str>,
-        _observed_at: Instant,
-        _observed_at_utc: DateTime<Utc>,
+        meeting_id: Option<&str>,
+        route: &EffectiveRoute,
+        disposition: OutboundDisposition,
+        redacted_code: Option<&str>,
+        observed_at: Instant,
+        observed_at_utc: DateTime<Utc>,
     ) -> Result<u64, OutboundLedgerError> {
-        // Intentional TDD RED stub: Task 1 tests define the ledger contract.
-        Ok(0)
+        let meeting_id = meeting_id
+            .map(|meeting_id| {
+                if is_safe_identifier(meeting_id) {
+                    Ok(meeting_id.to_string())
+                } else {
+                    Err(OutboundLedgerError::InvalidMeetingId)
+                }
+            })
+            .transpose()?;
+        let redacted_code = redacted_code
+            .map(|code| {
+                if is_safe_code(code) {
+                    Ok(code.to_string())
+                } else {
+                    Err(OutboundLedgerError::InvalidRedactedCode)
+                }
+            })
+            .transpose()?;
+        let route = sanitize_network_route(route)?;
+        let monotonic_offset_ns = observed_at
+            .saturating_duration_since(self.origin)
+            .as_nanos()
+            .min(u64::MAX as u128) as u64;
+
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        let sequence = state.next_sequence;
+        state.next_sequence = state
+            .next_sequence
+            .checked_add(1)
+            .ok_or(OutboundLedgerError::SequenceExhausted)?;
+        if state.attempts.len() >= self.capacity {
+            state.overflow_count = state.overflow_count.saturating_add(1);
+            return Err(OutboundLedgerError::CapacityExceeded { sequence });
+        }
+        state.attempts.push(OutboundAttempt {
+            run_id: self.run_id.clone(),
+            meeting_id,
+            sequence,
+            monotonic_offset_ns,
+            observed_at_utc,
+            route,
+            disposition,
+            redacted_code,
+        });
+        Ok(sequence)
     }
 
     pub fn snapshot(&self) -> OutboundSnapshot {
         let state = self.state.lock().unwrap_or_else(|error| error.into_inner());
-        let _ = (&self.origin, state.next_sequence);
+        let mut attempts = state.attempts.clone();
+        attempts.sort_by_key(|attempt| (attempt.monotonic_offset_ns, attempt.sequence));
         OutboundSnapshot {
             run_id: self.run_id.clone(),
             capacity: self.capacity,
-            attempts: state.attempts.clone(),
+            attempts,
             overflow_count: state.overflow_count,
-            attribution_complete: true,
+            attribution_complete: state.overflow_count == 0,
         }
     }
+}
+
+fn sanitize_network_route(route: &EffectiveRoute) -> Result<OutboundRoute, OutboundLedgerError> {
+    let location_class = route
+        .location_class
+        .ok_or(OutboundLedgerError::InvalidRoute)?;
+    let raw_origin = route
+        .sanitized_origin
+        .as_deref()
+        .ok_or(OutboundLedgerError::InvalidRoute)?;
+    if location_class == LocationClass::Local
+        && raw_origin == "This device"
+        && route.resolved_addresses.is_empty()
+    {
+        return Err(OutboundLedgerError::InProcessRoute);
+    }
+
+    let origin = Url::parse(raw_origin).map_err(|_| OutboundLedgerError::InvalidRoute)?;
+    if !matches!(origin.scheme(), "http" | "https") || origin.host().is_none() {
+        return Err(OutboundLedgerError::InvalidRoute);
+    }
+    let sanitized_origin = origin.origin().ascii_serialization();
+    let resolved_addresses = route
+        .resolved_addresses
+        .iter()
+        .map(|address| {
+            address
+                .parse::<IpAddr>()
+                .map(|address| address.to_string())
+                .map_err(|_| OutboundLedgerError::InvalidRoute)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if resolved_addresses.is_empty() {
+        return Err(OutboundLedgerError::InvalidRoute);
+    }
+
+    Ok(OutboundRoute {
+        capability: route.capability,
+        provider_id: route.provider_id.clone(),
+        model_id: route.model_id.clone(),
+        location_class,
+        sanitized_origin,
+        encrypted: route.encrypted,
+        validation_state: route.validation_state,
+        resolved_addresses,
+    })
+}
+
+fn is_safe_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':')
+        })
+}
+
+fn is_safe_code(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
 }
 
 #[cfg(test)]
