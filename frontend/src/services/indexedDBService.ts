@@ -14,6 +14,25 @@ export type MeetingCompleteness =
   | 'recovered_with_gaps'
   | 'completion_not_verified';
 
+export interface RecoveryGap {
+  gap_id: string;
+  meeting_id: string;
+  gap_kind: string;
+  reason_code: string;
+  audio_start_ms: number | null;
+  audio_end_ms: number | null;
+}
+
+export interface RecoveryResult {
+  meeting_id: string;
+  lifecycle: MeetingLifecycle;
+  completeness: MeetingCompleteness;
+  evidence_count: number;
+  gap_count: number;
+  gaps: RecoveryGap[];
+  reconciled_at_utc: string;
+}
+
 // Database schema interfaces
 export interface MeetingMetadata {
   meetingId: string;          // Primary key: canonical Rust UUID
@@ -263,6 +282,47 @@ class IndexedDBService {
       });
     } catch (error) {
       console.warn('Failed to mark meeting as saved:', error);
+    }
+  }
+
+  /**
+   * Mirror Rust's authoritative recovery projection onto the existing cache
+   * candidate. The canonical key never changes and the row remains available
+   * for an idempotent repeat reconciliation in the open recovery dialog.
+   */
+  async applyRecoveryResult(result: RecoveryResult): Promise<MeetingMetadata | null> {
+    try {
+      if (!this.db) await this.init();
+
+      const transaction = this.db!.transaction(['meetings'], 'readwrite');
+      const store = transaction.objectStore('meetings');
+      const meeting = await new Promise<MeetingMetadata | null>((resolve, reject) => {
+        const request = store.get(result.meeting_id);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+
+      if (!meeting) return null;
+
+      const reconciledAt = Date.parse(result.reconciled_at_utc);
+      meeting.lifecycle = result.lifecycle;
+      meeting.completeness = result.completeness;
+      meeting.transcriptCount = result.evidence_count;
+      meeting.lastUpdated = Number.isFinite(reconciledAt) ? reconciledAt : meeting.lastUpdated;
+      const reasonCodes = result.gaps.map(gap => gap.reason_code);
+      if (reasonCodes.length > 0) {
+        meeting.completenessReason = [...new Set(reasonCodes)].sort().join(',');
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const request = store.put(meeting);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+      return meeting;
+    } catch (error) {
+      console.warn('Failed to project recovery result into IndexedDB');
+      return null;
     }
   }
 

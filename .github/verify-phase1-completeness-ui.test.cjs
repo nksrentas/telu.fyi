@@ -34,7 +34,7 @@ test('authoritative recovery updates the existing cache candidate without remova
   assert.match(indexedDBService, /store\.put\(meeting\)/);
   assert.match(recoveryHook, /applyRecoveryResult\(result\)/);
   assert.match(recoveryHook, /meeting\.meetingId === result\.meeting_id/);
-  assert.doesNotMatch(recoveryHook, /prev\.filter\(m => m\.meetingId !== meetingId\)/);
+  assert.match(recoveryHook, /setRecoverableMeetings\(prev => prev\.map/);
 });
 
 test('recovery remains in the dialog and renders authoritative result actions', () => {
@@ -45,9 +45,9 @@ test('recovery remains in the dialog and renders authoritative result actions', 
   );
   assert.match(recoveryDialog, /Meeting recovered\. No recorded gaps remain\./);
   assert.match(recoveryDialog, /Meeting recovered with[\s\S]*gap/);
-  assert.match(recoveryDialog, />View meeting</);
-  assert.match(recoveryDialog, />Close recovery</);
-  assert.match(recoveryDialog, />Review gaps</);
+  assert.match(recoveryDialog, />\s*View meeting\s*</);
+  assert.match(recoveryDialog, />\s*Close recovery\s*</);
+  assert.match(recoveryDialog, />\s*Review gaps\s*</);
 });
 
 test('recovery loading, empty, selection, and delete controls stay explicit', () => {
@@ -63,6 +63,6 @@ test('recovery loading, empty, selection, and delete controls stay explicit', ()
     recoveryDialog,
     /Its local recovery data will be removed\. This cannot be undone\./,
   );
-  assert.match(recoveryDialog, />Keep meeting</);
-  assert.match(recoveryDialog, />Delete meeting</);
+  assert.match(recoveryDialog, />\s*Keep meeting\s*</);
+  assert.match(recoveryDialog, />\s*Delete meeting\s*</);
 });

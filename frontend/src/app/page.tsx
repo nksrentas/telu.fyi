@@ -19,7 +19,6 @@ import { useTranscriptRecovery } from '@/hooks/useTranscriptRecovery';
 import { TranscriptRecovery } from '@/components/TranscriptRecovery';
 import { indexedDBService } from '@/services/indexedDBService';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
 
 export default function Home() {
   // Local page state (not moved to contexts)
@@ -51,15 +50,11 @@ export default function Home() {
   // Recovery hook
   const {
     recoverableMeetings,
-    isLoading: isLoadingRecovery,
-    isRecovering,
     checkForRecoverableTranscripts,
     recoverMeeting,
     loadMeetingTranscripts,
     deleteRecoverableMeeting
   } = useTranscriptRecovery();
-
-  const router = useRouter();
 
   useEffect(() => {
     // Track page view
@@ -117,43 +112,15 @@ export default function Home() {
     }
   }, [recoverableMeetings]);
 
-  // Handle recovery with toast notifications and navigation
+  // The recovery dialog owns result presentation and deliberate navigation.
   const handleRecovery = async (meetingId: string) => {
     try {
       const result = await recoverMeeting(meetingId);
-
-      if (result.success) {
-        toast.success('Meeting recovered successfully!', {
-          description: result.audioRecoveryStatus?.status === 'success'
-            ? 'Transcripts and audio recovered'
-            : 'Transcripts recovered (no audio available)',
-          action: result.meetingId ? {
-            label: 'View Meeting',
-            onClick: () => {
-              router.push(`/meeting-details?id=${result.meetingId}`);
-            }
-          } : undefined,
-          duration: 10000,
-        });
-
-        // Refresh sidebar to show the newly recovered meeting
-        await refetchMeetings();
-
-        // If no more recoverable meetings, clear session flag so dialog can show again
-        if (recoverableMeetings.length === 0) {
-          sessionStorage.removeItem('recovery_dialog_shown');
-        }
-
-        // Auto-navigate after a short delay
-        if (result.meetingId) {
-          setTimeout(() => {
-            router.push(`/meeting-details?id=${result.meetingId}`);
-          }, 2000);
-        }
-      }
+      await refetchMeetings();
+      return result;
     } catch (error) {
       toast.error('Failed to recover meeting', {
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        description: 'Telu could not reconcile this meeting. The recovery record is unchanged.',
       });
       throw error;
     }

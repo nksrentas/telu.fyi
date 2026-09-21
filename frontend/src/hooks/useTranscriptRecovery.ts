@@ -7,12 +7,16 @@
 
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { indexedDBService, MeetingMetadata, StoredTranscript } from '@/services/indexedDBService';
-import { storageService } from '@/services/storageService';
+import {
+  indexedDBService,
+  type CanonicalStoredTranscript,
+  type MeetingMetadata,
+  type RecoveryResult,
+  type StoredTranscript,
+} from '@/services/indexedDBService';
 import { applyPinnedSummaryLanguageToMeeting } from '@/lib/summary-language-preferences';
-import { toast } from 'sonner';
 
-interface AudioRecoveryStatus {
+export interface AudioRecoveryStatus {
   status: string; // "success" | "partial" | "failed" | "none"
   chunk_count: number;
   estimated_duration_seconds: number;
@@ -20,12 +24,21 @@ interface AudioRecoveryStatus {
   message: string;
 }
 
+export interface RecoveryOutcome {
+  result: RecoveryResult;
+  audioRecoveryStatus: AudioRecoveryStatus;
+}
+
+interface RecoveryCommandError {
+  code?: string;
+}
+
 export interface UseTranscriptRecoveryReturn {
   recoverableMeetings: MeetingMetadata[];
   isLoading: boolean;
   isRecovering: boolean;
   checkForRecoverableTranscripts: () => Promise<void>;
-  recoverMeeting: (meetingId: string) => Promise<{ success: boolean; audioRecoveryStatus?: AudioRecoveryStatus | null; meetingId?: string }>;
+  recoverMeeting: (meetingId: string) => Promise<RecoveryOutcome>;
   loadMeetingTranscripts: (meetingId: string) => Promise<StoredTranscript[]>;
   deleteRecoverableMeeting: (meetingId: string) => Promise<void>;
 }
@@ -58,6 +71,7 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
       // Verify audio checkpoint availability for each meeting
       const meetingsWithAudioStatus = await Promise.all(
         recentMeetings.map(async (meeting) => {
+          const finalEvidence = await indexedDBService.getFinalTranscripts(meeting.meetingId);
           if (meeting.folderPath) {
             try {
               const hasAudio = await invoke<boolean>('has_audio_checkpoints', {
@@ -67,15 +81,16 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
               // If no audio files, clear folderPath to show "No audio" in UI
               return {
                 ...meeting,
+                transcriptCount: finalEvidence.length,
                 folderPath: hasAudio ? meeting.folderPath : undefined
               };
             } catch (error) {
               console.warn('Failed to check audio for meeting:', error);
               // On error, assume no audio to be safe
-              return { ...meeting, folderPath: undefined };
+              return { ...meeting, transcriptCount: finalEvidence.length, folderPath: undefined };
             }
           }
-          return meeting;
+          return { ...meeting, transcriptCount: finalEvidence.length };
         })
       );
 
@@ -94,7 +109,7 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
    */
   const loadMeetingTranscripts = useCallback(async (meetingId: string): Promise<StoredTranscript[]> => {
     try {
-      const transcripts = await indexedDBService.getTranscripts(meetingId);
+      const transcripts = await indexedDBService.getFinalTranscripts(meetingId);
       // Sort by sequence ID
       transcripts.sort((a, b) => (a.sequenceId || 0) - (b.sequenceId || 0));
       return transcripts;
@@ -107,7 +122,7 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
   /**
    * Recover a meeting from IndexedDB
    */
-  const recoverMeeting = useCallback(async (meetingId: string): Promise<{ success: boolean; audioRecoveryStatus?: AudioRecoveryStatus | null; meetingId?: string }> => {
+  const recoverMeeting = useCallback(async (meetingId: string): Promise<RecoveryOutcome> => {
     setIsRecovering(true);
     try {
       // 1. Load meeting metadata
@@ -117,10 +132,7 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
       }
 
       // 2. Load all transcripts
-      const transcripts = await loadMeetingTranscripts(meetingId);
-      if (transcripts.length === 0) {
-        throw new Error('No transcripts found for this meeting');
-      }
+      const transcripts = await indexedDBService.getFinalTranscripts(meetingId);
 
       // 3. Check for folder path
       let folderPath = metadata.folderPath;
@@ -136,20 +148,19 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
       }
 
       // 4. Attempt audio recovery if folder path exists
-      let audioRecoveryStatus: AudioRecoveryStatus | null = null;
+      let audioRecoveryStatus: AudioRecoveryStatus;
       if (folderPath) {
         try {
           audioRecoveryStatus = await invoke<AudioRecoveryStatus>(
             'recover_audio_from_checkpoints',
             { meetingFolder: folderPath, sampleRate: 48000 }
           );
-        } catch (error) {
-          console.error('Audio recovery failed:', error);
+        } catch {
           audioRecoveryStatus = {
             status: 'failed',
             chunk_count: 0,
             estimated_duration_seconds: 0,
-            message: error instanceof Error ? error.message : 'Unknown error'
+            message: 'Audio checkpoint recovery was unavailable'
           };
         }
       } else {
@@ -161,40 +172,50 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
         };
       }
 
-      // 5. Convert StoredTranscripts to the format expected by storageService
-      const formattedTranscripts = transcripts.map((t, index) => ({
-        id: t.id?.toString() || `${Date.now()}-${index}`,
-        text: t.text,
-        timestamp: t.timestamp,
-        sequence_id: t.sequenceId || index,
-        chunk_start_time: (t as any).chunk_start_time,
-        is_partial: (t as any).is_partial || false,
-        confidence: t.confidence,
-        audio_start_time: (t as any).audio_start_time,
-        audio_end_time: (t as any).audio_end_time,
-        duration: (t as any).duration,
-      }));
+      const evidence = transcripts
+        .filter((transcript): transcript is CanonicalStoredTranscript => (
+          transcript.meetingId === metadata.meetingId
+          && transcript.isFinal
+          && transcript.isCanonical
+        ))
+        .map(transcript => ({
+          evidence_id: transcript.evidenceId,
+          meeting_id: transcript.meetingId,
+          source_track: transcript.source,
+          source_segment_key: transcript.sourceSegmentKey,
+          sequence: transcript.sequenceId,
+          transcript: transcript.text,
+          audio_start_time: transcript.audio_start_time,
+          audio_end_time: transcript.audio_end_time,
+          capture_completeness: transcript.captureCompleteness,
+        }));
 
-      // 6. Save to backend database using existing save utilities
-      const saveResponse = await storageService.saveMeeting(
-        metadata.title,
-        formattedTranscripts,
-        folderPath ?? null
-      );
-
-      const savedMeetingId = saveResponse.meeting_id;
+      const result = await invoke<RecoveryResult>('reconcile_meeting', {
+        request: {
+          meeting_id: metadata.meetingId,
+          evidence,
+          gaps: [],
+        },
+      });
 
       try {
-        await applyPinnedSummaryLanguageToMeeting(savedMeetingId);
-      } catch (error) {
-        console.warn('Failed to apply pinned summary language to recovered meeting:', error);
-        toast.warning('Could not apply default summary language', {
-          description: 'The recovered meeting was saved, but the default summary language was not applied.',
-        });
+        await applyPinnedSummaryLanguageToMeeting(result.meeting_id);
+      } catch {
+        console.warn('Failed to apply the default summary language to the recovered meeting');
       }
 
-      // 7. Mark as saved in IndexedDB
-      await indexedDBService.markMeetingSaved(meetingId);
+      await indexedDBService.applyRecoveryResult(result);
+      setRecoverableMeetings(prev => prev.map(meeting => (
+        meeting.meetingId === result.meeting_id
+          ? {
+              ...meeting,
+              lifecycle: result.lifecycle,
+              completeness: result.completeness,
+              transcriptCount: result.evidence_count,
+              lastUpdated: Date.parse(result.reconciled_at_utc) || meeting.lastUpdated,
+            }
+          : meeting
+      )));
 
 
       // 8. Clean up checkpoint files
@@ -207,21 +228,18 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
         }
       }
 
-      // 9. Remove from recoverable list
-      setRecoverableMeetings(prev => prev.filter(m => m.meetingId !== meetingId));
-
       return {
-        success: true,
+        result,
         audioRecoveryStatus,
-        meetingId: savedMeetingId
       };
     } catch (error) {
-      console.error('Failed to recover meeting:', error);
-      throw error;
+      const code = (error as RecoveryCommandError | null)?.code ?? 'RECOVERY_FAILED';
+      console.error(`Meeting recovery failed: ${code}`);
+      throw new Error(code);
     } finally {
       setIsRecovering(false);
     }
-  }, [loadMeetingTranscripts]);
+  }, []);
 
   /**
    * Delete a recoverable meeting
