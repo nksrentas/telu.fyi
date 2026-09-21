@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-16-PLAN.md
-last_updated: "2026-09-21T10:15:29.055Z"
+stopped_at: Completed 01-17-PLAN.md
+last_updated: "2026-09-21T10:49:55.636Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: 1ff7ee88b5feb869f5348f544e2a0207f7c8ec5c
+state_head: e606bb7290f1f5ca9217a209d3dd70b44686815c
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 17
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 17 of 19
+Plan: 18 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -74,6 +74,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P14 | 17m | 2 tasks | 6 files |
 | Phase 01 P15 | 27m | 2 tasks | 10 files |
 | Phase 01 P16 | 31m | 2 tasks | 7 files |
+| Phase 01 P17 | 30m | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Plan 01-16: Product evidence and terminal lifecycle commit before diagnostic indexing; evaluation failures cannot roll product state back.
 - [Phase 01]: Plan 01-16: Raw terminal evidence commits before isolated derived aggregation, and aggregate failure is retained as SUMMARY_AGGREGATION_FAILED.
 - [Phase 01]: Plan 01-16: Evaluation storage uses typed allowlisted columns and redacted codes instead of content-bearing payload blobs.
+- [Phase 01]: Plan 01-17: Publish a run bundle only after all nine files are atomically written to a unique temp directory and the complete bundle validates.
+- [Phase 01]: Plan 01-17: Keep bundle access local and narrow: finalize, redacted list metadata, and validated summary reads only.
+- [Phase 01]: Plan 01-17: Preserve threshold-free outcomes, optional evidence gaps, outliers, limitations, and interrupted writes as explicit unknown or invalid states.
+- [Phase 01]: Plan 01-17: Disqualify malformed timestamps, reserved stages, order/conservation violations, unsafe identities, and sensitive content.
 
 ### Pending Todos
 
@@ -165,6 +170,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-21T10:15:29.040Z
-Stopped at: Completed 01-16-PLAN.md
+Last session: 2026-09-21T10:49:55.617Z
+Stopped at: Completed 01-17-PLAN.md
 Resume file: None
