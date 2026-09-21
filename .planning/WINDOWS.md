@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 9
+open_count: 11
 waived_count: 0
 fixed_count: 0
-total_count: 9
-last_updated: 2026-09-20T21:12:05.724Z
+total_count: 11
+last_updated: 2026-09-21T07:45:23.226Z
 ---
 
 # Broken Windows Ledger
@@ -24,6 +24,8 @@ last_updated: 2026-09-20T21:12:05.724Z
 | 7 | 01 | deviation | frontend/src-tauri/src/audio/recording_manager.rs |  | Resolved: bounded transcription integration required queue construction and ledger propagation through recording manager and command call sites | open |  | 2026-09-20T20:19:40.568Z |  |
 | 8 | 01 | deviation | frontend/src-tauri/src/audio/recording_commands.rs |  | Committed finalization required adjacent manager/command wiring before recording metadata could mirror authoritative terminal state | open |  | 2026-09-20T21:12:05.630Z |  |
 | 9 | 01 | deviation | frontend/src-tauri/src/lib.rs |  | Typed current-finalization read initially targeted the legacy queue-status command and was rewired to a dedicated authoritative IPC command | open |  | 2026-09-20T21:12:05.724Z |  |
+| 10 | 01 | deviation | frontend/src/hooks/useRecordingStart.ts |  | Removed frontend Parakeet fallback so absent transcription configuration fails without provider substitution | open |  | 2026-09-21T07:45:23.155Z |  |
+| 11 | 01 | deviation | frontend/src/app/page.tsx |  | Connected provider reconfiguration recovery to the existing focusable settings controls | open |  | 2026-09-21T07:45:23.226Z |  |
 
 ````json
 [
@@ -133,6 +135,30 @@ last_updated: 2026-09-20T21:12:05.724Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-20T21:12:05.724Z",
+    "resolved_at": null
+  },
+  {
+    "id": 10,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src/hooks/useRecordingStart.ts",
+    "line": null,
+    "description": "Removed frontend Parakeet fallback so absent transcription configuration fails without provider substitution",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T07:45:23.155Z",
+    "resolved_at": null
+  },
+  {
+    "id": 11,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src/app/page.tsx",
+    "line": null,
+    "description": "Connected provider reconfiguration recovery to the existing focusable settings controls",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T07:45:23.226Z",
     "resolved_at": null
   }
 ]

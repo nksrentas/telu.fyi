@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-10-PLAN.md
-last_updated: "2026-09-21T07:20:30.334Z"
+stopped_at: Completed 01-11-PLAN.md
+last_updated: "2026-09-21T07:45:54.247Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: b99dbb0706f2ff2eaff43eca236b1f11c945abb4
+state_head: 435014680830b1183483ff4424c58eb64f6539d7
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 11 of 19
+Plan: 12 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -68,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P08 | 18min | 2 tasks | 6 files |
 | Phase 01 P09 | 9h 7m | 2 tasks | 16 files |
 | Phase 01 P10 | 26m | 2 tasks | 9 files |
+| Phase 01 P11 | 20m | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Route classification follows the resolved effective destination; provider brand is detail, not the privacy boundary.
 - [Phase 01]: Missing, invalid, unresolved, or materially changed routes fail closed and never default to Local or substitute a provider/model.
 - [Phase 01]: Summary dispatch compares a validated route snapshot with a fresh pre-request resolution before provider I/O.
+- [Phase 01]: React renders the Rust EffectiveRoute record directly and never infers or strengthens provider locality.
+- [Phase 01]: Recording and summary dispatch validate the exact route snapshot already shown to the user before data-bearing work.
+- [Phase 01]: Retry preserves provider choice, reconfigure focuses the existing provider control, and cancel dismisses only that capability attempt.
+- [Phase 01]: Active transcription route failures derive capture outcome from Rust-synchronized recording state.
 
 ### Pending Todos
 
@@ -136,6 +141,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-21T07:20:30.321Z
-Stopped at: Completed 01-10-PLAN.md
+Last session: 2026-09-21T07:45:54.233Z
+Stopped at: Completed 01-11-PLAN.md
 Resume file: None
