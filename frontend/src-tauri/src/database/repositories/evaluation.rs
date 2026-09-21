@@ -1,6 +1,7 @@
 //! Durable, content-redacted evaluation evidence for one canonical meeting run.
 
 use crate::audio::transcription::QueueSnapshot;
+use crate::database::repositories::meeting::FinalizationGapInput;
 use crate::observability::{Observation, PowerSource, ResourceSample, StageRecord, UnknownReason};
 use crate::trust::outbound::{OutboundAttempt, OutboundRoute};
 use crate::trust::provider_route::EffectiveRoute;
@@ -98,6 +99,33 @@ pub struct AppendBatchResult {
     pub already_present: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EvaluationTerminalRunInput {
+    pub run_id: String,
+    pub meeting_id: String,
+    pub observed_offset_micros: u64,
+    pub observed_at_utc: DateTime<Utc>,
+    pub lifecycle: String,
+    pub deadline_at_utc: String,
+    pub deadline_ms: u64,
+    pub remaining_work_count: u64,
+    pub queue: QueueSnapshot,
+    pub stages: Vec<StageRecord>,
+    pub resources: Vec<ResourceSample>,
+    pub routes: Vec<EvaluationRouteRecord>,
+    pub outbound: Vec<EvaluationOutboundRecord>,
+    pub gaps: Vec<FinalizationGapInput>,
+    pub errors: Vec<EvaluationErrorRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvaluationTerminalPersistResult {
+    pub raw_records_inserted: usize,
+    pub raw_records_already_present: usize,
+    pub summary_written: bool,
+    pub aggregation_error_code: Option<String>,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum EvaluationRepositoryError {
     #[error("invalid evaluation record")]
@@ -111,6 +139,23 @@ pub enum EvaluationRepositoryError {
 pub struct EvaluationRepository;
 
 impl EvaluationRepository {
+    pub async fn append_committed_evidence(
+        _pool: &SqlitePool,
+        _meeting_id: &str,
+        _evidence_id: &str,
+        _sequence: u64,
+        _committed_at_utc: DateTime<Utc>,
+    ) -> Result<AppendBatchResult, EvaluationRepositoryError> {
+        Err(EvaluationRepositoryError::InvalidRecord)
+    }
+
+    pub async fn persist_terminal_run(
+        _pool: &SqlitePool,
+        _input: &EvaluationTerminalRunInput,
+    ) -> Result<EvaluationTerminalPersistResult, EvaluationRepositoryError> {
+        Err(EvaluationRepositoryError::InvalidRecord)
+    }
+
     pub async fn create_run(
         pool: &SqlitePool,
         manifest: &EvaluationRunManifest,
@@ -1050,5 +1095,160 @@ mod evaluation_repository_tests {
                 "migration must exclude {forbidden_column}"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn evaluation_wiring_final_persisted_is_recorded_only_after_evidence_commit() {
+        use crate::database::models::{CaptureCompleteness, TranscriptEvidenceInput};
+        use crate::database::repositories::transcript::TranscriptsRepository;
+
+        let pool = migrated_pool().await;
+        EvaluationRepository::create_run(&pool, &manifest())
+            .await
+            .expect("versioned evaluation run");
+        TranscriptsRepository::upsert_final_evidence(
+            &pool,
+            &TranscriptEvidenceInput {
+                evidence_id: EVIDENCE_ID.to_string(),
+                meeting_id: MEETING_ID.to_string(),
+                source_track: "mixed".to_string(),
+                source_segment_key: "segment-42".to_string(),
+                sequence: 42,
+                transcript: "private fixture text must stay in product storage".to_string(),
+                audio_start_time: 1.25,
+                audio_end_time: 2.5,
+                capture_completeness: CaptureCompleteness::Complete,
+            },
+        )
+        .await
+        .expect("product evidence commit");
+
+        let joined = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*)
+             FROM evaluation_evidence_commits evaluation
+             JOIN transcript_evidence evidence ON evidence.evidence_id = evaluation.evidence_id
+             WHERE evaluation.run_id = ? AND evidence.meeting_id = ?",
+        )
+        .bind(RUN_ID)
+        .bind(MEETING_ID)
+        .fetch_one(&pool)
+        .await
+        .expect("post-commit evidence index");
+        assert_eq!(joined, 1);
+    }
+
+    fn terminal_input() -> EvaluationTerminalRunInput {
+        let observed_at_utc = DateTime::parse_from_rfc3339("2026-09-21T00:00:05Z")
+            .expect("fixed UTC fixture")
+            .with_timezone(&Utc);
+        let mut stages = Vec::new();
+        let mut resources = Vec::new();
+        let mut routes = Vec::new();
+        let mut outbound = Vec::new();
+        let mut errors = Vec::new();
+        let mut queue = None;
+        for record in records() {
+            match record {
+                EvaluationRecord::Stage(record) => stages.push(record),
+                EvaluationRecord::Queue(record) => queue = Some(record.snapshot),
+                EvaluationRecord::Resource(record) => resources.push(record),
+                EvaluationRecord::Route(record) => routes.push(record),
+                EvaluationRecord::Outbound(record) => outbound.push(record),
+                EvaluationRecord::Error(record) => errors.push(record),
+            }
+        }
+        EvaluationTerminalRunInput {
+            run_id: RUN_ID.to_string(),
+            meeting_id: MEETING_ID.to_string(),
+            observed_offset_micros: 5_000,
+            observed_at_utc,
+            lifecycle: "incomplete".to_string(),
+            deadline_at_utc: "2026-09-21T00:02:00Z".to_string(),
+            deadline_ms: 120_000,
+            remaining_work_count: 1,
+            queue: queue.expect("queue fixture"),
+            stages,
+            resources,
+            routes,
+            outbound,
+            gaps: vec![FinalizationGapInput {
+                work_id: "mixed:chunk-1".to_string(),
+                gap_kind: "accepted_work".to_string(),
+                reason_code: "transcription_failed".to_string(),
+                audio_start_ms: None,
+                audio_end_ms: None,
+            }],
+            errors,
+        }
+    }
+
+    #[tokio::test]
+    async fn evaluation_wiring_finalization_attaches_terminal_truth_to_same_run() {
+        let pool = migrated_pool().await;
+        EvaluationRepository::create_run(&pool, &manifest())
+            .await
+            .expect("versioned evaluation run");
+        let persisted = EvaluationRepository::persist_terminal_run(&pool, &terminal_input())
+            .await
+            .expect("terminal evaluation run");
+        assert!(persisted.summary_written);
+
+        for table in [
+            "evaluation_stage_records",
+            "evaluation_queue_records",
+            "evaluation_resource_records",
+            "evaluation_route_records",
+            "evaluation_outbound_records",
+            "evaluation_error_records",
+            "evaluation_gap_records",
+            "evaluation_terminal_records",
+        ] {
+            let count = sqlx::query_scalar::<_, i64>(&format!(
+                "SELECT COUNT(*) FROM {table} WHERE run_id = ?"
+            ))
+            .bind(RUN_ID)
+            .fetch_one(&pool)
+            .await
+            .expect("terminal run record count");
+            assert!(count >= 1, "table={table}");
+        }
+    }
+
+    #[tokio::test]
+    async fn evaluation_wiring_summary_failure_preserves_raw_records_and_explicit_error() {
+        let pool = migrated_pool().await;
+        EvaluationRepository::create_run(&pool, &manifest())
+            .await
+            .expect("versioned evaluation run");
+        sqlx::query("DROP TABLE evaluation_run_summaries")
+            .execute(&pool)
+            .await
+            .expect("summary failure injection");
+
+        let persisted = EvaluationRepository::persist_terminal_run(&pool, &terminal_input())
+            .await
+            .expect("raw evidence remains authoritative");
+        assert!(!persisted.summary_written);
+        assert_eq!(
+            persisted.aggregation_error_code.as_deref(),
+            Some("SUMMARY_AGGREGATION_FAILED")
+        );
+        let stages = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM evaluation_stage_records WHERE run_id = ?",
+        )
+        .bind(RUN_ID)
+        .fetch_one(&pool)
+        .await
+        .expect("raw stage count");
+        let explicit_errors = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM evaluation_error_records
+             WHERE run_id = ? AND redacted_code = 'SUMMARY_AGGREGATION_FAILED'",
+        )
+        .bind(RUN_ID)
+        .fetch_one(&pool)
+        .await
+        .expect("explicit aggregation error");
+        assert_eq!(stages, 1);
+        assert_eq!(explicit_errors, 1);
     }
 }
