@@ -6,6 +6,8 @@
 //! conservation cannot drift from separately maintained counters.
 
 use serde::{Deserialize, Serialize};
+use crate::observability::{StageClock, StageIdentity, DEFAULT_STAGE_CHANNEL_CAPACITY};
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -80,6 +82,7 @@ pub struct QueueSnapshot {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueueWorkRecord {
     pub work_id: String,
+    pub evidence_id: Option<String>,
     pub event_sequence: u64,
     pub accepted_at: Instant,
     pub started_at: Option<Instant>,
@@ -101,6 +104,7 @@ pub struct QueueGap {
 pub struct QueueLedger {
     meeting_id: String,
     capacity: usize,
+    stage_clock: Arc<StageClock>,
     state: Mutex<QueueLedgerState>,
 }
 
@@ -124,6 +128,7 @@ impl QueueLedger {
             return Err(QueueTransitionError::InvalidCapacity);
         }
         Ok(Self {
+            stage_clock: StageClock::new(meeting_id.clone(), DEFAULT_STAGE_CHANNEL_CAPACITY),
             meeting_id,
             capacity,
             state: Mutex::new(QueueLedgerState::default()),
@@ -138,9 +143,22 @@ impl QueueLedger {
         self.capacity
     }
 
+    pub fn stage_clock(&self) -> Arc<StageClock> {
+        self.stage_clock.clone()
+    }
+
     pub fn accept(
         &self,
         work_id: impl Into<String>,
+        accepted_at: Instant,
+    ) -> Result<u64, QueueTransitionError> {
+        self.accept_with_evidence(work_id, None, accepted_at)
+    }
+
+    pub fn accept_with_evidence(
+        &self,
+        work_id: impl Into<String>,
+        evidence_id: Option<String>,
         accepted_at: Instant,
     ) -> Result<u64, QueueTransitionError> {
         let work_id = validate_work_id(work_id.into())?;
@@ -149,6 +167,7 @@ impl QueueLedger {
         let event_sequence = next_event_sequence(&mut state)?;
         state.work.push(QueueWorkRecord {
             work_id,
+            evidence_id,
             event_sequence,
             accepted_at,
             started_at: None,
@@ -156,6 +175,26 @@ impl QueueLedger {
             outcome: None,
         });
         Ok(event_sequence)
+    }
+
+    pub fn stage_identity(&self, work_id: &str) -> Option<StageIdentity> {
+        self.lock_state()
+            .work
+            .iter()
+            .find(|record| record.work_id == work_id)
+            .and_then(|record| {
+                record.evidence_id.as_ref().map(|evidence_id| {
+                    StageIdentity::new(record.work_id.clone(), evidence_id.clone())
+                })
+            })
+    }
+
+    pub fn stage_identity_for_evidence(&self, evidence_id: &str) -> Option<StageIdentity> {
+        self.lock_state()
+            .work
+            .iter()
+            .find(|record| record.evidence_id.as_deref() == Some(evidence_id))
+            .map(|record| StageIdentity::new(record.work_id.clone(), evidence_id))
     }
 
     pub fn start(&self, work_id: &str, started_at: Instant) -> Result<(), QueueTransitionError> {

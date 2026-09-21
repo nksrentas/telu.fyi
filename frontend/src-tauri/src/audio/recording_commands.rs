@@ -485,6 +485,15 @@ fn validate_phase1_stage_name(stage: &str) -> std::result::Result<(), DeliveryAc
     Err(DeliveryAckError::InvalidStage)
 }
 
+fn current_queue_ledger(meeting_id: &str) -> Option<Arc<QueueLedger>> {
+    RECORDING_MANAGER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .as_ref()
+        .and_then(|manager| manager.get_state().queue_ledger())
+        .filter(|ledger| ledger.meeting_id() == meeting_id)
+}
+
 /// Publish only a canonical, already-persisted final. Registering here keeps
 /// the delivery token downstream of the persistence-before-publish boundary.
 pub(crate) fn emit_canonical_transcript<R: Runtime>(
@@ -526,6 +535,19 @@ pub fn acknowledge_transcript_visible(
             Utc::now(),
         )
         .map_err(|error| error.code().to_string())?;
+    if let Some(ledger) = current_queue_ledger(&meeting_id) {
+        if let Some(identity) = ledger.stage_identity_for_evidence(&evidence_id) {
+            let admission = ledger
+                .stage_clock()
+                .try_record(crate::observability::StageName::UiAcknowledged, &identity);
+            if admission != crate::observability::StageAdmission::Accepted {
+                warn!(
+                    "UI acknowledgement stage observation was not admitted: {:?}",
+                    admission
+                );
+            }
+        }
+    }
     info!(
         "stage={} meeting_id={} evidence_id={} duration_micros={} emitted_at_utc={} acknowledged_at_utc={}",
         acknowledgement.stage,

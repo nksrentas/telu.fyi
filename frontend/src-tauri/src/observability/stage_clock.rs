@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 use uuid::Uuid;
 
 pub const STAGE_SCHEMA_VERSION: u16 = 1;
+pub const DEFAULT_STAGE_CHANNEL_CAPACITY: usize = 1_024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -150,7 +151,7 @@ impl StageClock {
         &self,
         stage: StageName,
         identity: &StageIdentity,
-        _observed_at: Instant,
+        observed_at: Instant,
         observed_at_utc: DateTime<Utc>,
     ) -> StageAdmission {
         if !stage.is_phase1() {
@@ -166,16 +167,25 @@ impl StageClock {
             work_id: identity.work_id.clone(),
             evidence_id: identity.evidence_id.clone(),
             stage,
-            // Intentional RED: the implementation must derive this from `origin`.
-            offset_micros: 0,
+            offset_micros: self.offset_micros_at(observed_at),
             observed_at_utc,
         };
 
         match self.sender.try_send(record) {
             Ok(()) => StageAdmission::Accepted,
-            Err(mpsc::error::TrySendError::Full(_)) => StageAdmission::Overflow,
+            Err(mpsc::error::TrySendError::Full(_)) => {
+                self.overflowed.fetch_add(1, Ordering::Relaxed);
+                StageAdmission::Overflow
+            }
             Err(mpsc::error::TrySendError::Closed(_)) => StageAdmission::Closed,
         }
+    }
+
+    pub fn offset_micros_at(&self, observed_at: Instant) -> u64 {
+        observed_at
+            .saturating_duration_since(self.origin)
+            .as_micros()
+            .min(u64::MAX as u128) as u64
     }
 
     pub fn drain(&self) -> Vec<StageRecord> {
@@ -313,5 +323,33 @@ mod observability_stage_tests {
         assert_eq!(clock.snapshot().capacity, 1);
         assert_eq!(clock.snapshot().pending, 1);
         assert_eq!(clock.snapshot().overflowed, 1);
+    }
+
+    #[test]
+    fn observability_stage_actual_phase1_seams_are_wired_and_content_redacted() {
+        let pipeline = include_str!("../audio/pipeline.rs");
+        let worker = include_str!("../audio/transcription/worker.rs");
+        let commands = include_str!("../audio/recording_commands.rs");
+
+        assert!(pipeline.contains("StageName::AudioCaptured"));
+        assert!(pipeline.contains("StageName::SegmentBoundary"));
+        assert!(pipeline.contains("StageName::TranscriptionEnqueued"));
+        assert!(worker.contains("StageName::TranscriptionStarted"));
+        assert!(worker.contains("StageName::FinalTranscriptProduced"));
+        assert!(worker.contains("StageName::FinalTranscriptPersisted"));
+        assert!(commands.contains("StageName::UiAcknowledged"));
+
+        let clock = StageClock::new("meeting-1", 2);
+        assert_eq!(
+            clock.try_record(StageName::AudioCaptured, &identity()),
+            StageAdmission::Accepted
+        );
+        let json = serde_json::to_string(&clock.drain()[0]).expect("serialize stage record");
+        for forbidden in ["transcript", "audio_data", "api_key", "secret", "token"] {
+            assert!(
+                !json.contains(forbidden),
+                "stage record must not contain content-bearing field {forbidden}"
+            );
+        }
     }
 }

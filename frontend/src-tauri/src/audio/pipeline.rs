@@ -15,6 +15,8 @@ use super::transcription::queue_ledger::{
 };
 use super::audio_processing::{audio_to_mono, LoudnessNormalizer, NoiseSuppressionProcessor, HighPassFilter};
 use super::vad::{ContinuousVadProcessor};
+use crate::observability::{StageClock, StageIdentity, StageName};
+use uuid::Uuid;
 
 /// How long a silence must last before the VAD closes a speech segment, and
 /// therefore how long the audio clips handed to the ASR engine are.
@@ -67,6 +69,8 @@ enum TranscriptionAdmission {
 fn try_admit_transcription(
     sender: &mpsc::Sender<AudioChunk>,
     ledger: &QueueLedger,
+    stage_clock: &StageClock,
+    stage_identity: &StageIdentity,
     chunk: AudioChunk,
 ) -> TranscriptionAdmission {
     let work_id = transcription_work_id(chunk.chunk_id);
@@ -77,8 +81,13 @@ fn try_admit_transcription(
     let audio_end_ms = audio_start_ms.saturating_add(duration_ms);
 
     match sender.try_reserve() {
-        Ok(permit) => match ledger.accept(work_id, admitted_at) {
+        Ok(permit) => match ledger.accept_with_evidence(
+            work_id,
+            Some(stage_identity.evidence_id.clone()),
+            admitted_at,
+        ) {
             Ok(_) => {
+                let _ = stage_clock.try_record(StageName::TranscriptionEnqueued, stage_identity);
                 permit.send(chunk);
                 TranscriptionAdmission::Accepted
             }
@@ -801,6 +810,7 @@ pub struct AudioPipeline {
     receiver: mpsc::UnboundedReceiver<AudioChunk>,
     transcription_sender: mpsc::Sender<AudioChunk>,
     transcription_ledger: Arc<QueueLedger>,
+    stage_clock: Arc<StageClock>,
     state: Arc<RecordingState>,
     vad_processor: ContinuousVadProcessor,
     sample_rate: u32,
@@ -880,11 +890,13 @@ impl AudioPipeline {
         let transcription_ledger = state
             .queue_ledger()
             .ok_or_else(|| anyhow::anyhow!("transcription queue ledger is not initialized"))?;
+        let stage_clock = transcription_ledger.stage_clock();
 
         Ok(Self {
             receiver,
             transcription_sender,
             transcription_ledger,
+            stage_clock,
             state,
             vad_processor,
             sample_rate,
@@ -987,9 +999,24 @@ impl AudioPipeline {
                                                 device_type: DeviceType::Microphone,  // Mixed audio
                                             };
 
+                                            let stage_identity = StageIdentity::new(
+                                                transcription_work_id(self.chunk_id_counter),
+                                                Uuid::new_v4().to_string(),
+                                            );
+                                            let _ = self.stage_clock.try_record(
+                                                StageName::AudioCaptured,
+                                                &stage_identity,
+                                            );
+                                            let _ = self.stage_clock.try_record(
+                                                StageName::SegmentBoundary,
+                                                &stage_identity,
+                                            );
+
                                             let admission = try_admit_transcription(
                                                 &self.transcription_sender,
                                                 &self.transcription_ledger,
+                                                &self.stage_clock,
+                                                &stage_identity,
                                                 transcription_chunk,
                                             );
                                             self.chunk_id_counter += 1;
@@ -1061,9 +1088,24 @@ impl AudioPipeline {
                             device_type: DeviceType::Microphone,
                         };
 
+                        let stage_identity = StageIdentity::new(
+                            transcription_work_id(self.chunk_id_counter),
+                            Uuid::new_v4().to_string(),
+                        );
+                        let _ = self.stage_clock.try_record(
+                            StageName::AudioCaptured,
+                            &stage_identity,
+                        );
+                        let _ = self.stage_clock.try_record(
+                            StageName::SegmentBoundary,
+                            &stage_identity,
+                        );
+
                         let admission = try_admit_transcription(
                             &self.transcription_sender,
                             &self.transcription_ledger,
+                            &self.stage_clock,
+                            &stage_identity,
                             transcription_chunk,
                         );
                         self.chunk_id_counter += 1;
@@ -1251,9 +1293,19 @@ mod tests {
         let full_ledger = QueueLedger::new("meeting-full", 1).expect("full ledger");
         let (full_sender, _full_receiver) = mpsc::channel(1);
         full_sender.try_send(chunk(0)).expect("fill bounded queue");
+        let full_identity = StageIdentity::new(
+            "mixed:chunk-1",
+            "11111111-1111-4111-8111-111111111111",
+        );
 
         let started = Instant::now();
-        let full = try_admit_transcription(&full_sender, &full_ledger, chunk(1));
+        let full = try_admit_transcription(
+            &full_sender,
+            &full_ledger,
+            &full_ledger.stage_clock(),
+            &full_identity,
+            chunk(1),
+        );
         assert!(started.elapsed() < Duration::from_millis(50));
         assert_eq!(full, TranscriptionAdmission::Rejected(RejectionReason::Capacity));
         let full_snapshot = full_ledger.snapshot(Instant::now());
@@ -1268,10 +1320,49 @@ mod tests {
         let closed_ledger = QueueLedger::new("meeting-closed", 1).expect("closed ledger");
         let (closed_sender, closed_receiver) = mpsc::channel(1);
         drop(closed_receiver);
-        let closed = try_admit_transcription(&closed_sender, &closed_ledger, chunk(2));
+        let closed_identity = StageIdentity::new(
+            "mixed:chunk-2",
+            "22222222-2222-4222-8222-222222222222",
+        );
+        let closed = try_admit_transcription(
+            &closed_sender,
+            &closed_ledger,
+            &closed_ledger.stage_clock(),
+            &closed_identity,
+            chunk(2),
+        );
         assert_eq!(closed, TranscriptionAdmission::Rejected(RejectionReason::Closed));
         assert_eq!(closed_ledger.snapshot(Instant::now()).rejected, 1);
         assert_eq!(closed_ledger.gaps()[0].reason, RejectionReason::Closed);
         assert_eq!(closed_ledger.gaps()[0].work_id, "mixed:chunk-2");
+    }
+
+    #[test]
+    fn observability_stage_enqueue_uses_nonblocking_admission_and_stable_identity() {
+        let ledger = QueueLedger::new("meeting-observed", 1).expect("observed ledger");
+        let (sender, mut receiver) = mpsc::channel(1);
+        let identity = StageIdentity::new(
+            "mixed:chunk-9",
+            "99999999-9999-4999-8999-999999999999",
+        );
+
+        assert_eq!(
+            try_admit_transcription(
+                &sender,
+                &ledger,
+                &ledger.stage_clock(),
+                &identity,
+                chunk(9),
+            ),
+            TranscriptionAdmission::Accepted
+        );
+        assert_eq!(receiver.try_recv().expect("admitted chunk").chunk_id, 9);
+        assert_eq!(ledger.stage_identity("mixed:chunk-9"), Some(identity.clone()));
+
+        let records = ledger.stage_clock().drain();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].stage, StageName::TranscriptionEnqueued);
+        assert_eq!(records[0].work_id, identity.work_id);
+        assert_eq!(records[0].evidence_id, identity.evidence_id);
     }
 }

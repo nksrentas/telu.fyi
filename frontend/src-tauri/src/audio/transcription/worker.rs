@@ -7,6 +7,7 @@ use super::provider::TranscriptionError;
 use crate::audio::AudioChunk;
 use crate::database::models::{CaptureCompleteness, TranscriptEvidence, TranscriptEvidenceInput};
 use crate::database::repositories::transcript::TranscriptsRepository;
+use crate::observability::StageName;
 use super::queue_ledger::{
     transcription_work_id, QueueLedger, WorkFailureReason, WorkOutcome,
 };
@@ -237,6 +238,7 @@ pub fn start_transcription_task<R: Runtime>(
             let database_pool_clone = database_pool.clone();
             let meeting_id_clone = meeting_id.clone();
             let queue_ledger_clone = queue_ledger.clone();
+            let stage_clock_clone = queue_ledger.stage_clock();
 
             let worker_handle = tokio::spawn(async move {
                 info!("👷 Worker {} started", worker_id);
@@ -272,6 +274,7 @@ pub fn start_transcription_task<R: Runtime>(
                     match chunk {
                         Some(chunk) => {
                             let work_id = transcription_work_id(chunk.chunk_id);
+                            let stage_identity = queue_ledger_clone.stage_identity(&work_id);
                             if let Err(error) = queue_ledger_clone
                                 .start(&work_id, std::time::Instant::now())
                             {
@@ -280,6 +283,10 @@ pub fn start_transcription_task<R: Runtime>(
                                     worker_id, work_id, error
                                 );
                                 continue;
+                            }
+                            if let Some(identity) = stage_identity.as_ref() {
+                                let _ = stage_clock_clone
+                                    .try_record(StageName::TranscriptionStarted, identity);
                             }
 
                             // PERFORMANCE OPTIMIZATION: Reduce logging in hot path
@@ -396,7 +403,16 @@ pub fn start_transcription_task<R: Runtime>(
                                                 );
                                             }
                                         } else {
-                                            let evidence_id = Uuid::new_v4().to_string();
+                                            let evidence_id = stage_identity
+                                                .as_ref()
+                                                .map(|identity| identity.evidence_id.clone())
+                                                .unwrap_or_else(|| Uuid::new_v4().to_string());
+                                            if let Some(identity) = stage_identity.as_ref() {
+                                                let _ = stage_clock_clone.try_record(
+                                                    StageName::FinalTranscriptProduced,
+                                                    identity,
+                                                );
+                                            }
                                             if let Ok(sequence) = i64::try_from(sequence_id) {
                                                 let evidence = TranscriptEvidenceInput {
                                                     evidence_id: evidence_id.clone(),
@@ -413,17 +429,26 @@ pub fn start_transcription_task<R: Runtime>(
                                                 let persist_pool = database_pool_clone.clone();
                                                 let canonical_app = app_clone.clone();
                                                 let failure_app = app_clone.clone();
+                                                let persist_stage_clock = stage_clock_clone.clone();
+                                                let persist_stage_identity = stage_identity.clone();
 
                                                 match persist_and_publish_final(
                                                     evidence,
                                                     update,
                                                     move |input| async move {
-                                                        TranscriptsRepository::upsert_final_evidence(
+                                                        let persisted = TranscriptsRepository::upsert_final_evidence(
                                                             &persist_pool,
                                                             &input,
                                                         )
                                                         .await
-                                                        .map_err(|_| ())
+                                                        .map_err(|_| ())?;
+                                                        if let Some(identity) = persist_stage_identity.as_ref() {
+                                                            let _ = persist_stage_clock.try_record(
+                                                                StageName::FinalTranscriptPersisted,
+                                                                identity,
+                                                            );
+                                                        }
+                                                        Ok(persisted)
                                                     },
                                                     move |canonical| {
                                                         crate::audio::recording_commands::emit_canonical_transcript(
