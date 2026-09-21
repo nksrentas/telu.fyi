@@ -7,6 +7,7 @@ import { Label } from './ui/label';
 import { Eye, EyeOff, Lock, Unlock } from 'lucide-react';
 import { ModelManager } from './WhisperModelManager';
 import { ParakeetModelManager } from './ParakeetModelManager';
+import { ProviderBoundary } from './ProviderBoundary';
 
 
 export interface TranscriptModelProps {
@@ -172,6 +173,11 @@ export function TranscriptSettings({ transcriptModelConfig, setTranscriptModelCo
                         </div>
                     )}
 
+                    <ProviderBoundary
+                        capability="transcription"
+                        refreshKey={`${transcriptModelConfig.provider}:${transcriptModelConfig.model}`}
+                    />
+
 
                     {requiresApiKey && (
                         <div>
@@ -224,7 +230,6 @@ export function TranscriptSettings({ transcriptModelConfig, setTranscriptModelCo
         </div >
     )
 }
-
 
 
 

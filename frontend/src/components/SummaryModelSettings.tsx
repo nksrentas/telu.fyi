@@ -7,6 +7,7 @@ import { ModelConfig, ModelSettingsModal } from '@/components/ModelSettingsModal
 import { SummaryLanguageSettings } from '@/components/SummaryLanguageSettings';
 import { Switch } from './ui/switch';
 import { useConfig } from '@/contexts/ConfigContext';
+import { ProviderBoundary } from '@/components/ProviderBoundary';
 
 interface SummaryModelSettingsProps {
   refetchTrigger?: number; // Change this to trigger refetch
@@ -147,6 +148,11 @@ export function SummaryModelSettings({ refetchTrigger }: SummaryModelSettingsPro
           setModelConfig={setModelConfig}
           onSave={handleSaveModelConfig}
           skipInitialFetch={true}
+        />
+        <ProviderBoundary
+          capability="summary"
+          refreshKey={`${modelConfig.provider}:${modelConfig.model}:${modelConfig.ollamaEndpoint ?? ''}`}
+          className="mt-4"
         />
       </div>
     </div>

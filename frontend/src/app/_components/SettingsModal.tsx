@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useRecordingState } from "@/contexts/RecordingStateContext";
+import { ProviderBoundary } from "@/components/ProviderBoundary";
 
 type modalType = "modelSettings" | "deviceSettings" | "languageSettings" | "modelSelector" | "errorAlert" | "chunkDropWarning";
 
@@ -123,6 +124,11 @@ export function SettingsModals({
                       ))}
                     </select>
                   </div>
+                  <ProviderBoundary
+                    capability="summary"
+                    refreshKey={`${modelConfig.provider}:${modelConfig.model}:${modelConfig.ollamaEndpoint ?? ''}`}
+                    className="mt-4"
+                  />
                 </div>
                 {modelConfig.provider === 'ollama' && (
                   <div>
