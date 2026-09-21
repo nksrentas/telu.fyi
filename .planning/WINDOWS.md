@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 16
+open_count: 17
 waived_count: 0
 fixed_count: 0
-total_count: 16
-last_updated: 2026-09-21T08:44:06.281Z
+total_count: 17
+last_updated: 2026-09-21T09:39:25.826Z
 ---
 
 # Broken Windows Ledger
@@ -31,6 +31,7 @@ last_updated: 2026-09-21T08:44:06.281Z
 | 14 | 01 | deviation | frontend/src-tauri/src/trust/provider_route.rs |  | Added a distinct updater route capability so canary evidence is accurately attributable | open |  | 2026-09-21T08:44:06.130Z |  |
 | 15 | 01 | deviation | frontend/src-tauri/src/lib.rs |  | Registered canary commands in the active Tauri invoke handler | open |  | 2026-09-21T08:44:06.214Z |  |
 | 16 | 01 | deviation | frontend/src/components/AnalyticsProvider.tsx |  | Loaded canary state before analytics store migration to prevent canary-time settings writes | open |  | 2026-09-21T08:44:06.281Z |  |
+| 17 | 01 | deviation | frontend/src-tauri/src/audio/transcription/queue_ledger.rs |  | Adjacent queue-ledger and acknowledgement seams were required to correlate the complete actual Phase 1 path | open |  | 2026-09-21T09:39:25.826Z |  |
 
 ````json
 [
@@ -224,6 +225,18 @@ last_updated: 2026-09-21T08:44:06.281Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-21T08:44:06.281Z",
+    "resolved_at": null
+  },
+  {
+    "id": 17,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src-tauri/src/audio/transcription/queue_ledger.rs",
+    "line": null,
+    "description": "Adjacent queue-ledger and acknowledgement seams were required to correlate the complete actual Phase 1 path",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T09:39:25.826Z",
     "resolved_at": null
   }
 ]
