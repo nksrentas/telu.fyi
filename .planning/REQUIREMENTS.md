@@ -19,8 +19,8 @@
 - [x] **IDENT-01**: A meeting receives one durable Rust-owned identifier before preparation or recording begins, and recording, recovery, documents, transcript, analysis, and series membership reuse it.
 - [x] **IDENT-02**: Final transcript segments are persisted incrementally and idempotently with stable evidence identifiers and capture-completeness metadata.
 - [x] **IDENT-03**: Repeated recovery or retry operations reconcile to the same meeting and transcript evidence instead of creating duplicates.
-- [ ] **PRIV-01**: A user can see whether each configured transcription, summary, document-processing, or generation path is local or remote and what destination receives data.
-- [ ] **PRIV-02**: Telu never silently falls back from a local path to a hosted provider; an unavailable selected path fails visibly and preserves user choice.
+- [x] **PRIV-01**: A user can see whether each configured transcription, summary, document-processing, or generation path is local or remote and what destination receives data.
+- [x] **PRIV-02**: Telu never silently falls back from a local path to a hosted provider; an unavailable selected path fails visibly and preserves user choice.
 - [ ] **PRIV-03**: Local capture, storage, and evaluation work without undisclosed network calls, while every enabled remote or LAN destination remains explicit and configurable.
 
 ### Evidence-Linked Post-Meeting Knowledge
@@ -135,8 +135,8 @@
 | IDENT-01 | Phase 1 | Complete |
 | IDENT-02 | Phase 1 | Complete |
 | IDENT-03 | Phase 1 | Complete |
-| PRIV-01 | Phase 1 | Pending |
-| PRIV-02 | Phase 1 | Pending |
+| PRIV-01 | Phase 1 | Complete |
+| PRIV-02 | Phase 1 | Complete |
 | PRIV-03 | Phase 1 | Pending |
 | KNOW-01 | Phase 2 | Pending |
 | KNOW-02 | Phase 2 | Pending |

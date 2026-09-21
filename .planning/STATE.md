@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-09-PLAN.md
-last_updated: "2026-09-21T06:49:02.051Z"
+stopped_at: Completed 01-10-PLAN.md
+last_updated: "2026-09-21T07:20:30.334Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: e3c89d84a5d135e8789165c5b117ce22b97170e6
+state_head: b99dbb0706f2ff2eaff43eca236b1f11c945abb4
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 10 of 19
+Plan: 11 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P07 | 17min | 2 tasks | 10 files |
 | Phase 01 P08 | 18min | 2 tasks | 6 files |
 | Phase 01 P09 | 9h 7m | 2 tasks | 16 files |
+| Phase 01 P10 | 26m | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,9 @@ Recent decisions affecting current work:
 - [Phase 01]: History and detail render lifecycle, completeness, and durable gaps projected by Rust; an empty renderer gap array never promotes completion.
 - [Phase 01]: Pending uses the incomplete presentation while migrated legacy records remain Completion not verified.
 - [Phase 01]: One shared completeness surface owns accessible text-plus-icon status, persistent notices, and explicit Unknown gap facts.
+- [Phase 01]: Route classification follows the resolved effective destination; provider brand is detail, not the privacy boundary.
+- [Phase 01]: Missing, invalid, unresolved, or materially changed routes fail closed and never default to Local or substitute a provider/model.
+- [Phase 01]: Summary dispatch compares a validated route snapshot with a fresh pre-request resolution before provider I/O.
 
 ### Pending Todos
 
@@ -132,6 +136,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-21T06:49:02.037Z
-Stopped at: Completed 01-09-PLAN.md
+Last session: 2026-09-21T07:20:30.321Z
+Stopped at: Completed 01-10-PLAN.md
 Resume file: None
