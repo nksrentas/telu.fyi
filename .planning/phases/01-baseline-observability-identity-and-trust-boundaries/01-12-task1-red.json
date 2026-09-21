@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml outbound_ledger --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - trust::outbound::tests::outbound_ledger_records_attributed_sanitized_attempt_fields\nnot ok 2 - trust::outbound::tests::outbound_ledger_keeps_identical_concurrent_attempts_distinct_and_ordered\nnot ok 3 - trust::outbound::tests::outbound_ledger_marks_overflow_incomplete_without_erasing_retained_attempts\nok 4 - trust::outbound::tests::outbound_ledger_serialization_excludes_content_credentials_query_and_path\nnot ok 5 - trust::outbound::tests::outbound_ledger_rejects_in_process_work_but_keeps_loopback_network_attempts\n1..5\n# tests 5\n# pass 1\n# fail 4\n# cancelled 0",
+  "targetTest": "trust::outbound::tests::outbound_ledger_records_attributed_sanitized_attempt_fields",
+  "expected": "Each network-capable attempt is retained with run and meeting identity, sanitized EffectiveRoute metadata, disposition, monotonic offset, UTC correlation, and a unique stable sequence; bounded overflow makes attribution incomplete and in-process device work is rejected",
+  "actual": "The intentional RED stub returned sequence zero without retaining attempts, detecting capacity overflow, or distinguishing in-process device work from loopback network traffic; four named behavior assertions failed"
+}
