@@ -2,8 +2,8 @@ pub mod resource_sampler;
 pub mod stage_clock;
 
 pub use resource_sampler::{
-    CpuMemoryObservation, Observation, PowerObservation, PowerSource, ResourceSample,
-    ResourceScope, UnknownReason,
+    CpuMemoryObservation, Observation, PlatformPowerCollector, PowerCollector, PowerObservation,
+    PowerSource, ResourceSample, ResourceSampler, ResourceScope, UnknownReason,
 };
 
 pub use stage_clock::{
