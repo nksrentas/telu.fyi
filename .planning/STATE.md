@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-13-PLAN.md
-last_updated: "2026-09-21T08:44:22.409Z"
+stopped_at: Completed 01-14-PLAN.md
+last_updated: "2026-09-21T09:06:21.127Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: e73cea8e1eba319a077b8c975f66489246d142d1
+state_head: 41f3b825b963f17cba8d80c41a3efa4575cb979e
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 13
+  completed_plans: 14
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 14 of 19
+Plan: 15 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -71,6 +71,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P11 | 20m | 2 tasks | 13 files |
 | Phase 01 P12 | 25m | 2 tasks | 11 files |
 | Phase 01 P13 | 21m | 2 tasks | 10 files |
+| Phase 01 P14 | 17m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Automatic analytics and updater work is suppressed by default during canaries; allowed background work records a decision before dispatch.
 - [Phase 01]: Analytics reads active canary state before loading its store and skips canary-time persistent-setting migration.
 - [Phase 01]: Telu records application-level suppression intent; the Plan 19 OS or proxy method remains authoritative for packets.
+- [Phase 01]: Static renderer filesystem scope is limited to app data; runtime dialog selection grants explicit import/export file authority.
+- [Phase 01]: Zero-attempt canary evidence is valid only for a present, complete, non-overflowed same-run ledger with every required local workflow stage complete.
+- [Phase 01]: Local attempts remain attributable; LAN and Remote attempts require exact declared origins and retain denial evidence before dispatch.
+- [Phase 01]: Application-side canary proof does not replace the independent physical packet observation required by Plan 19.
 
 ### Pending Todos
 
@@ -151,6 +156,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-21T08:44:22.394Z
-Stopped at: Completed 01-13-PLAN.md
+Last session: 2026-09-21T09:06:21.108Z
+Stopped at: Completed 01-14-PLAN.md
 Resume file: None
