@@ -153,6 +153,33 @@ fn proposed_profile_and_unrun_platforms_remain_unknown_or_unverified() {
 }
 
 #[test]
+fn current_host_capture_is_proposed_redacted_and_explicitly_incomplete() {
+    let output = run(&["propose-reference"]);
+    assert!(
+        output.status.success(),
+        "host proposal failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let proposal = parse_stdout(&output);
+    assert_eq!(proposal["referenceProfile"]["status"], "proposed");
+    assert_eq!(proposal["note"], "proposed_only_not_approved");
+    assert_eq!(
+        proposal["missingRequiredFields"],
+        json!([
+            "power",
+            "devices",
+            "model",
+            "language",
+            "networkCanaryMethod"
+        ])
+    );
+    let serialized = serde_json::to_string(&proposal).expect("serialize proposal");
+    assert!(!serialized.contains("/Users/"));
+    assert!(!serialized.contains("serial_number"));
+    assert!(!serialized.contains("platform_UUID"));
+}
+
+#[test]
 fn aggregate_rejects_invalid_bundles_through_the_plan_17_validator() {
     let root = tempfile::tempdir().expect("aggregate tempdir");
     let plan_path = root.path().join("matrix-plan.json");
