@@ -5,13 +5,42 @@ use log::{info, warn, error};
 use tauri::{AppHandle, Runtime, Emitter};
 use tokio::sync::mpsc;
 use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use super::recording_state::AudioChunk;
 use super::audio_processing::create_meeting_folder;
 use super::incremental_saver::IncrementalAudioSaver;
 use crate::database::models::{MeetingCompleteness, MeetingLifecycle};
 use crate::database::repositories::meeting::FinalizationSnapshot;
+
+/// Write one file through a sibling temporary file and publish it with rename.
+/// Callers construct the target path from app-owned directories and generated
+/// identifiers; no user-controlled path is accepted here.
+pub(crate) fn write_atomic_file(target: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let parent = target.parent().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidInput, "target has no parent")
+    })?;
+    let file_name = target
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, "target has no filename")
+        })?;
+    let temporary = parent.join(format!(".{file_name}.tmp"));
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&temporary)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    std::fs::rename(&temporary, target)?;
+    if let Ok(directory) = std::fs::File::open(parent) {
+        let _ = directory.sync_all();
+    }
+    Ok(())
+}
 
 /// Structured transcript segment for JSON export
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -317,11 +346,9 @@ impl RecordingSaver {
     /// Write metadata.json to disk (atomic write with temp file)
     fn write_metadata(&self, folder: &PathBuf, metadata: &MeetingMetadata) -> Result<()> {
         let metadata_path = folder.join("metadata.json");
-        let temp_path = folder.join(".metadata.json.tmp");
 
         let json_string = serde_json::to_string_pretty(metadata)?;
-        std::fs::write(&temp_path, json_string)?;
-        std::fs::rename(&temp_path, &metadata_path)?;  // Atomic
+        write_atomic_file(&metadata_path, json_string.as_bytes())?;
 
         Ok(())
     }
@@ -339,7 +366,6 @@ impl RecordingSaver {
         info!("Writing {} transcript segments to JSON", segments_clone.len());
 
         let transcript_path = folder.join("transcripts.json");
-        let temp_path = folder.join(".transcripts.json.tmp");
 
         // Create JSON structure
         let json = serde_json::json!({
@@ -356,25 +382,11 @@ impl RecordingSaver {
                 anyhow::anyhow!("JSON serialization failed: {}", e)
             })?;
 
-        // Write to temp file with error handling
-        std::fs::write(&temp_path, &json_string)
+        // Write to a sibling temp file, sync, and publish with rename.
+        write_atomic_file(&transcript_path, json_string.as_bytes())
             .map_err(|e| {
-                error!("Failed to write transcript temp file to {}: {}", temp_path.display(), e);
+                error!("Failed to atomically write transcript file: {}", e);
                 anyhow::anyhow!("Failed to write temp file: {}", e)
-            })?;
-
-        // Verify temp file was written correctly
-        if !temp_path.exists() {
-            error!("Temp transcript file does not exist after write: {}", temp_path.display());
-            return Err(anyhow::anyhow!("Temp file verification failed"));
-        }
-
-        // Atomic rename
-        std::fs::rename(&temp_path, &transcript_path)
-            .map_err(|e| {
-                error!("Failed to rename transcript file from {} to {}: {}",
-                       temp_path.display(), transcript_path.display(), e);
-                anyhow::anyhow!("Failed to rename transcript file: {}", e)
             })?;
 
         info!("✅ Successfully wrote transcripts.json with {} segments", segments_clone.len());
