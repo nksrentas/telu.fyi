@@ -1,11 +1,15 @@
+use app_lib::config::{
+    evaluate_local_network_block_canary, LocalCanaryWorkflowStage, LocalNetworkBlockCanaryConfig,
+    LocalNetworkBlockCanaryFailure,
+};
 use app_lib::database::models::{CaptureCompleteness, RecoveryRequest, TranscriptEvidenceInput};
 use app_lib::database::repositories::meeting::MeetingsRepository;
 use app_lib::database::repositories::transcript::TranscriptsRepository;
 use app_lib::trust::outbound::{
-    authorize_and_record_dispatch, OutboundDisposition, OutboundLedger, OutboundSnapshot,
+    authorize_and_record_dispatch, OutboundDisposition, OutboundLedger,
 };
 use app_lib::trust::provider_route::{
-    resolve_route_from_addresses, Capability, RouteDestination,
+    resolve_route_from_addresses, Capability, LocationClass, RouteDestination,
 };
 use sqlx::sqlite::SqlitePoolOptions;
 use std::cell::Cell;
@@ -13,32 +17,6 @@ use std::collections::BTreeSet;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Instant;
 use uuid::Uuid;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum LocalWorkflowStage {
-    Capture,
-    Persistence,
-    Recovery,
-    Evaluation,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum LocalCanaryFailure {
-    ContractUnavailable,
-    AttributionLedgerMissing,
-    UnpermittedAttempt { sequence: u64 },
-}
-
-// Intentional RED seam: GREEN replaces this placeholder with the application
-// contract from config.rs, keeping these tests focused on observable outcomes.
-fn evaluate_network_block_contract(
-    _expected_run_id: &str,
-    _declared_origins: &BTreeSet<String>,
-    _outbound: Option<&OutboundSnapshot>,
-    _completed_stages: &BTreeSet<LocalWorkflowStage>,
-) -> Result<(), LocalCanaryFailure> {
-    Err(LocalCanaryFailure::ContractUnavailable)
-}
 
 trait ExternalConnector {
     fn dispatch(&self) -> Result<(), &'static str>;
@@ -81,12 +59,12 @@ fn remote_route() -> app_lib::trust::EffectiveRoute {
     )
 }
 
-fn all_local_stages() -> BTreeSet<LocalWorkflowStage> {
+fn all_local_stages() -> BTreeSet<LocalCanaryWorkflowStage> {
     [
-        LocalWorkflowStage::Capture,
-        LocalWorkflowStage::Persistence,
-        LocalWorkflowStage::Recovery,
-        LocalWorkflowStage::Evaluation,
+        LocalCanaryWorkflowStage::Capture,
+        LocalCanaryWorkflowStage::Persistence,
+        LocalCanaryWorkflowStage::Recovery,
+        LocalCanaryWorkflowStage::Evaluation,
     ]
     .into_iter()
     .collect()
@@ -106,7 +84,10 @@ async fn local_capture_persistence_recovery_and_evaluation_complete_with_deny_al
 
     let connector = DenyAllConnector::default();
     let captured_audio = [0_i16, 4, -4, 8];
-    assert!(!captured_audio.is_empty(), "capture fixture must contain local audio");
+    assert!(
+        !captured_audio.is_empty(),
+        "capture fixture must contain local audio"
+    );
 
     let meeting = MeetingsRepository::create_session(&pool, "Network-blocked local fixture")
         .await
@@ -139,15 +120,16 @@ async fn local_capture_persistence_recovery_and_evaluation_complete_with_deny_al
 
     let ledger = OutboundLedger::new("local-workflow", 8, Instant::now())
         .expect("present local attribution ledger");
-    let evaluation = evaluate_network_block_contract(
-        "local-workflow",
-        &BTreeSet::new(),
-        Some(&ledger.snapshot()),
-        &all_local_stages(),
-    );
+    let config = LocalNetworkBlockCanaryConfig::new("local-workflow", BTreeSet::new());
+    let evaluation =
+        evaluate_local_network_block_canary(&config, Some(&ledger.snapshot()), &all_local_stages());
 
     assert_eq!(evaluation, Ok(()));
-    assert_eq!(connector.attempts(), 0, "local fixture must not call the connector");
+    assert_eq!(
+        connector.attempts(),
+        0,
+        "local fixture must not call the connector"
+    );
 }
 
 #[test]
@@ -155,28 +137,31 @@ fn zero_attempts_pass_only_with_present_complete_attribution() {
     let ledger = OutboundLedger::new("zero-attempts", 4, Instant::now())
         .expect("present zero-attempt ledger");
     let stages = all_local_stages();
-    let declared_origins = BTreeSet::new();
+    let config = LocalNetworkBlockCanaryConfig::new("zero-attempts", BTreeSet::new());
 
     assert_eq!(
-        evaluate_network_block_contract(
-            "zero-attempts",
-            &declared_origins,
-            Some(&ledger.snapshot()),
-            &stages,
-        ),
+        evaluate_local_network_block_canary(&config, Some(&ledger.snapshot()), &stages),
         Ok(())
     );
     assert_eq!(
-        evaluate_network_block_contract("zero-attempts", &declared_origins, None, &stages),
-        Err(LocalCanaryFailure::AttributionLedgerMissing)
+        evaluate_local_network_block_canary(&config, None, &stages),
+        Err(LocalNetworkBlockCanaryFailure::AttributionLedgerMissing)
+    );
+
+    let mut incomplete = ledger.snapshot();
+    incomplete.attribution_complete = false;
+    incomplete.overflow_count = 1;
+    assert_eq!(
+        evaluate_local_network_block_canary(&config, Some(&incomplete), &stages),
+        Err(LocalNetworkBlockCanaryFailure::AttributionIncomplete { overflow_count: 1 })
     );
 }
 
 #[test]
 fn simulated_unpermitted_remote_attempt_is_blocked_attributed_and_fails_canary() {
     let connector = DenyAllConnector::default();
-    let ledger = OutboundLedger::new("blocked-remote", 4, Instant::now())
-        .expect("blocked-attempt ledger");
+    let ledger =
+        OutboundLedger::new("blocked-remote", 4, Instant::now()).expect("blocked-attempt ledger");
     let expected_remote = remote_route();
     let actual_local = loopback_route();
 
@@ -187,31 +172,44 @@ fn simulated_unpermitted_remote_attempt_is_blocked_attributed_and_fails_canary()
         &actual_local,
         || connector.dispatch(),
     );
-    assert!(dispatch.is_err(), "materially changed remote route must be blocked");
-    assert_eq!(connector.attempts(), 0, "blocked work must not reach a connector");
+    assert!(
+        dispatch.is_err(),
+        "materially changed remote route must be blocked"
+    );
+    assert_eq!(
+        connector.attempts(),
+        0,
+        "blocked work must not reach a connector"
+    );
 
     let snapshot = ledger.snapshot();
-    assert_eq!(snapshot.attempts.len(), 1, "blocked intent must be attributed");
-    assert_eq!(snapshot.attempts[0].disposition, OutboundDisposition::Blocked);
-    assert_eq!(snapshot.attempts[0].route.sanitized_origin, "https://203.0.113.9");
     assert_eq!(
-        evaluate_network_block_contract(
-            "blocked-remote",
-            &BTreeSet::new(),
-            Some(&snapshot),
-            &all_local_stages(),
-        ),
-        Err(LocalCanaryFailure::UnpermittedAttempt { sequence: 0 })
+        snapshot.attempts.len(),
+        1,
+        "blocked intent must be attributed"
+    );
+    assert_eq!(
+        snapshot.attempts[0].disposition,
+        OutboundDisposition::Blocked
+    );
+    assert_eq!(
+        snapshot.attempts[0].route.sanitized_origin,
+        "https://203.0.113.9"
+    );
+    let undeclared = LocalNetworkBlockCanaryConfig::new("blocked-remote", BTreeSet::new());
+    assert_eq!(
+        evaluate_local_network_block_canary(&undeclared, Some(&snapshot), &all_local_stages(),),
+        Err(LocalNetworkBlockCanaryFailure::UnpermittedAttempt {
+            sequence: 0,
+            location_class: LocationClass::Remote,
+            sanitized_origin: "https://203.0.113.9".to_string(),
+        })
     );
 
     let declared_origins = BTreeSet::from(["https://203.0.113.9".to_string()]);
+    let declared = LocalNetworkBlockCanaryConfig::new("blocked-remote", declared_origins);
     assert_eq!(
-        evaluate_network_block_contract(
-            "blocked-remote",
-            &declared_origins,
-            Some(&snapshot),
-            &all_local_stages(),
-        ),
+        evaluate_local_network_block_canary(&declared, Some(&snapshot), &all_local_stages(),),
         Ok(()),
         "a reviewed destination is attributable rather than undisclosed"
     );
