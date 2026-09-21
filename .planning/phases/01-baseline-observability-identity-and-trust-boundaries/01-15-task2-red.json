@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml resource_sampler --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "running 3 tests\nnot ok 1 - observability::resource_sampler::resource_sampler_tests::resource_sampler_records_interval_scope_process_and_system_metrics\nnot ok 2 - observability::resource_sampler::resource_sampler_tests::resource_sampler_parses_power_source_and_battery_with_method\nok 3 - observability::resource_sampler::resource_sampler_tests::resource_sampler_unknown_power_is_blocking_and_never_cpu_derived\n1..3\n# tests 3\n# pass 1\n# fail 2\n# cancelled 0",
+  "targetTest": "observability::resource_sampler::resource_sampler_tests::resource_sampler_records_interval_scope_process_and_system_metrics",
+  "expected": "Each run-correlated sample retains its real interval and distinct process/system CPU and memory scopes; platform power parsing retains method, observation, and explicit unknown energy impact",
+  "actual": "The intentional RED builder discarded the interval, mislabeled process metrics as system scope, and the macOS collector returned an unparseable unknown for a valid pmset observation"
+}
