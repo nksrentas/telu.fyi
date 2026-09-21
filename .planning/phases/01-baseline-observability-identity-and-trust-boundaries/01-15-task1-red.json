@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml observability_stage --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "running 4 tests\nnot ok 1 - observability::stage_clock::observability_stage_tests::observability_stage_uses_one_monotonic_origin_despite_utc_jump\nnot ok 2 - observability::stage_clock::observability_stage_tests::observability_stage_hot_admission_is_bounded_and_overflow_explicit\nok 3 - observability::stage_clock::observability_stage_tests::observability_stage_preserves_complete_phase1_order_and_correlation\nok 4 - observability::stage_clock::observability_stage_tests::observability_stage_rejects_reserved_future_stages_in_phase1\n1..4\n# tests 4\n# pass 2\n# fail 2\n# cancelled 0",
+  "targetTest": "observability::stage_clock::observability_stage_tests::observability_stage_uses_one_monotonic_origin_despite_utc_jump",
+  "expected": "Stage offsets and durations derive from one Rust Instant origin despite opposing UTC jumps, and bounded non-blocking overflow increments an explicit counter",
+  "actual": "The intentional RED implementation serialized every offset as zero and returned overflow without incrementing the overflow counter"
+}
