@@ -653,6 +653,8 @@ pub fn run() {
             observability::run_bundle::finalize_run_bundle,
             observability::run_bundle::list_run_bundles,
             observability::run_bundle::read_run_bundle_summary,
+            observability::run_bundle::list_diagnostic_runs,
+            observability::run_bundle::read_diagnostic_run,
             whisper_engine::commands::whisper_init,
             whisper_engine::commands::whisper_get_available_models,
             whisper_engine::commands::whisper_load_model,

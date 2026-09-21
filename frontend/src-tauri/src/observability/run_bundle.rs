@@ -99,6 +99,141 @@ pub struct RunBundleListItem {
     pub meeting_id: Option<String>,
     pub status: RunBundleStatus,
     pub validation_errors: Vec<String>,
+    pub scenario: Option<String>,
+    pub started_at_utc: Option<String>,
+    pub outcome: EvidenceStatus,
+    pub outcome_reason: Option<String>,
+    pub route: Option<DiagnosticRoute>,
+    pub duration_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticRoute {
+    pub capability: String,
+    pub provider_id: String,
+    pub model_id: String,
+    pub location_class: Option<String>,
+    pub sanitized_origin: Option<String>,
+    pub encrypted: Option<bool>,
+    pub validation_state: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticCheck {
+    pub id: String,
+    pub status: EvidenceStatus,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticResult {
+    pub outcome: EvidenceStatus,
+    pub outcome_reason: Option<String>,
+    pub checks: Vec<DiagnosticCheck>,
+    pub limitations: Vec<String>,
+    pub outliers: Vec<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticEnvironmentFact {
+    pub label: String,
+    pub status: EvidenceStatus,
+    pub value: Option<String>,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticStageRecord {
+    pub sequence: u64,
+    pub stage: String,
+    pub observed_offset_micros: u64,
+    pub observed_at_utc: String,
+    pub work_id: Option<String>,
+    pub evidence_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticQueueRecord {
+    pub sequence: u64,
+    pub observed_offset_micros: u64,
+    pub observed_at_utc: String,
+    pub capacity: u64,
+    pub depth: u64,
+    pub active: u64,
+    pub oldest_age_ms: Option<u64>,
+    pub accepted: u64,
+    pub started: u64,
+    pub completed: u64,
+    pub failed: u64,
+    pub cancelled: u64,
+    pub superseded: u64,
+    pub rejected: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticResourceRecord {
+    pub sequence: u64,
+    pub observed_offset_micros: u64,
+    pub observed_at_utc: String,
+    pub interval_ms: u64,
+    pub process_cpu_percent: Option<f64>,
+    pub process_memory_bytes: Option<u64>,
+    pub system_cpu_percent: Option<f64>,
+    pub system_memory_bytes: Option<u64>,
+    pub system_total_memory_bytes: Option<u64>,
+    pub power_source: Option<String>,
+    pub battery_percent: Option<f64>,
+    pub energy_impact: Option<f64>,
+    pub uncertainty: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticRouteRecord {
+    pub record_type: String,
+    pub sequence: u64,
+    pub observed_offset_micros: u64,
+    pub observed_at_utc: String,
+    pub route: DiagnosticRoute,
+    pub disposition: Option<String>,
+    pub redacted_code: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticErrorRecord {
+    pub sequence: u64,
+    pub observed_offset_micros: u64,
+    pub observed_at_utc: String,
+    pub component: String,
+    pub redacted_code: String,
+    pub work_id: Option<String>,
+    pub evidence_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticRunDetail {
+    pub run_id: String,
+    pub meeting_id: String,
+    pub scenario: String,
+    pub started_at_utc: String,
+    pub finalized_at_utc: String,
+    pub duration_ms: Option<u64>,
+    pub result: DiagnosticResult,
+    pub environment: Vec<DiagnosticEnvironmentFact>,
+    pub stages: Vec<DiagnosticStageRecord>,
+    pub queues: Vec<DiagnosticQueueRecord>,
+    pub resources: Vec<DiagnosticResourceRecord>,
+    pub routes: Vec<DiagnosticRouteRecord>,
+    pub errors: Vec<DiagnosticErrorRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -268,6 +403,12 @@ impl RunBundleWriter {
                     meeting_id: None,
                     status: RunBundleStatus::Interrupted,
                     validation_errors: vec!["RUN_BUNDLE_INTERRUPTED_WRITE".to_string()],
+                    scenario: None,
+                    started_at_utc: None,
+                    outcome: EvidenceStatus::Unknown,
+                    outcome_reason: Some("RUN_BUNDLE_INTERRUPTED_WRITE".to_string()),
+                    route: None,
+                    duration_ms: None,
                 });
                 continue;
             }
@@ -283,26 +424,23 @@ impl RunBundleWriter {
                     error_codes: vec![error.code().to_string()],
                 }
             });
-            let meeting_id = read_json_file(&entry.path().join("manifest.json"))
-                .ok()
-                .and_then(|manifest| {
-                    manifest
-                        .get("meetingId")
-                        .and_then(Value::as_str)
-                        .map(str::to_string)
-                });
-            items.push(RunBundleListItem {
-                run_id,
-                meeting_id,
-                status: if validation.valid {
-                    RunBundleStatus::Complete
-                } else {
-                    RunBundleStatus::Invalid
-                },
-                validation_errors: validation.error_codes,
-            });
+            let item = if validation.valid {
+                read_bundle_documents(&entry.path())
+                    .and_then(|documents| diagnostic_list_item(&run_id, &documents, validation))
+                    .unwrap_or_else(|error| invalid_diagnostic_list_item(run_id, error.code()))
+            } else {
+                let mut item = invalid_diagnostic_list_item(run_id, "RUN_BUNDLE_INVALID");
+                item.validation_errors = validation.error_codes;
+                item
+            };
+            items.push(item);
         }
-        items.sort_by(|left, right| left.run_id.cmp(&right.run_id));
+        items.sort_by(|left, right| {
+            right
+                .started_at_utc
+                .cmp(&left.started_at_utc)
+                .then_with(|| left.run_id.cmp(&right.run_id))
+        });
         Ok(items)
     }
 
@@ -318,6 +456,318 @@ impl RunBundleWriter {
         }
         read_text_file(&bundle.join("summary.md"), MAX_SUMMARY_BYTES)
     }
+
+    pub fn read_diagnostics(&self, run_id: &str) -> Result<DiagnosticRunDetail, RunBundleError> {
+        validate_uuid(run_id)?;
+        let bundle = self.root.join(format!("run-{run_id}"));
+        if !bundle.is_dir() {
+            return Err(RunBundleError::NotFound);
+        }
+        let validation = validate_run_bundle_dir(&bundle)?;
+        if !validation.valid {
+            return Err(RunBundleError::InvalidBundle);
+        }
+        diagnostic_detail(run_id, &read_bundle_documents(&bundle)?)
+    }
+}
+
+fn invalid_diagnostic_list_item(run_id: String, code: &str) -> RunBundleListItem {
+    RunBundleListItem {
+        run_id,
+        meeting_id: None,
+        status: RunBundleStatus::Invalid,
+        validation_errors: vec![code.to_string()],
+        scenario: None,
+        started_at_utc: None,
+        outcome: EvidenceStatus::Unknown,
+        outcome_reason: Some(code.to_string()),
+        route: None,
+        duration_ms: None,
+    }
+}
+
+fn read_bundle_documents(path: &Path) -> Result<BundleDocuments, RunBundleError> {
+    Ok(BundleDocuments {
+        manifest: read_json_file(&path.join("manifest.json"))?,
+        environment: read_json_file(&path.join("environment.json"))?,
+        stages: read_json_lines(&path.join("stages.jsonl"))?,
+        queues: read_json_lines(&path.join("queues.jsonl"))?,
+        resources: read_json_lines(&path.join("resources.jsonl"))?,
+        routes: read_json_lines(&path.join("routes.jsonl"))?,
+        errors: read_json_lines(&path.join("errors.jsonl"))?,
+        result: read_json_file(&path.join("result.json"))?,
+        summary: read_text_file(&path.join("summary.md"), MAX_SUMMARY_BYTES)?,
+    })
+}
+
+fn diagnostic_list_item(
+    run_id: &str,
+    documents: &BundleDocuments,
+    validation: RunBundleValidationReport,
+) -> Result<RunBundleListItem, RunBundleError> {
+    let detail = diagnostic_detail(run_id, documents)?;
+    let route = detail.routes.first().map(|record| record.route.clone());
+    Ok(RunBundleListItem {
+        run_id: detail.run_id,
+        meeting_id: Some(detail.meeting_id),
+        status: RunBundleStatus::Complete,
+        validation_errors: validation.error_codes,
+        scenario: Some(detail.scenario),
+        started_at_utc: Some(detail.started_at_utc),
+        outcome: detail.result.outcome,
+        outcome_reason: detail.result.outcome_reason,
+        route,
+        duration_ms: detail.duration_ms,
+    })
+}
+
+fn diagnostic_detail(
+    run_id: &str,
+    documents: &BundleDocuments,
+) -> Result<DiagnosticRunDetail, RunBundleError> {
+    let meeting_id = string_field(&documents.manifest, "meetingId")?.to_string();
+    let manifest_run_id = string_field(&documents.manifest, "runId")?;
+    if manifest_run_id != run_id {
+        return Err(RunBundleError::InvalidBundle);
+    }
+    let scenario = string_field(&documents.manifest, "scenarioVersion")?.to_string();
+    let started_at_utc = string_field(&documents.manifest, "startedAtUtc")?.to_string();
+    let finalized_at_utc = string_field(&documents.manifest, "finalizedAtUtc")?.to_string();
+    let duration_ms = duration_ms(&started_at_utc, &finalized_at_utc);
+
+    let result = DiagnosticResult {
+        outcome: diagnostic_status(documents.result.get("outcome").and_then(Value::as_str)),
+        outcome_reason: optional_safe_string(&documents.result, "outcomeReason"),
+        checks: documents
+            .result
+            .get("checks")
+            .and_then(Value::as_array)
+            .ok_or(RunBundleError::InvalidBundle)?
+            .iter()
+            .map(|check| {
+                Ok(DiagnosticCheck {
+                    id: string_field(check, "id")?.to_string(),
+                    status: diagnostic_status(check.get("status").and_then(Value::as_str)),
+                    reason: optional_safe_string(check, "reason"),
+                })
+            })
+            .collect::<Result<Vec<_>, RunBundleError>>()?,
+        limitations: safe_string_array(&documents.result, "limitations")?,
+        outliers: documents
+            .result
+            .get("outliers")
+            .and_then(Value::as_array)
+            .cloned()
+            .ok_or(RunBundleError::InvalidBundle)?,
+    };
+
+    let environment = [
+        ("App revision", "appRevision"),
+        ("Operating system", "os"),
+        ("Hardware", "hardware"),
+        ("Power", "power"),
+        ("Audio devices", "devices"),
+        ("Sample configuration", "sampleConfiguration"),
+        ("Model", "model"),
+        ("Effective route", "route"),
+        ("Language", "language"),
+    ]
+    .into_iter()
+    .map(|(label, key)| diagnostic_environment_fact(label, &documents.environment[key]))
+    .collect::<Result<Vec<_>, RunBundleError>>()?;
+
+    let stages = documents
+        .stages
+        .iter()
+        .map(|record| {
+            Ok(DiagnosticStageRecord {
+                sequence: required_u64(record, "sequence")?,
+                stage: string_field(record, "stage")?.to_string(),
+                observed_offset_micros: required_u64(record, "offsetMicros")?,
+                observed_at_utc: string_field(record, "observedAtUtc")?.to_string(),
+                work_id: optional_safe_string(record, "workId"),
+                evidence_id: optional_safe_string(record, "evidenceId"),
+            })
+        })
+        .collect::<Result<Vec<_>, RunBundleError>>()?;
+
+    let queues = documents
+        .queues
+        .iter()
+        .map(|record| {
+            Ok(DiagnosticQueueRecord {
+                sequence: required_u64(record, "sequence")?,
+                observed_offset_micros: required_u64(record, "observedOffsetMicros")?,
+                observed_at_utc: string_field(record, "observedAtUtc")?.to_string(),
+                capacity: required_u64(record, "capacity")?,
+                depth: required_u64(record, "depth")?,
+                active: required_u64(record, "active")?,
+                oldest_age_ms: optional_u64_field(record, "oldestAgeMs")
+                    .map_err(|_| RunBundleError::InvalidBundle)?,
+                accepted: required_u64(record, "accepted")?,
+                started: required_u64(record, "started")?,
+                completed: required_u64(record, "completed")?,
+                failed: required_u64(record, "failed")?,
+                cancelled: required_u64(record, "cancelled")?,
+                superseded: required_u64(record, "superseded")?,
+                rejected: required_u64(record, "rejected")?,
+            })
+        })
+        .collect::<Result<Vec<_>, RunBundleError>>()?;
+
+    let resources = documents
+        .resources
+        .iter()
+        .map(diagnostic_resource_record)
+        .collect::<Result<Vec<_>, RunBundleError>>()?;
+    let routes = documents
+        .routes
+        .iter()
+        .map(diagnostic_route_record)
+        .collect::<Result<Vec<_>, RunBundleError>>()?;
+    let errors = documents
+        .errors
+        .iter()
+        .map(|record| {
+            Ok(DiagnosticErrorRecord {
+                sequence: required_u64(record, "sequence")?,
+                observed_offset_micros: required_u64(record, "observedOffsetMicros")?,
+                observed_at_utc: string_field(record, "observedAtUtc")?.to_string(),
+                component: string_field(record, "component")?.to_string(),
+                redacted_code: string_field(record, "redactedCode")?.to_string(),
+                work_id: optional_safe_string(record, "workId"),
+                evidence_id: optional_safe_string(record, "evidenceId"),
+            })
+        })
+        .collect::<Result<Vec<_>, RunBundleError>>()?;
+
+    Ok(DiagnosticRunDetail {
+        run_id: run_id.to_string(),
+        meeting_id,
+        scenario,
+        started_at_utc,
+        finalized_at_utc,
+        duration_ms,
+        result,
+        environment,
+        stages,
+        queues,
+        resources,
+        routes,
+        errors,
+    })
+}
+
+fn diagnostic_environment_fact(
+    label: &str,
+    value: &Value,
+) -> Result<DiagnosticEnvironmentFact, RunBundleError> {
+    if !value.is_object() {
+        return Err(RunBundleError::InvalidBundle);
+    }
+    Ok(DiagnosticEnvironmentFact {
+        label: label.to_string(),
+        status: diagnostic_status(value.get("status").and_then(Value::as_str)),
+        value: optional_safe_string(value, "value"),
+        reason: optional_safe_string(value, "reason"),
+    })
+}
+
+fn diagnostic_resource_record(value: &Value) -> Result<DiagnosticResourceRecord, RunBundleError> {
+    Ok(DiagnosticResourceRecord {
+        sequence: required_u64(value, "sequence")?,
+        observed_offset_micros: required_u64(value, "observedOffsetMicros")?,
+        observed_at_utc: string_field(value, "observedAtUtc")?.to_string(),
+        interval_ms: required_u64(value, "intervalMs")?,
+        process_cpu_percent: value["process"]["cpuPercent"].as_f64(),
+        process_memory_bytes: value["process"]["memoryBytes"].as_u64(),
+        system_cpu_percent: value["system"]["cpuPercent"].as_f64(),
+        system_memory_bytes: value["system"]["memoryBytes"].as_u64(),
+        system_total_memory_bytes: value["system"]["totalMemoryBytes"].as_u64(),
+        power_source: observation_display(&value["power"]["source"]),
+        battery_percent: value["power"]["batteryPercent"]["value"].as_f64(),
+        energy_impact: value["power"]["energyImpact"]["value"].as_f64(),
+        uncertainty: optional_safe_string(&value["power"], "uncertainty"),
+    })
+}
+
+fn diagnostic_route_record(value: &Value) -> Result<DiagnosticRouteRecord, RunBundleError> {
+    Ok(DiagnosticRouteRecord {
+        record_type: string_field(value, "recordType")?.to_string(),
+        sequence: required_u64(value, "sequence")?,
+        observed_offset_micros: required_u64(value, "observedOffsetMicros")?,
+        observed_at_utc: string_field(value, "observedAtUtc")?.to_string(),
+        route: diagnostic_route(&value["route"])?,
+        disposition: optional_safe_string(value, "disposition"),
+        redacted_code: optional_safe_string(value, "redactedCode"),
+    })
+}
+
+fn diagnostic_route(value: &Value) -> Result<DiagnosticRoute, RunBundleError> {
+    Ok(DiagnosticRoute {
+        capability: string_field(value, "capability")?.to_string(),
+        provider_id: string_field(value, "providerId")?.to_string(),
+        model_id: string_field(value, "modelId")?.to_string(),
+        location_class: optional_safe_string(value, "locationClass"),
+        sanitized_origin: optional_safe_string(value, "sanitizedOrigin"),
+        encrypted: value.get("encrypted").and_then(Value::as_bool),
+        validation_state: string_field(value, "validationState")?.to_string(),
+    })
+}
+
+fn diagnostic_status(value: Option<&str>) -> EvidenceStatus {
+    match value {
+        Some("pass" | "observed") => EvidenceStatus::Pass,
+        Some("fail") => EvidenceStatus::Fail,
+        _ => EvidenceStatus::Unknown,
+    }
+}
+
+fn observation_display(value: &Value) -> Option<String> {
+    value
+        .get("value")
+        .and_then(|item| match item {
+            Value::String(text) if is_safe_display(text) => Some(text.clone()),
+            Value::Number(number) => Some(number.to_string()),
+            _ => None,
+        })
+        .or_else(|| optional_safe_string(value, "reason"))
+}
+
+fn safe_string_array(value: &Value, field: &str) -> Result<Vec<String>, RunBundleError> {
+    value
+        .get(field)
+        .and_then(Value::as_array)
+        .ok_or(RunBundleError::InvalidBundle)?
+        .iter()
+        .map(|item| {
+            item.as_str()
+                .filter(|text| is_safe_display(text))
+                .map(str::to_string)
+                .ok_or(RunBundleError::InvalidBundle)
+        })
+        .collect()
+}
+
+fn required_u64(value: &Value, field: &str) -> Result<u64, RunBundleError> {
+    value
+        .get(field)
+        .and_then(Value::as_u64)
+        .ok_or(RunBundleError::InvalidBundle)
+}
+
+fn optional_safe_string(value: &Value, field: &str) -> Option<String> {
+    value
+        .get(field)
+        .and_then(Value::as_str)
+        .filter(|text| is_safe_display(text))
+        .map(str::to_string)
+}
+
+fn duration_ms(started_at_utc: &str, finalized_at_utc: &str) -> Option<u64> {
+    let started = DateTime::parse_from_rfc3339(started_at_utc).ok()?;
+    let finalized = DateTime::parse_from_rfc3339(finalized_at_utc).ok()?;
+    u64::try_from(finalized.signed_duration_since(started).num_milliseconds()).ok()
 }
 
 pub fn validate_run_bundle_dir(
@@ -383,6 +833,37 @@ pub fn read_run_bundle_summary(
         })?;
     RunBundleWriter::new(app_data_dir)
         .read_summary(&run_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn list_diagnostic_runs(
+    app: tauri::AppHandle,
+) -> Result<Vec<RunBundleListItem>, RunBundleCommandError> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| RunBundleCommandError {
+            code: "RUN_BUNDLE_STORAGE_FAILED".to_string(),
+        })?;
+    RunBundleWriter::new(app_data_dir)
+        .list()
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn read_diagnostic_run(
+    app: tauri::AppHandle,
+    run_id: String,
+) -> Result<DiagnosticRunDetail, RunBundleCommandError> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| RunBundleCommandError {
+            code: "RUN_BUNDLE_STORAGE_FAILED".to_string(),
+        })?;
+    RunBundleWriter::new(app_data_dir)
+        .read_diagnostics(&run_id)
         .map_err(Into::into)
 }
 
@@ -2142,5 +2623,24 @@ mod run_bundle_writer_tests {
         assert!(item.get("path").is_none());
         assert!(item.get("transcript").is_none());
         assert!(item.get("audio").is_none());
+
+        let detail = writer
+            .read_diagnostics(RUN_ID)
+            .expect("read typed diagnostic detail");
+        assert_eq!(detail.result.outcome, EvidenceStatus::Unknown);
+        assert_eq!(detail.result.limitations.len(), 2);
+        assert_eq!(detail.environment.len(), 9);
+        assert_eq!(detail.stages[0].stage, "audio_captured");
+        assert_eq!(detail.queues[0].completed, 1);
+        assert_eq!(detail.resources[0].process_memory_bytes, Some(1024));
+        assert_eq!(
+            detail.routes[0].route.sanitized_origin.as_deref(),
+            Some("This device")
+        );
+        assert!(detail.errors.is_empty());
+        let serialized = serde_json::to_string(&detail).expect("serialize detail projection");
+        assert!(!serialized.contains("/Users/"));
+        assert!(!serialized.contains("transcriptText"));
+        assert!(!serialized.contains("audioIncluded"));
     }
 }

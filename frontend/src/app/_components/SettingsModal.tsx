@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import { useConfig } from "@/contexts/ConfigContext";
 import { useRecordingState } from "@/contexts/RecordingStateContext";
 import { ProviderBoundary } from "@/components/ProviderBoundary";
+import { DiagnosticsPanel } from "@/components/DiagnosticsPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type modalType = "modelSettings" | "deviceSettings" | "languageSettings" | "modelSelector" | "errorAlert" | "chunkDropWarning";
 
@@ -79,83 +81,91 @@ export function SettingsModals({
           </div>
 
           {/* Content - Scrollable */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-8">
-            {/* General Preferences Section */}
-            <PreferenceSettings />
+          <div className="flex-1 overflow-y-auto p-6">
+            <Tabs defaultValue="preferences" className="w-full">
+              <TabsList className="h-auto w-full justify-start overflow-x-auto rounded-none border-b border-border bg-transparent p-0">
+                <TabsTrigger value="preferences" className="rounded-none px-4 py-3 data-[state=active]:text-primary">General</TabsTrigger>
+                <TabsTrigger value="models" className="rounded-none px-4 py-3 data-[state=active]:text-primary">AI model</TabsTrigger>
+                <TabsTrigger value="diagnostics" className="rounded-none px-4 py-3 data-[state=active]:text-primary">Diagnostics</TabsTrigger>
+              </TabsList>
 
-            {/* Divider */}
-            <div className="border-t pt-8">
-              <h4 className="text-lg font-semibold text-gray-900 mb-4">AI Model Configuration</h4>
-              <div className="space-y-4">
+              <TabsContent value="preferences" className="pt-6">
+                <PreferenceSettings />
+              </TabsContent>
+
+              <TabsContent value="models" className="pt-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Summarization Model
-                  </label>
-                  <div className="flex space-x-2">
-                    <select
-                      className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      value={modelConfig.provider}
-                      onChange={(e) => {
-                        const provider = e.target.value as ModelConfig['provider'];
-                        setModelConfig({
-                          ...modelConfig,
-                          provider,
-                          model: modelOptions[provider][0]
-                        });
-                      }}
-                    >
-                      <option value="builtin-ai">Built-in AI</option>
-                      <option value="claude">Claude</option>
-                      <option value="groq">Groq</option>
-                      <option value="ollama">Ollama</option>
-                      <option value="openrouter">OpenRouter</option>
-                      <option value="openai">OpenAI</option>
-                    </select>
+                  <h4 className="mb-4 text-lg font-semibold text-gray-900">AI Model Configuration</h4>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-gray-700">
+                        Summarization Model
+                      </label>
+                      <div className="flex space-x-2">
+                        <select
+                          className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
+                          value={modelConfig.provider}
+                          onChange={(e) => {
+                            const provider = e.target.value as ModelConfig['provider'];
+                            setModelConfig({
+                              ...modelConfig,
+                              provider,
+                              model: modelOptions[provider][0]
+                            });
+                          }}
+                        >
+                          <option value="builtin-ai">Built-in AI</option>
+                          <option value="claude">Claude</option>
+                          <option value="groq">Groq</option>
+                          <option value="ollama">Ollama</option>
+                          <option value="openrouter">OpenRouter</option>
+                          <option value="openai">OpenAI</option>
+                        </select>
 
-                    <select
-                      className="flex-1 px-3 py-2 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                      value={modelConfig.model}
-                      onChange={(e) => setModelConfig((prev: ModelConfig) => ({ ...prev, model: e.target.value }))}
-                    >
-                      {modelOptions[modelConfig.provider].map((model: string) => (
-                        <option key={model} value={model}>
-                          {model}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <ProviderBoundary
-                    capability="summary"
-                    refreshKey={`${modelConfig.provider}:${modelConfig.model}:${modelConfig.ollamaEndpoint ?? ''}`}
-                    className="mt-4"
-                  />
-                </div>
-                {modelConfig.provider === 'ollama' && (
-                  <div>
-                    <h4 className="text-lg font-bold mb-4">Available Ollama Models</h4>
-                    {error && (
-                      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                        {error}
+                        <select
+                          className="flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring"
+                          value={modelConfig.model}
+                          onChange={(e) => setModelConfig((prev: ModelConfig) => ({ ...prev, model: e.target.value }))}
+                        >
+                          {modelOptions[modelConfig.provider].map((model: string) => (
+                            <option key={model} value={model}>{model}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <ProviderBoundary
+                        capability="summary"
+                        refreshKey={`${modelConfig.provider}:${modelConfig.model}:${modelConfig.ollamaEndpoint ?? ''}`}
+                        className="mt-4"
+                      />
+                    </div>
+                    {modelConfig.provider === 'ollama' && (
+                      <div>
+                        <h4 className="mb-4 text-lg font-bold">Available Ollama Models</h4>
+                        {error && <div className="mb-4 rounded border border-red-400 bg-red-100 px-4 py-3 text-red-700">{error}</div>}
+                        <div className="max-h-[400px] space-y-4 overflow-y-auto pr-2">
+                          {models.map((model) => (
+                            <button
+                              type="button"
+                              key={model.id}
+                              className={`block w-full rounded-lg bg-white p-4 text-left shadow transition-colors focus:outline-none focus:ring-2 focus:ring-ring ${modelConfig.model === model.name ? 'ring-2 ring-primary bg-accent' : 'hover:bg-muted'}`}
+                              onClick={() => setModelConfig((prev: ModelConfig) => ({ ...prev, model: model.name }))}
+                            >
+                              <span className="block font-bold">{model.name}</span>
+                              <span className="block text-gray-600">Size: {model.size}</span>
+                              <span className="block text-gray-600">Modified: {model.modified}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     )}
-                    <div className="grid gap-4 max-h-[400px] overflow-y-auto pr-2">
-                      {models.map((model) => (
-                        <div
-                          key={model.id}
-                          className={`bg-white p-4 rounded-lg shadow cursor-pointer transition-colors ${modelConfig.model === model.name ? 'ring-2 ring-blue-500 bg-blue-50' : 'hover:bg-gray-50'
-                            }`}
-                          onClick={() => setModelConfig((prev: ModelConfig) => ({ ...prev, model: model.name }))}
-                        >
-                          <h3 className="font-bold">{model.name}</h3>
-                          <p className="text-gray-600">Size: {model.size}</p>
-                          <p className="text-gray-600">Modified: {model.modified}</p>
-                        </div>
-                      ))}
-                    </div>
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="diagnostics" className="mt-0">
+                <DiagnosticsPanel />
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Footer */}
