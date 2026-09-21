@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml --test network_blocked_local -- --nocapture",
+  "exitCode": 101,
+  "output": "running 3 tests\nnot ok 1 - local_capture_persistence_recovery_and_evaluation_complete_with_deny_all_connector\nnot ok 2 - simulated_unpermitted_remote_attempt_is_blocked_attributed_and_fails_canary\nnot ok 3 - zero_attempts_pass_only_with_present_complete_attribution\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0",
+  "targetTest": "local_capture_persistence_recovery_and_evaluation_complete_with_deny_all_connector",
+  "expected": "A local capture, canonical persistence, same-ID recovery, and evaluation fixture completes with a deny-all connector; zero attempts requires a present complete ledger; an undeclared remote intent is blocked, retained, and fails evaluation",
+  "actual": "The intentional RED evaluator returned ContractUnavailable for the completed local fixture, the present zero-attempt ledger, and the attributed blocked remote attempt"
+}
