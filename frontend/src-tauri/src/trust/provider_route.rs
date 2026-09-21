@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fmt;
-use std::net::IpAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use url::{Host, Url};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Capability {
     Transcription,
@@ -11,7 +13,7 @@ pub enum Capability {
     Generation,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LocationClass {
     Local,
@@ -48,12 +50,21 @@ pub struct EffectiveRoute {
 
 impl EffectiveRoute {
     fn unavailable(capability: Capability, provider_id: &str, model_id: &str) -> Self {
+        Self::unavailable_with_origin(capability, provider_id, model_id, None)
+    }
+
+    fn unavailable_with_origin(
+        capability: Capability,
+        provider_id: &str,
+        model_id: &str,
+        sanitized_origin: Option<String>,
+    ) -> Self {
         Self {
             capability,
             provider_id: provider_id.to_string(),
             model_id: model_id.to_string(),
             location_class: None,
-            sanitized_origin: None,
+            sanitized_origin,
             encrypted: false,
             validation_state: RouteValidationState::Unavailable,
             resolved_addresses: Vec::new(),
@@ -93,23 +104,176 @@ pub fn resolve_route_from_addresses(
     capability: Capability,
     provider_id: &str,
     model_id: &str,
-    _destination: RouteDestination<'_>,
-    _resolved_addresses: &[IpAddr],
+    destination: RouteDestination<'_>,
+    resolved_addresses: &[IpAddr],
 ) -> EffectiveRoute {
-    EffectiveRoute::unavailable(capability, provider_id, model_id)
+    match destination {
+        RouteDestination::Device => EffectiveRoute {
+            capability,
+            provider_id: provider_id.to_string(),
+            model_id: model_id.to_string(),
+            location_class: Some(LocationClass::Local),
+            sanitized_origin: Some("This device".to_string()),
+            encrypted: true,
+            validation_state: RouteValidationState::Validated,
+            resolved_addresses: Vec::new(),
+        },
+        RouteDestination::Url(raw_destination) => {
+            let Some(raw_destination) = raw_destination.filter(|value| !value.trim().is_empty())
+            else {
+                return EffectiveRoute::unavailable(capability, provider_id, model_id);
+            };
+            let Ok(url) = Url::parse(raw_destination) else {
+                return EffectiveRoute::unavailable(capability, provider_id, model_id);
+            };
+            if !matches!(url.scheme(), "http" | "https") || url.host().is_none() {
+                return EffectiveRoute::unavailable(capability, provider_id, model_id);
+            }
+
+            let sanitized_origin = Some(url.origin().ascii_serialization());
+            let mut addresses = resolved_addresses.to_vec();
+            if addresses.is_empty() {
+                match url.host() {
+                    Some(Host::Ipv4(address)) => addresses.push(IpAddr::V4(address)),
+                    Some(Host::Ipv6(address)) => addresses.push(IpAddr::V6(address)),
+                    _ => {}
+                }
+            }
+
+            let mut classes = BTreeSet::new();
+            let mut normalized_addresses = BTreeSet::new();
+            for address in addresses {
+                let Some(class) = classify_address(address) else {
+                    return EffectiveRoute::unavailable_with_origin(
+                        capability,
+                        provider_id,
+                        model_id,
+                        sanitized_origin,
+                    );
+                };
+                classes.insert(class);
+                normalized_addresses.insert(address.to_string());
+            }
+
+            if classes.len() != 1 || normalized_addresses.is_empty() {
+                return EffectiveRoute::unavailable_with_origin(
+                    capability,
+                    provider_id,
+                    model_id,
+                    sanitized_origin,
+                );
+            }
+
+            EffectiveRoute {
+                capability,
+                provider_id: provider_id.to_string(),
+                model_id: model_id.to_string(),
+                location_class: classes.into_iter().next(),
+                sanitized_origin,
+                encrypted: url.scheme() == "https",
+                validation_state: RouteValidationState::Validated,
+                resolved_addresses: normalized_addresses.into_iter().collect(),
+            }
+        }
+    }
+}
+
+pub async fn resolve_provider_route(
+    capability: Capability,
+    provider_id: &str,
+    model_id: &str,
+    destination: RouteDestination<'_>,
+) -> EffectiveRoute {
+    let RouteDestination::Url(Some(raw_destination)) = destination else {
+        return resolve_route_from_addresses(capability, provider_id, model_id, destination, &[]);
+    };
+
+    let Ok(url) = Url::parse(raw_destination) else {
+        return resolve_route_from_addresses(capability, provider_id, model_id, destination, &[]);
+    };
+    let Some(host) = url.host_str() else {
+        return resolve_route_from_addresses(capability, provider_id, model_id, destination, &[]);
+    };
+    let Some(port) = url.port_or_known_default() else {
+        return resolve_route_from_addresses(capability, provider_id, model_id, destination, &[]);
+    };
+
+    let addresses = match tokio::net::lookup_host((host, port)).await {
+        Ok(addresses) => addresses.map(|address| address.ip()).collect::<Vec<_>>(),
+        Err(_) => Vec::new(),
+    };
+    resolve_route_from_addresses(capability, provider_id, model_id, destination, &addresses)
+}
+
+fn classify_address(address: IpAddr) -> Option<LocationClass> {
+    match address {
+        IpAddr::V4(address) if address.is_unspecified() || address.is_multicast() => None,
+        IpAddr::V4(address) if address == Ipv4Addr::BROADCAST => None,
+        IpAddr::V4(address) if address.is_loopback() => Some(LocationClass::Local),
+        IpAddr::V4(address) if address.is_private() || address.is_link_local() => {
+            Some(LocationClass::Lan)
+        }
+        IpAddr::V4(_) => Some(LocationClass::Remote),
+        IpAddr::V6(address) if address.is_unspecified() || address.is_multicast() => None,
+        IpAddr::V6(address) if address.is_loopback() => Some(LocationClass::Local),
+        IpAddr::V6(address) if is_unique_local(address) || is_unicast_link_local(address) => {
+            Some(LocationClass::Lan)
+        }
+        IpAddr::V6(_) => Some(LocationClass::Remote),
+    }
+}
+
+fn is_unique_local(address: Ipv6Addr) -> bool {
+    address.segments()[0] & 0xfe00 == 0xfc00
+}
+
+fn is_unicast_link_local(address: Ipv6Addr) -> bool {
+    address.segments()[0] & 0xffc0 == 0xfe80
 }
 
 pub fn validate_route_contract(
     expected: &EffectiveRoute,
-    _current: &EffectiveRoute,
+    current: &EffectiveRoute,
 ) -> Result<(), ProviderRouteError> {
-    Err(ProviderRouteError {
-        code: "PROVIDER_ROUTE_UNAVAILABLE".to_string(),
-        capability: expected.capability,
-        provider_id: expected.provider_id.clone(),
-        model_id: expected.model_id.clone(),
-        sanitized_origin: expected.sanitized_origin.clone(),
-    })
+    if expected.validation_state != RouteValidationState::Validated
+        || current.validation_state != RouteValidationState::Validated
+    {
+        return Err(route_error("PROVIDER_ROUTE_UNAVAILABLE", expected));
+    }
+
+    if expected.capability != current.capability
+        || expected.provider_id != current.provider_id
+        || expected.model_id != current.model_id
+        || expected.location_class != current.location_class
+        || expected.sanitized_origin != current.sanitized_origin
+        || expected.encrypted != current.encrypted
+        || expected.resolved_addresses != current.resolved_addresses
+    {
+        return Err(route_error("PROVIDER_ROUTE_MATERIALLY_CHANGED", expected));
+    }
+
+    Ok(())
+}
+
+pub fn require_available_route(route: &EffectiveRoute) -> Result<(), ProviderRouteError> {
+    if route.validation_state == RouteValidationState::Validated
+        && route.location_class.is_some()
+        && route.sanitized_origin.is_some()
+    {
+        Ok(())
+    } else {
+        Err(route_error("PROVIDER_ROUTE_UNAVAILABLE", route))
+    }
+}
+
+fn route_error(code: &str, route: &EffectiveRoute) -> ProviderRouteError {
+    ProviderRouteError {
+        code: code.to_string(),
+        capability: route.capability,
+        provider_id: route.provider_id.clone(),
+        model_id: route.model_id.clone(),
+        sanitized_origin: route.sanitized_origin.clone(),
+    }
 }
 
 #[cfg(test)]
@@ -178,7 +342,10 @@ mod tests {
             &[IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34))],
         );
 
-        assert_eq!(route.sanitized_origin.as_deref(), Some("https://example.com"));
+        assert_eq!(
+            route.sanitized_origin.as_deref(),
+            Some("https://example.com")
+        );
         let serialized = serde_json::to_string(&route).unwrap();
         assert!(!serialized.contains("alice"));
         assert!(!serialized.contains("super-secret"));
@@ -189,7 +356,10 @@ mod tests {
 
     #[test]
     fn provider_route_resolution_rejects_missing_invalid_and_materially_changed_routes() {
-        for destination in [RouteDestination::Url(None), RouteDestination::Url(Some("not a url"))] {
+        for destination in [
+            RouteDestination::Url(None),
+            RouteDestination::Url(Some("not a url")),
+        ] {
             let route = resolve_route_from_addresses(
                 Capability::Summary,
                 "custom-openai",
