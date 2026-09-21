@@ -4,13 +4,14 @@ use crate::audio::recording_saver::write_atomic_file;
 use crate::database::repositories::evaluation::EVALUATION_SCHEMA_VERSION;
 use crate::observability::resource_sampler::RESOURCE_SCHEMA_VERSION;
 use crate::observability::stage_clock::STAGE_SCHEMA_VERSION;
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{Row, SqlitePool};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use tauri::Manager;
 use uuid::Uuid;
 
@@ -238,6 +239,61 @@ pub struct DiagnosticRunDetail {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DiagnosticExportSelection {
+    pub token: String,
+    pub folder_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticExportRequest {
+    pub run_id: String,
+    pub destination_token: String,
+    pub include_transcript: bool,
+    pub include_audio: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosticExportResult {
+    pub run_id: String,
+    pub export_id: String,
+    pub folder_name: String,
+    pub reveal_token: String,
+    pub transcript_requested: bool,
+    pub transcript_included: bool,
+    pub audio_requested: bool,
+    pub audio_included: bool,
+    pub local_only: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DiagnosticExportManifest {
+    schema_version: u16,
+    export_id: String,
+    run_id: String,
+    created_at_utc: String,
+    local_only: bool,
+    included_categories: Vec<&'static str>,
+    redaction_policy: Vec<&'static str>,
+    transcript_requested: bool,
+    transcript_included: bool,
+    audio_requested: bool,
+    audio_included: bool,
+    result: &'static str,
+}
+
+#[derive(Debug, Default)]
+struct DiagnosticExportPaths {
+    destinations: BTreeMap<String, PathBuf>,
+    completed: BTreeMap<String, PathBuf>,
+}
+
+static DIAGNOSTIC_EXPORT_PATHS: OnceLock<Mutex<DiagnosticExportPaths>> = OnceLock::new();
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RunBundleValidationReport {
     pub valid: bool,
     pub error_codes: Vec<String>,
@@ -266,6 +322,10 @@ pub enum RunBundleError {
     Storage,
     #[error("run bundle was not found")]
     NotFound,
+    #[error("diagnostic export destination is invalid")]
+    InvalidDestination,
+    #[error("diagnostic export destination was not selected")]
+    DestinationNotSelected,
 }
 
 impl RunBundleError {
@@ -277,6 +337,8 @@ impl RunBundleError {
             Self::InvalidBundle => "RUN_BUNDLE_INVALID",
             Self::Storage => "RUN_BUNDLE_STORAGE_FAILED",
             Self::NotFound => "RUN_BUNDLE_NOT_FOUND",
+            Self::InvalidDestination => "DIAGNOSTIC_EXPORT_INVALID_DESTINATION",
+            Self::DestinationNotSelected => "DIAGNOSTIC_EXPORT_DESTINATION_NOT_SELECTED",
         }
     }
 }
@@ -469,6 +531,119 @@ impl RunBundleWriter {
         }
         diagnostic_detail(run_id, &read_bundle_documents(&bundle)?)
     }
+
+    pub fn export_diagnostic_copy_to(
+        &self,
+        run_id: &str,
+        destination: impl AsRef<Path>,
+        include_transcript: bool,
+        include_audio: bool,
+    ) -> Result<(DiagnosticExportResult, PathBuf), RunBundleError> {
+        validate_uuid(run_id)?;
+        let source = self.root.join(format!("run-{run_id}"));
+        let source_validation = validate_run_bundle_dir(&source)?;
+        if !source_validation.valid {
+            return Err(RunBundleError::InvalidBundle);
+        }
+        let documents = read_bundle_documents(&source)?;
+        let meeting_id = string_field(&documents.manifest, "meetingId")?;
+        validate_documents(&documents, run_id, meeting_id)?;
+
+        let destination = validate_export_destination(destination.as_ref())?;
+        let source = source
+            .canonicalize()
+            .map_err(|_| RunBundleError::InvalidBundle)?;
+        if destination == source || destination.starts_with(&source) {
+            return Err(RunBundleError::InvalidDestination);
+        }
+        let export_id = Uuid::new_v4().to_string();
+        let folder_name = format!("telu-diagnostic-{run_id}-{export_id}");
+        let final_path = destination.join(&folder_name);
+        let temp_path = destination.join(format!(".{folder_name}.tmp"));
+        if final_path.exists() || temp_path.exists() {
+            return Err(RunBundleError::Storage);
+        }
+
+        fs::create_dir(&temp_path).map_err(|_| RunBundleError::Storage)?;
+        let write_result = (|| {
+            let bundle_path = temp_path.join("bundle");
+            fs::create_dir(&bundle_path).map_err(|_| RunBundleError::Storage)?;
+            write_json_file(&bundle_path.join("manifest.json"), &documents.manifest)?;
+            write_json_file(
+                &bundle_path.join("environment.json"),
+                &documents.environment,
+            )?;
+            write_json_lines(&bundle_path.join("stages.jsonl"), &documents.stages)?;
+            write_json_lines(&bundle_path.join("queues.jsonl"), &documents.queues)?;
+            write_json_lines(&bundle_path.join("resources.jsonl"), &documents.resources)?;
+            write_json_lines(&bundle_path.join("routes.jsonl"), &documents.routes)?;
+            write_json_lines(&bundle_path.join("errors.jsonl"), &documents.errors)?;
+            write_json_file(&bundle_path.join("result.json"), &documents.result)?;
+            write_atomic_file(
+                &bundle_path.join("summary.md"),
+                documents.summary.as_bytes(),
+            )
+            .map_err(|_| RunBundleError::Storage)?;
+
+            let copied_validation = validate_run_bundle_dir(&bundle_path)?;
+            if !copied_validation.valid {
+                return Err(RunBundleError::InvalidBundle);
+            }
+
+            let export_manifest = DiagnosticExportManifest {
+                schema_version: 1,
+                export_id: export_id.clone(),
+                run_id: run_id.to_string(),
+                created_at_utc: Utc::now().to_rfc3339(),
+                local_only: true,
+                included_categories: vec![
+                    "result_and_limitations",
+                    "environment",
+                    "stage_timing",
+                    "queue_and_terminal_outcomes",
+                    "resources",
+                    "provider_route_and_outbound_attempts",
+                    "redacted_errors",
+                ],
+                redaction_policy: vec![
+                    "credentials_excluded",
+                    "full_sensitive_paths_excluded",
+                    "source_bundle_revalidated",
+                ],
+                transcript_requested: include_transcript,
+                transcript_included: false,
+                audio_requested: include_audio,
+                audio_included: false,
+                result: "exported_local_copy",
+            };
+            let export_manifest =
+                serde_json::to_value(export_manifest).map_err(|_| RunBundleError::InvalidBundle)?;
+            if contains_sensitive_json(&export_manifest, None) {
+                return Err(RunBundleError::UnsafeContent);
+            }
+            write_json_file(&temp_path.join("export-manifest.json"), &export_manifest)?;
+            fs::rename(&temp_path, &final_path).map_err(|_| RunBundleError::Storage)?;
+            Ok(())
+        })();
+
+        if let Err(error) = write_result {
+            let _ = fs::remove_dir_all(&temp_path);
+            return Err(error);
+        }
+
+        let result = DiagnosticExportResult {
+            run_id: run_id.to_string(),
+            export_id,
+            folder_name,
+            reveal_token: String::new(),
+            transcript_requested: include_transcript,
+            transcript_included: false,
+            audio_requested: include_audio,
+            audio_included: false,
+            local_only: true,
+        };
+        Ok((result, final_path))
+    }
 }
 
 fn invalid_diagnostic_list_item(run_id: String, code: &str) -> RunBundleListItem {
@@ -484,6 +659,83 @@ fn invalid_diagnostic_list_item(run_id: String, code: &str) -> RunBundleListItem
         route: None,
         duration_ms: None,
     }
+}
+
+fn diagnostic_export_paths() -> &'static Mutex<DiagnosticExportPaths> {
+    DIAGNOSTIC_EXPORT_PATHS.get_or_init(|| Mutex::new(DiagnosticExportPaths::default()))
+}
+
+fn validate_export_destination(path: &Path) -> Result<PathBuf, RunBundleError> {
+    let metadata = fs::symlink_metadata(path).map_err(|_| RunBundleError::InvalidDestination)?;
+    if !metadata.file_type().is_dir() || metadata.file_type().is_symlink() {
+        return Err(RunBundleError::InvalidDestination);
+    }
+    path.canonicalize()
+        .map_err(|_| RunBundleError::InvalidDestination)
+}
+
+fn register_export_destination(
+    path: impl AsRef<Path>,
+) -> Result<DiagnosticExportSelection, RunBundleError> {
+    let path = validate_export_destination(path.as_ref())?;
+    let token = Uuid::new_v4().to_string();
+    let folder_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| is_safe_display(name) && !contains_sensitive_string(name))
+        .map(str::to_string)
+        .unwrap_or_else(|| "Selected folder".to_string());
+    let mut paths = diagnostic_export_paths()
+        .lock()
+        .map_err(|_| RunBundleError::Storage)?;
+    if paths.destinations.len() >= 16 {
+        paths.destinations.clear();
+    }
+    paths.destinations.insert(token.clone(), path);
+    Ok(DiagnosticExportSelection { token, folder_name })
+}
+
+fn export_destination(token: &str) -> Result<PathBuf, RunBundleError> {
+    validate_uuid(token).map_err(|_| RunBundleError::DestinationNotSelected)?;
+    diagnostic_export_paths()
+        .lock()
+        .map_err(|_| RunBundleError::Storage)?
+        .destinations
+        .get(token)
+        .cloned()
+        .ok_or(RunBundleError::DestinationNotSelected)
+}
+
+fn consume_export_destination(token: &str) -> Result<(), RunBundleError> {
+    diagnostic_export_paths()
+        .lock()
+        .map_err(|_| RunBundleError::Storage)?
+        .destinations
+        .remove(token);
+    Ok(())
+}
+
+fn register_completed_export(path: PathBuf) -> Result<String, RunBundleError> {
+    let token = Uuid::new_v4().to_string();
+    let mut paths = diagnostic_export_paths()
+        .lock()
+        .map_err(|_| RunBundleError::Storage)?;
+    if paths.completed.len() >= 16 {
+        paths.completed.clear();
+    }
+    paths.completed.insert(token.clone(), path);
+    Ok(token)
+}
+
+fn completed_export_path(token: &str) -> Result<PathBuf, RunBundleError> {
+    validate_uuid(token).map_err(|_| RunBundleError::NotFound)?;
+    diagnostic_export_paths()
+        .lock()
+        .map_err(|_| RunBundleError::Storage)?
+        .completed
+        .get(token)
+        .cloned()
+        .ok_or(RunBundleError::NotFound)
 }
 
 fn read_bundle_documents(path: &Path) -> Result<BundleDocuments, RunBundleError> {
@@ -865,6 +1117,69 @@ pub fn read_diagnostic_run(
     RunBundleWriter::new(app_data_dir)
         .read_diagnostics(&run_id)
         .map_err(Into::into)
+}
+
+#[tauri::command]
+pub async fn select_diagnostic_export_folder(
+    app: tauri::AppHandle,
+) -> Result<Option<DiagnosticExportSelection>, RunBundleCommandError> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let selected = app.dialog().file().blocking_pick_folder();
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let path = selected
+        .into_path()
+        .map_err(|_| RunBundleCommandError::from(RunBundleError::InvalidDestination))?;
+    register_export_destination(path)
+        .map(Some)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn export_diagnostic_copy(
+    app: tauri::AppHandle,
+    request: DiagnosticExportRequest,
+) -> Result<DiagnosticExportResult, RunBundleCommandError> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| RunBundleCommandError::from(RunBundleError::Storage))?;
+    let destination = export_destination(&request.destination_token)?;
+    let (mut result, exported_path) = RunBundleWriter::new(app_data_dir)
+        .export_diagnostic_copy_to(
+            &request.run_id,
+            destination,
+            request.include_transcript,
+            request.include_audio,
+        )?;
+    consume_export_destination(&request.destination_token)?;
+    result.reveal_token = register_completed_export(exported_path)?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn show_diagnostic_export_in_folder(reveal_token: String) -> Result<(), RunBundleCommandError> {
+    let export_path = completed_export_path(&reveal_token)?;
+    if !export_path.is_dir() {
+        return Err(RunBundleError::NotFound.into());
+    }
+
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("explorer")
+        .arg(&export_path)
+        .spawn();
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(&export_path).spawn();
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open")
+        .arg(&export_path)
+        .spawn();
+
+    result
+        .map(|_| ())
+        .map_err(|_| RunBundleError::Storage.into())
 }
 
 async fn load_documents(
@@ -2646,11 +2961,104 @@ mod run_bundle_writer_tests {
 
     #[test]
     fn diagnostic_export_creates_a_sanitized_local_copy_without_mutating_source() {
-        let source = include_str!("run_bundle.rs");
-        let boundary = ["export_diagnostic", "copy_to"].join("_");
-        assert!(
-            source.contains(&boundary),
-            "a reviewed local-copy export boundary must exist before export behavior can pass"
+        let app_data = tempfile::tempdir().expect("temporary app data");
+        let destination = tempfile::tempdir().expect("temporary selected destination");
+        let writer = RunBundleWriter::new(app_data.path());
+        writer
+            .write_documents(RUN_ID, MEETING_ID, &fixture_documents())
+            .expect("write source bundle");
+        let source_path = app_data
+            .path()
+            .join(RUN_BUNDLE_DIRECTORY)
+            .join(format!("run-{RUN_ID}"));
+        let source_before = REQUIRED_BUNDLE_FILES
+            .into_iter()
+            .map(|name| {
+                (
+                    name,
+                    fs::read(source_path.join(name)).expect("read source artifact"),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        let (result, exported_path) = writer
+            .export_diagnostic_copy_to(RUN_ID, destination.path(), true, true)
+            .expect("create sanitized local copy");
+
+        assert!(result.local_only);
+        assert!(result.transcript_requested);
+        assert!(!result.transcript_included);
+        assert!(result.audio_requested);
+        assert!(!result.audio_included);
+        assert_eq!(
+            validate_run_bundle_dir(exported_path.join("bundle"))
+                .expect("validate copied bundle")
+                .valid,
+            true
         );
+        let manifest =
+            read_json_file(&exported_path.join("export-manifest.json")).expect("export manifest");
+        assert_eq!(manifest["localOnly"], true);
+        assert_eq!(manifest["transcriptRequested"], true);
+        assert_eq!(manifest["transcriptIncluded"], false);
+        assert_eq!(manifest["audioRequested"], true);
+        assert_eq!(manifest["audioIncluded"], false);
+        assert_eq!(manifest["result"], "exported_local_copy");
+        assert!(!serde_json::to_string(&manifest)
+            .expect("manifest serialization")
+            .contains(destination.path().to_string_lossy().as_ref()));
+
+        for (name, before) in source_before {
+            assert_eq!(
+                fs::read(source_path.join(name)).expect("read unchanged source artifact"),
+                before,
+                "source artifact {name} changed during export"
+            );
+        }
+        assert!(fs::read_dir(destination.path())
+            .expect("destination entries")
+            .all(|entry| !entry
+                .expect("destination entry")
+                .file_name()
+                .to_string_lossy()
+                .ends_with(".tmp")));
+    }
+
+    #[test]
+    fn diagnostic_export_rejects_an_unsafe_destination_and_never_overwrites_source() {
+        let app_data = tempfile::tempdir().expect("temporary app data");
+        let writer = RunBundleWriter::new(app_data.path());
+        writer
+            .write_documents(RUN_ID, MEETING_ID, &fixture_documents())
+            .expect("write source bundle");
+        let not_a_directory = app_data.path().join("selected-file");
+        fs::write(&not_a_directory, b"not a directory").expect("seed invalid destination");
+
+        assert_eq!(
+            writer
+                .export_diagnostic_copy_to(RUN_ID, &not_a_directory, false, false)
+                .expect_err("file destination must fail")
+                .code(),
+            "DIAGNOSTIC_EXPORT_INVALID_DESTINATION"
+        );
+        let source_path = app_data
+            .path()
+            .join(RUN_BUNDLE_DIRECTORY)
+            .join(format!("run-{RUN_ID}"));
+        let manifest_before = fs::read(source_path.join("manifest.json"))
+            .expect("read source manifest before containment rejection");
+        assert_eq!(
+            writer
+                .export_diagnostic_copy_to(RUN_ID, &source_path, false, false)
+                .expect_err("source directory destination must fail")
+                .code(),
+            "DIAGNOSTIC_EXPORT_INVALID_DESTINATION"
+        );
+        assert_eq!(
+            fs::read(source_path.join("manifest.json"))
+                .expect("read source manifest after containment rejection"),
+            manifest_before
+        );
+        assert!(source_path.is_dir());
     }
 }

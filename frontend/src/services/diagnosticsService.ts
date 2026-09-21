@@ -129,6 +129,30 @@ export interface DiagnosticCommandError {
   code: string;
 }
 
+export interface DiagnosticExportSelection {
+  token: string;
+  folderName: string;
+}
+
+export interface DiagnosticExportRequest {
+  runId: string;
+  destinationToken: string;
+  includeTranscript: boolean;
+  includeAudio: boolean;
+}
+
+export interface DiagnosticExportResult {
+  runId: string;
+  exportId: string;
+  folderName: string;
+  revealToken: string;
+  transcriptRequested: boolean;
+  transcriptIncluded: boolean;
+  audioRequested: boolean;
+  audioIncluded: boolean;
+  localOnly: boolean;
+}
+
 function normalizeError(error: unknown): DiagnosticCommandError {
   if (error && typeof error === 'object' && 'code' in error && typeof error.code === 'string') {
     return { code: error.code };
@@ -151,5 +175,17 @@ export const diagnosticsService = {
 
   readRun(runId: string): Promise<DiagnosticRunDetail> {
     return invokeDiagnostic('read_diagnostic_run', { runId });
+  },
+
+  selectExportFolder(): Promise<DiagnosticExportSelection | null> {
+    return invokeDiagnostic('select_diagnostic_export_folder');
+  },
+
+  exportLocalCopy(request: DiagnosticExportRequest): Promise<DiagnosticExportResult> {
+    return invokeDiagnostic('export_diagnostic_copy', { request });
+  },
+
+  showExportInFolder(revealToken: string): Promise<void> {
+    return invokeDiagnostic('show_diagnostic_export_in_folder', { revealToken });
   },
 };

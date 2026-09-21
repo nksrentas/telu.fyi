@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { AlertCircle, CheckCircle2, CircleHelp, Copy, RotateCcw } from 'lucide-react';
+import { AlertCircle, CheckCircle2, CircleHelp, Copy, Download, RotateCcw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -12,6 +12,7 @@ import {
   DiagnosticRunSummary,
   DiagnosticStatus,
 } from '@/services/diagnosticsService';
+import { DiagnosticExportDialog } from '@/components/DiagnosticExportDialog';
 
 const UNKNOWN = 'Unknown';
 
@@ -104,7 +105,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function DiagnosticDetail({ detail, onClose }: { detail: DiagnosticRunDetail; onClose: () => void }) {
+function DiagnosticDetail({ detail, onClose, onExport }: { detail: DiagnosticRunDetail; onClose: () => void; onExport: () => void }) {
   return (
     <div className="space-y-6 rounded-lg border border-border bg-card p-4 sm:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -114,7 +115,10 @@ function DiagnosticDetail({ detail, onClose }: { detail: DiagnosticRunDetail; on
           <p className="text-xs text-muted-foreground">Meeting ID</p>
           <CopyId label="meeting ID" value={detail.meetingId} />
         </div>
-        <Button type="button" variant="outline" onClick={onClose}>Back to runs</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" onClick={onExport}><Download aria-hidden="true" />Export diagnostics</Button>
+          <Button type="button" variant="outline" onClick={onClose}>Back to runs</Button>
+        </div>
       </div>
 
       <Separator />
@@ -175,6 +179,7 @@ export function DiagnosticsPanel() {
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -231,7 +236,7 @@ export function DiagnosticsPanel() {
       ) : detailLoading ? (
         <div role="status" className="rounded-lg border border-border bg-card p-6 text-sm text-muted-foreground">Loading diagnostic details…</div>
       ) : detail ? (
-        <DiagnosticDetail detail={detail} onClose={() => setDetail(null)} />
+        <DiagnosticDetail detail={detail} onClose={() => setDetail(null)} onExport={() => setExportOpen(true)} />
       ) : runs.length === 0 ? (
         <div className="rounded-lg border border-border bg-card p-8 text-center">
           <h3 className="text-sm font-semibold text-foreground">No diagnostic runs yet</h3>
@@ -261,6 +266,7 @@ export function DiagnosticsPanel() {
           </div>
         </ScrollArea>
       )}
+      {detail && <DiagnosticExportDialog open={exportOpen} onOpenChange={setExportOpen} runId={detail.runId} />}
     </div>
   );
 }
