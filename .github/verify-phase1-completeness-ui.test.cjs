@@ -16,6 +16,27 @@ const recoveryDialog = readFileSync(
   join(root, 'frontend/src/components/TranscriptRecovery/TranscriptRecovery.tsx'),
   'utf8',
 );
+const completeness = readFileSync(
+  join(root, 'frontend/src/components/MeetingCompleteness.tsx'),
+  'utf8',
+);
+const sidebarProvider = readFileSync(
+  join(root, 'frontend/src/components/Sidebar/SidebarProvider.tsx'),
+  'utf8',
+);
+const sidebar = readFileSync(
+  join(root, 'frontend/src/components/Sidebar/index.tsx'),
+  'utf8',
+);
+const meetingDetails = readFileSync(
+  join(root, 'frontend/src/app/meeting-details/page-content.tsx'),
+  'utf8',
+);
+const globals = readFileSync(join(root, 'frontend/src/app/globals.css'), 'utf8');
+const rustApi = readFileSync(
+  join(root, 'frontend/src-tauri/src/api/api.rs'),
+  'utf8',
+);
 
 test('recovery submits only canonical meeting and final evidence identity to Rust', () => {
   assert.match(recoveryHook, /invoke<RecoveryResult>\(\s*'reconcile_meeting'/);
@@ -65,4 +86,66 @@ test('recovery loading, empty, selection, and delete controls stay explicit', ()
   );
   assert.match(recoveryDialog, />\s*Keep meeting\s*</);
   assert.match(recoveryDialog, />\s*Delete meeting\s*</);
+});
+
+test('shared completeness renders exactly the four authoritative lifecycle labels', () => {
+  for (const copy of [
+    'Complete',
+    'Incomplete ·',
+    'Recovered with gaps ·',
+    'Completion not verified',
+  ]) {
+    assert.match(completeness, new RegExp(copy.replace('·', '\\·')));
+  }
+  for (const icon of ['CheckCircle2', 'AlertTriangle', 'RotateCcw', 'CircleHelp']) {
+    assert.match(completeness, new RegExp(`\\b${icon}\\b`));
+  }
+  assert.match(completeness, /aria-label=\{label\}/);
+});
+
+test('history and detail project Rust lifecycle and completeness without dropping fields', () => {
+  assert.match(rustApi, /pub lifecycle:\s*MeetingLifecycle/);
+  assert.match(rustApi, /pub completeness:\s*MeetingCompleteness/);
+  assert.match(rustApi, /pub gap_count:\s*u64/);
+  assert.match(sidebarProvider, /lifecycle:\s*meeting\.lifecycle/);
+  assert.match(sidebarProvider, /completeness:\s*meeting\.completeness/);
+  assert.match(sidebar, /<MeetingCompleteness/);
+  assert.match(sidebar, /line-clamp-2/);
+  assert.match(meetingDetails, /<MeetingCompleteness/);
+  assert.match(meetingDetails, /variant="detail"/);
+});
+
+test('detail notices and gap review preserve missing and unknown facts', () => {
+  assert.match(
+    completeness,
+    /Some audio or transcript content is missing\. Review the recorded gaps before relying on this meeting\./,
+  );
+  assert.match(
+    completeness,
+    /Recovery preserved the available content, but some audio or transcript content is still missing\./,
+  );
+  assert.match(completeness, /Review gaps/);
+  assert.match(completeness, /sortGapsByRelativeTime/);
+  assert.match(completeness, /Gap type/);
+  assert.match(completeness, /Source/);
+  assert.match(completeness, /Time range/);
+  assert.match(completeness, /Reason/);
+  assert.match(completeness, /Unknown/);
+  assert.match(completeness, /No recorded gaps/);
+  assert.match(
+    completeness,
+    /Telu has no recorded audio or transcript gaps for this meeting\. The meeting status above remains authoritative\./,
+  );
+});
+
+test('zero gaps never promote completion and touched surfaces use Telu tokens', () => {
+  assert.doesNotMatch(
+    completeness,
+    /(gaps\.length|gapCount)\s*={2,3}\s*0[\s\S]{0,100}(Complete|'complete'|"complete")/,
+  );
+  assert.match(completeness, /switch \(completeness\)/);
+  assert.match(globals, /--background:\s*60 16\.7% 96\.3%/);
+  assert.match(globals, /--primary:\s*239 74\.3% 64\.9%/);
+  assert.match(globals, /--destructive:\s*4 100% 69\.2%/);
+  assert.doesNotMatch(completeness, /#67E8C5|fresh-mint|Fresh Mint/i);
 });

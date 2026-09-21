@@ -1,0 +1,8 @@
+{
+  "command": "node --test .github/verify-phase1-completeness-ui.test.cjs",
+  "exitCode": 1,
+  "output": "TAP version 13\nok 1 - recovery submits only canonical meeting and final evidence identity to Rust\nok 2 - authoritative recovery updates the existing cache candidate without removal or duplication\nok 3 - recovery remains in the dialog and renders authoritative result actions\nok 4 - recovery loading, empty, selection, and delete controls stay explicit\nnot ok 5 - shared completeness renders exactly the four authoritative lifecycle labels\nnot ok 6 - history and detail project Rust lifecycle and completeness without dropping fields\nnot ok 7 - detail notices and gap review preserve missing and unknown facts\nnot ok 8 - zero gaps never promote completion and touched surfaces use Telu tokens\n1..8\n# tests 8\n# pass 4\n# fail 4\n# cancelled 0",
+  "targetTest": "shared completeness renders exactly the four authoritative lifecycle labels",
+  "expected": "History, detail, and recovery render the four Rust-owned completeness classes with accessible text and icons; non-complete detail states retain notices and a deterministic gap review with explicit unknowns; zero gaps never promote lifecycle; touched surfaces use Telu tokens",
+  "actual": "Four named assertions failed because the shared component was an intentional RED stub, Rust DTOs dropped lifecycle/completeness/gaps, history and detail had no shared status surface, and the global token layer still used the prior palette"
+}
