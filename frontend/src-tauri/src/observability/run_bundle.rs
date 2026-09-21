@@ -4,6 +4,7 @@ use crate::audio::recording_saver::write_atomic_file;
 use crate::database::repositories::evaluation::EVALUATION_SCHEMA_VERSION;
 use crate::observability::resource_sampler::RESOURCE_SCHEMA_VERSION;
 use crate::observability::stage_clock::STAGE_SCHEMA_VERSION;
+use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{Row, SqlitePool};
@@ -1201,6 +1202,13 @@ fn validate_manifest(
     {
         errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
     }
+    let started = parsed_rfc3339_field(manifest, "startedAtUtc");
+    let finalized = parsed_rfc3339_field(manifest, "finalizedAtUtc");
+    if started.is_none() || finalized.is_none() {
+        errors.insert("RUN_BUNDLE_MALFORMED".to_string());
+    } else if finalized < started {
+        errors.insert("RUN_BUNDLE_ORDER_VIOLATION".to_string());
+    }
 }
 
 fn validate_environment(
@@ -1358,6 +1366,7 @@ fn validate_stage_lines(
             errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
             continue;
         }
+        validate_rfc3339_field(record, "observedAtUtc", errors);
         let Some(rank) = stage.and_then(|name| ranks.get(name).copied()) else {
             errors.insert("RUN_BUNDLE_RESERVED_STAGE".to_string());
             continue;
@@ -1431,6 +1440,7 @@ fn validate_queue_lines(records: &[Value], run_id: &str, errors: &mut BTreeSet<S
             errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
             continue;
         }
+        validate_rfc3339_field(record, "observedAtUtc", errors);
         let depth = depth.unwrap_or_default();
         let terminal = completed
             .unwrap_or_default()
@@ -1476,6 +1486,7 @@ fn validate_ordered_lines(
             errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
             continue;
         }
+        validate_rfc3339_field(record, "observedAtUtc", errors);
         let order = (offset.unwrap_or_default(), sequence.unwrap_or_default());
         if last_order.is_some_and(|previous| previous > order) {
             errors.insert("RUN_BUNDLE_ORDER_VIOLATION".to_string());
@@ -1506,6 +1517,7 @@ fn validate_route_lines(
             errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
             continue;
         }
+        validate_rfc3339_field(record, "observedAtUtc", errors);
         let order = (
             offset.unwrap_or_default(),
             record
@@ -1573,6 +1585,11 @@ fn validate_result(
         .and_then(Value::as_array)
         .map_or(0, Vec::len);
     let terminal = result.get("terminal").filter(|value| !value.is_null());
+    validate_result_evidence(result, errors);
+    validate_result_gaps(result, errors);
+    if let Some(terminal) = terminal {
+        validate_terminal(terminal, meeting_id, errors);
+    }
     let count_matches = |field: &str, expected: usize| {
         result
             .get("counts")
@@ -1599,6 +1616,108 @@ fn validate_result(
             != u64::try_from(gaps).ok()
     {
         errors.insert("RUN_BUNDLE_MISSING_REQUIRED_EVIDENCE".to_string());
+    }
+}
+
+fn validate_result_evidence(result: &Value, errors: &mut BTreeSet<String>) {
+    let Some(records) = result.get("evidenceCommits").and_then(Value::as_array) else {
+        errors.insert("RUN_BUNDLE_MISSING_REQUIRED_EVIDENCE".to_string());
+        return;
+    };
+    let mut last_sequence = None;
+    for record in records {
+        let sequence = record.get("sequence").and_then(Value::as_u64);
+        let evidence_id = record.get("evidenceId").and_then(Value::as_str);
+        if sequence.is_none() || evidence_id.map_or(true, |value| validate_uuid(value).is_err()) {
+            errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
+        }
+        validate_rfc3339_field(record, "committedAtUtc", errors);
+        if sequence.is_some_and(|current| last_sequence.is_some_and(|previous| previous >= current))
+        {
+            errors.insert("RUN_BUNDLE_ORDER_VIOLATION".to_string());
+        }
+        if sequence.is_some() {
+            last_sequence = sequence;
+        }
+    }
+}
+
+fn validate_result_gaps(result: &Value, errors: &mut BTreeSet<String>) {
+    let Some(records) = result.get("gaps").and_then(Value::as_array) else {
+        errors.insert("RUN_BUNDLE_MISSING_REQUIRED_EVIDENCE".to_string());
+        return;
+    };
+    let mut last_sequence = None;
+    for record in records {
+        let sequence = record.get("sequence").and_then(Value::as_u64);
+        let work_id = record.get("workId").and_then(Value::as_str);
+        let gap_kind = record.get("gapKind").and_then(Value::as_str);
+        let reason_code = record.get("reasonCode").and_then(Value::as_str);
+        let start = optional_u64_field(record, "audioStartMs");
+        let end = optional_u64_field(record, "audioEndMs");
+        if sequence.is_none()
+            || work_id.map_or(true, str::is_empty)
+            || gap_kind.map_or(true, |value| !is_safe_reason(value))
+            || reason_code.map_or(true, |value| !is_safe_reason(value))
+            || start.is_err()
+            || end.is_err()
+        {
+            errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
+        }
+        if sequence.is_some_and(|current| last_sequence.is_some_and(|previous| previous >= current))
+        {
+            errors.insert("RUN_BUNDLE_ORDER_VIOLATION".to_string());
+        }
+        if sequence.is_some() {
+            last_sequence = sequence;
+        }
+        if let (Ok(start), Ok(end)) = (start, end) {
+            if start.is_some() != end.is_some()
+                || start.zip(end).is_some_and(|(start, end)| start > end)
+            {
+                errors.insert("RUN_BUNDLE_ORDER_VIOLATION".to_string());
+            }
+        }
+    }
+}
+
+fn validate_terminal(terminal: &Value, meeting_id: &str, errors: &mut BTreeSet<String>) {
+    let lifecycle = terminal.get("lifecycle").and_then(Value::as_str);
+    if terminal.get("sequence").and_then(Value::as_u64).is_none()
+        || terminal.get("meetingId").and_then(Value::as_str) != Some(meeting_id)
+        || terminal
+            .get("observedOffsetMicros")
+            .and_then(Value::as_u64)
+            .is_none()
+        || !matches!(lifecycle, Some("complete" | "incomplete"))
+        || terminal
+            .get("deadlineMs")
+            .and_then(Value::as_u64)
+            .map_or(true, |value| value == 0)
+        || ["remainingWorkCount", "gapCount", "errorCount"]
+            .iter()
+            .any(|field| terminal.get(*field).and_then(Value::as_u64).is_none())
+    {
+        errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
+    }
+    validate_rfc3339_field(terminal, "observedAtUtc", errors);
+    validate_rfc3339_field(terminal, "deadlineAtUtc", errors);
+}
+
+fn parsed_rfc3339_field(value: &Value, field: &str) -> Option<DateTime<FixedOffset>> {
+    DateTime::parse_from_rfc3339(value.get(field)?.as_str()?).ok()
+}
+
+fn validate_rfc3339_field(value: &Value, field: &str, errors: &mut BTreeSet<String>) {
+    if parsed_rfc3339_field(value, field).is_none() {
+        errors.insert("RUN_BUNDLE_MALFORMED".to_string());
+    }
+}
+
+fn optional_u64_field(value: &Value, field: &str) -> Result<Option<u64>, ()> {
+    match value.get(field) {
+        None | Some(Value::Null) => Ok(None),
+        Some(value) => value.as_u64().map(Some).ok_or(()),
     }
 }
 
