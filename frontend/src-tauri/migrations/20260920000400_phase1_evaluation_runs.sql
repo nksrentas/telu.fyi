@@ -137,4 +137,62 @@ CREATE TABLE evaluation_error_records (
     FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
 );
 
+CREATE TABLE evaluation_evidence_commits (
+    run_id TEXT NOT NULL,
+    sequence INTEGER NOT NULL CHECK (sequence >= 0),
+    evidence_id TEXT NOT NULL,
+    committed_at_utc TEXT NOT NULL,
+    record_fingerprint TEXT NOT NULL,
+    PRIMARY KEY (run_id, sequence),
+    UNIQUE (run_id, evidence_id),
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    FOREIGN KEY (evidence_id) REFERENCES transcript_evidence(evidence_id) ON DELETE CASCADE
+);
+
+CREATE TABLE evaluation_gap_records (
+    run_id TEXT NOT NULL,
+    sequence INTEGER NOT NULL CHECK (sequence >= 0),
+    work_id TEXT NOT NULL,
+    gap_kind TEXT NOT NULL,
+    reason_code TEXT NOT NULL,
+    audio_start_ms INTEGER CHECK (audio_start_ms >= 0),
+    audio_end_ms INTEGER CHECK (audio_end_ms >= 0),
+    record_fingerprint TEXT NOT NULL,
+    PRIMARY KEY (run_id, sequence),
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+);
+
+CREATE TABLE evaluation_terminal_records (
+    run_id TEXT NOT NULL,
+    sequence INTEGER NOT NULL CHECK (sequence >= 0),
+    meeting_id TEXT NOT NULL,
+    observed_offset_micros INTEGER NOT NULL CHECK (observed_offset_micros >= 0),
+    observed_at_utc TEXT NOT NULL,
+    lifecycle TEXT NOT NULL,
+    deadline_at_utc TEXT NOT NULL,
+    deadline_ms INTEGER NOT NULL CHECK (deadline_ms > 0),
+    remaining_work_count INTEGER NOT NULL CHECK (remaining_work_count >= 0),
+    gap_count INTEGER NOT NULL CHECK (gap_count >= 0),
+    error_count INTEGER NOT NULL CHECK (error_count >= 0),
+    record_fingerprint TEXT NOT NULL,
+    PRIMARY KEY (run_id, sequence),
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE,
+    FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+);
+
+CREATE TABLE evaluation_run_summaries (
+    run_id TEXT PRIMARY KEY NOT NULL,
+    stage_count INTEGER NOT NULL CHECK (stage_count >= 0),
+    queue_count INTEGER NOT NULL CHECK (queue_count >= 0),
+    resource_count INTEGER NOT NULL CHECK (resource_count >= 0),
+    route_count INTEGER NOT NULL CHECK (route_count >= 0),
+    outbound_count INTEGER NOT NULL CHECK (outbound_count >= 0),
+    error_count INTEGER NOT NULL CHECK (error_count >= 0),
+    evidence_count INTEGER NOT NULL CHECK (evidence_count >= 0),
+    gap_count INTEGER NOT NULL CHECK (gap_count >= 0),
+    terminal_count INTEGER NOT NULL CHECK (terminal_count >= 0),
+    aggregated_at_utc TEXT NOT NULL,
+    FOREIGN KEY (run_id) REFERENCES evaluation_runs(run_id) ON DELETE CASCADE
+);
+
 CREATE INDEX idx_evaluation_runs_meeting ON evaluation_runs(meeting_id);

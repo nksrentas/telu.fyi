@@ -1,8 +1,9 @@
 use crate::api::{TranscriptSearchResult, TranscriptSegment};
 use crate::database::models::{TranscriptEvidence, TranscriptEvidenceInput};
+use crate::database::repositories::evaluation::EvaluationRepository;
 use chrono::Utc;
 use sqlx::{Connection, Error as SqlxError, SqlitePool};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub struct TranscriptsRepository;
@@ -84,6 +85,35 @@ impl TranscriptsRepository {
         }
 
         transaction.commit().await?;
+        if let Err(index_error) = EvaluationRepository::append_committed_evidence(
+            pool,
+            &evidence.meeting_id,
+            &evidence.evidence_id,
+            evidence.sequence as u64,
+            now,
+        )
+        .await
+        {
+            warn!(
+                code = index_error.code(),
+                "final evidence committed but evaluation indexing failed"
+            );
+            if let Err(error_index_error) = EvaluationRepository::append_error_for_meeting(
+                pool,
+                &evidence.meeting_id,
+                "transcript_evidence",
+                "EVIDENCE_INDEX_FAILED",
+                None,
+                Some(evidence.evidence_id.clone()),
+            )
+            .await
+            {
+                warn!(
+                    code = error_index_error.code(),
+                    "evaluation indexing failure could not be recorded"
+                );
+            }
+        }
         Ok(persisted)
     }
 

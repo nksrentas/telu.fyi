@@ -23,9 +23,16 @@ use uuid::Uuid;
 use crate::database::repositories::meeting::{
     FinalizationGapInput, FinalizeMeetingInput, MeetingCompleteness, MeetingsRepository,
 };
+use crate::database::repositories::evaluation::{
+    EvaluationErrorRecord, EvaluationOutboundRecord, EvaluationRepository,
+    EvaluationRouteRecord, EvaluationRunManifest, EvaluationTerminalRunInput,
+    EVALUATION_SCHEMA_VERSION,
+};
 pub use crate::database::repositories::meeting::StartMeetingResult;
 pub use crate::database::repositories::meeting::FinalizationSnapshot;
+use crate::observability::ResourceSampler;
 use crate::state::AppState;
+use crate::trust::provider_route::EffectiveRoute;
 
 use super::{
     recording_manager::RecordingStartError,
@@ -149,6 +156,7 @@ const TRANSCRIPTION_RUNTIME_START_ERROR_CODE: &str =
     "TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED";
 const TRANSCRIPTION_RUNTIME_USER_MESSAGE: &str = "Speech recognition could not initialize. Restart Meetily. If the problem continues, repair or reinstall the app.";
 const MEETING_IDENTITY_PERSISTENCE_ERROR_CODE: &str = "MEETING_IDENTITY_PERSISTENCE_FAILED";
+const TERMINAL_EVALUATION_ERROR_SEQUENCE_BASE: u64 = 1_u64 << 62;
 
 // ============================================================================
 // PUBLIC TYPES
@@ -593,6 +601,130 @@ fn recording_database_pool<R: Runtime>(app: &AppHandle<R>) -> Result<SqlitePool,
         .ok_or_else(|| MEETING_IDENTITY_PERSISTENCE_ERROR_CODE.to_string())
 }
 
+async fn initialize_evaluation_run(pool: &SqlitePool, queue_ledger: &QueueLedger) {
+    let stage_clock = queue_ledger.stage_clock();
+    let manifest = EvaluationRunManifest {
+        schema_version: EVALUATION_SCHEMA_VERSION,
+        run_id: stage_clock.run_id().to_string(),
+        meeting_id: stage_clock.meeting_id().to_string(),
+        scenario_version: "recording_runtime_v1".to_string(),
+        started_at_utc: stage_clock.started_at_utc(),
+    };
+    if let Err(error) = EvaluationRepository::create_run(pool, &manifest).await {
+        warn!(
+            "Evaluation run initialization failed; code={}",
+            error.code()
+        );
+    }
+}
+
+async fn persist_terminal_evaluation(
+    pool: &SqlitePool,
+    queue_ledger: &QueueLedger,
+    finalization_input: &FinalizeMeetingInput,
+    finalization: &FinalizationSnapshot,
+) {
+    let stage_clock = queue_ledger.stage_clock();
+    let observed_at = Instant::now();
+    let observed_at_utc = Utc::now();
+    let run_id = stage_clock.run_id().to_string();
+
+    let mut resources = Vec::new();
+    let mut supplemental_errors = Vec::new();
+    if stage_clock.snapshot().overflowed > 0 {
+        supplemental_errors.push("STAGE_RECORD_OVERFLOW".to_string());
+    }
+    match ResourceSampler::new(Arc::clone(&stage_clock)).and_then(|mut sampler| sampler.sample()) {
+        Ok(sample) => resources.push(sample),
+        Err(_error) => supplemental_errors.push("RESOURCE_SAMPLE_FAILED".to_string()),
+    }
+
+    let outbound_snapshot = crate::trust::outbound::active_outbound_ledger().snapshot();
+    if outbound_snapshot.overflow_count > 0 {
+        supplemental_errors.push("OUTBOUND_LEDGER_OVERFLOW".to_string());
+    }
+    let outbound_attempts = outbound_snapshot
+        .attempts
+        .into_iter()
+        .filter(|attempt| attempt.meeting_id.as_deref() == Some(finalization.meeting_id.as_str()))
+        .collect::<Vec<_>>();
+    let routes = outbound_attempts
+        .iter()
+        .map(|attempt| EvaluationRouteRecord {
+            run_id: run_id.clone(),
+            meeting_id: finalization.meeting_id.clone(),
+            sequence: attempt.sequence,
+            observed_offset_micros: attempt.monotonic_offset_ns / 1_000,
+            observed_at_utc: attempt.observed_at_utc,
+            route: EffectiveRoute {
+                capability: attempt.route.capability,
+                provider_id: attempt.route.provider_id.clone(),
+                model_id: attempt.route.model_id.clone(),
+                location_class: Some(attempt.route.location_class),
+                sanitized_origin: Some(attempt.route.sanitized_origin.clone()),
+                encrypted: attempt.route.encrypted,
+                validation_state: attempt.route.validation_state,
+                resolved_addresses: attempt.route.resolved_addresses.clone(),
+            },
+        })
+        .collect::<Vec<_>>();
+    let outbound = outbound_attempts
+        .into_iter()
+        .map(|attempt| EvaluationOutboundRecord::from_attempt(run_id.clone(), attempt))
+        .collect::<Vec<_>>();
+
+    let mut reason_codes = finalization.reason_codes.clone();
+    reason_codes.append(&mut supplemental_errors);
+    reason_codes.sort();
+    reason_codes.dedup();
+    let errors = reason_codes
+        .into_iter()
+        .enumerate()
+        .map(|(sequence, redacted_code)| EvaluationErrorRecord {
+            run_id: run_id.clone(),
+            sequence: TERMINAL_EVALUATION_ERROR_SEQUENCE_BASE.saturating_add(sequence as u64),
+            observed_offset_micros: stage_clock.offset_micros_at(observed_at),
+            observed_at_utc,
+            component: "finalization".to_string(),
+            redacted_code,
+            work_id: None,
+            evidence_id: None,
+        })
+        .collect::<Vec<_>>();
+
+    let input = EvaluationTerminalRunInput {
+        run_id,
+        meeting_id: finalization.meeting_id.clone(),
+        observed_offset_micros: stage_clock.offset_micros_at(observed_at),
+        observed_at_utc,
+        lifecycle: finalization.lifecycle.as_str().to_string(),
+        deadline_at_utc: finalization.deadline_at_utc.clone(),
+        deadline_ms: finalization.deadline_ms,
+        remaining_work_count: finalization.remaining_work_ids.len() as u64,
+        queue: finalization.queue.clone(),
+        stages: stage_clock.drain(),
+        resources,
+        routes,
+        outbound,
+        gaps: finalization_input.gaps.clone(),
+        errors,
+    };
+    match EvaluationRepository::persist_terminal_run(pool, &input).await {
+        Ok(result) if !result.summary_written => warn!(
+            "Raw evaluation evidence committed without aggregate; code={}",
+            result
+                .aggregation_error_code
+                .as_deref()
+                .unwrap_or("SUMMARY_AGGREGATION_FAILED")
+        ),
+        Ok(_) => {}
+        Err(error) => warn!(
+            "Terminal evaluation evidence persistence failed; code={}",
+            error.code()
+        ),
+    }
+}
+
 fn map_start_meeting_failure<R: Runtime>(
     app: &AppHandle<R>,
     failure: StartMeetingFailure,
@@ -934,6 +1066,7 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     let queue_ledger = session
         .queue_ledger()
         .expect("successful recording start initializes the transcription queue ledger");
+    initialize_evaluation_run(&database_pool, &queue_ledger).await;
     let task_handle = transcription::start_transcription_task(
         app.clone(),
         transcription_receiver,
@@ -1143,6 +1276,7 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     let queue_ledger = session
         .queue_ledger()
         .expect("successful recording start initializes the transcription queue ledger");
+    initialize_evaluation_run(&database_pool, &queue_ledger).await;
     let task_handle = transcription::start_transcription_task(
         app.clone(),
         transcription_receiver,
@@ -1445,6 +1579,7 @@ pub async fn stop_recording<R: Runtime>(
     IS_RECORDING.store(false, Ordering::SeqCst);
     CURRENT_MEETING.lock().unwrap().take();
     let finalization = finalization_result?;
+    persist_terminal_evaluation(&database_pool, &queue_ledger, &input, &finalization).await;
     if let Err(error) = manager.mirror_committed_finalization(&finalization) {
         warn!(
             "Terminal finalization committed but recording metadata mirror failed: {error}"

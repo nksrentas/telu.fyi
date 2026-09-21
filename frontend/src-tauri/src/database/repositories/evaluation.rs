@@ -126,6 +126,36 @@ pub struct EvaluationTerminalPersistResult {
     pub aggregation_error_code: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct EvaluationEvidenceCommit {
+    run_id: String,
+    sequence: u64,
+    evidence_id: String,
+    committed_at_utc: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct EvaluationGapRecord {
+    run_id: String,
+    sequence: u64,
+    gap: FinalizationGapInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct EvaluationTerminalRecord {
+    run_id: String,
+    sequence: u64,
+    meeting_id: String,
+    observed_offset_micros: u64,
+    observed_at_utc: DateTime<Utc>,
+    lifecycle: String,
+    deadline_at_utc: String,
+    deadline_ms: u64,
+    remaining_work_count: u64,
+    gap_count: u64,
+    error_count: u64,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum EvaluationRepositoryError {
     #[error("invalid evaluation record")]
@@ -136,24 +166,204 @@ pub enum EvaluationRepositoryError {
     Storage(#[from] SqlxError),
 }
 
+impl EvaluationRepositoryError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidRecord => "EVALUATION_INVALID_RECORD",
+            Self::IdentityConflict => "EVALUATION_IDENTITY_CONFLICT",
+            Self::Storage(_) => "EVALUATION_STORAGE_FAILED",
+        }
+    }
+}
+
 pub struct EvaluationRepository;
 
 impl EvaluationRepository {
-    pub async fn append_committed_evidence(
-        _pool: &SqlitePool,
-        _meeting_id: &str,
-        _evidence_id: &str,
-        _sequence: u64,
-        _committed_at_utc: DateTime<Utc>,
+    pub async fn append_error_for_meeting(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        component: &str,
+        redacted_code: &str,
+        work_id: Option<String>,
+        evidence_id: Option<String>,
     ) -> Result<AppendBatchResult, EvaluationRepositoryError> {
-        Err(EvaluationRepositoryError::InvalidRecord)
+        let run_id = run_id_for_meeting(pool, meeting_id).await?;
+        let sequence = next_error_sequence(pool, &run_id).await?;
+        Self::append_batch(
+            pool,
+            &run_id,
+            &[EvaluationRecord::Error(EvaluationErrorRecord {
+                run_id: run_id.clone(),
+                sequence,
+                observed_offset_micros: 0,
+                observed_at_utc: Utc::now(),
+                component: component.to_string(),
+                redacted_code: redacted_code.to_string(),
+                work_id,
+                evidence_id,
+            })],
+        )
+        .await
+    }
+
+    pub async fn append_committed_evidence(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        evidence_id: &str,
+        sequence: u64,
+        committed_at_utc: DateTime<Utc>,
+    ) -> Result<AppendBatchResult, EvaluationRepositoryError> {
+        validate_safe_identifier(meeting_id)?;
+        validate_safe_identifier(evidence_id)?;
+        let run_id = run_id_for_meeting(pool, meeting_id).await?;
+        let record = EvaluationEvidenceCommit {
+            run_id,
+            sequence,
+            evidence_id: evidence_id.to_string(),
+            committed_at_utc,
+        };
+        let mut transaction = pool.begin_with("BEGIN IMMEDIATE").await?;
+        let product_commit_exists = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM transcript_evidence
+             WHERE evidence_id = ? AND meeting_id = ? AND sequence = ?",
+        )
+        .bind(evidence_id)
+        .bind(meeting_id)
+        .bind(to_i64(sequence)?)
+        .fetch_one(&mut *transaction)
+        .await?;
+        if product_commit_exists != 1 {
+            transaction.rollback().await?;
+            return Err(EvaluationRepositoryError::InvalidRecord);
+        }
+        let outcome = append_evidence_commit(&mut transaction, &record).await?;
+        transaction.commit().await?;
+        Ok(AppendBatchResult {
+            attempted: 1,
+            inserted: usize::from(outcome == AppendOutcome::Inserted),
+            already_present: usize::from(outcome == AppendOutcome::AlreadyPresent),
+        })
     }
 
     pub async fn persist_terminal_run(
-        _pool: &SqlitePool,
-        _input: &EvaluationTerminalRunInput,
+        pool: &SqlitePool,
+        input: &EvaluationTerminalRunInput,
     ) -> Result<EvaluationTerminalPersistResult, EvaluationRepositoryError> {
-        Err(EvaluationRepositoryError::InvalidRecord)
+        validate_terminal_input(input)?;
+        let mut transaction = pool.begin_with("BEGIN IMMEDIATE").await?;
+        verify_run_identity(&mut transaction, &input.run_id, &input.meeting_id).await?;
+
+        let mut result = AppendBatchResult {
+            attempted: 0,
+            inserted: 0,
+            already_present: 0,
+        };
+        let mut records = Vec::with_capacity(
+            input.stages.len()
+                + input.resources.len()
+                + input.routes.len()
+                + input.outbound.len()
+                + input.errors.len()
+                + 1,
+        );
+        records.extend(input.stages.iter().cloned().map(EvaluationRecord::Stage));
+        records.push(EvaluationRecord::Queue(EvaluationQueueRecord {
+            run_id: input.run_id.clone(),
+            sequence: 0,
+            observed_offset_micros: input.observed_offset_micros,
+            observed_at_utc: input.observed_at_utc,
+            snapshot: input.queue.clone(),
+        }));
+        records.extend(
+            input
+                .resources
+                .iter()
+                .cloned()
+                .map(EvaluationRecord::Resource),
+        );
+        records.extend(input.routes.iter().cloned().map(EvaluationRecord::Route));
+        records.extend(
+            input
+                .outbound
+                .iter()
+                .cloned()
+                .map(EvaluationRecord::Outbound),
+        );
+        records.extend(input.errors.iter().cloned().map(EvaluationRecord::Error));
+
+        for record in &records {
+            validate_record_run_id(record, &input.run_id)?;
+            result.attempted += 1;
+            accumulate_outcome(&mut result, append_record(&mut transaction, record).await?);
+        }
+        for (sequence, gap) in input.gaps.iter().enumerate() {
+            let record = EvaluationGapRecord {
+                run_id: input.run_id.clone(),
+                sequence: u64::try_from(sequence)
+                    .map_err(|_| EvaluationRepositoryError::InvalidRecord)?,
+                gap: gap.clone(),
+            };
+            result.attempted += 1;
+            accumulate_outcome(
+                &mut result,
+                append_gap_record(&mut transaction, &record).await?,
+            );
+        }
+        let terminal = EvaluationTerminalRecord {
+            run_id: input.run_id.clone(),
+            sequence: 0,
+            meeting_id: input.meeting_id.clone(),
+            observed_offset_micros: input.observed_offset_micros,
+            observed_at_utc: input.observed_at_utc,
+            lifecycle: input.lifecycle.clone(),
+            deadline_at_utc: input.deadline_at_utc.clone(),
+            deadline_ms: input.deadline_ms,
+            remaining_work_count: input.remaining_work_count,
+            gap_count: u64::try_from(input.gaps.len())
+                .map_err(|_| EvaluationRepositoryError::InvalidRecord)?,
+            error_count: u64::try_from(input.errors.len())
+                .map_err(|_| EvaluationRepositoryError::InvalidRecord)?,
+        };
+        result.attempted += 1;
+        accumulate_outcome(
+            &mut result,
+            append_terminal_record(&mut transaction, &terminal).await?,
+        );
+        transaction.commit().await?;
+
+        match write_summary_aggregate(pool, &input.run_id).await {
+            Ok(()) => Ok(EvaluationTerminalPersistResult {
+                raw_records_inserted: result.inserted,
+                raw_records_already_present: result.already_present,
+                summary_written: true,
+                aggregation_error_code: None,
+            }),
+            Err(_error) => {
+                let next_sequence = next_error_sequence(pool, &input.run_id).await?;
+                let aggregation_error = EvaluationErrorRecord {
+                    run_id: input.run_id.clone(),
+                    sequence: next_sequence,
+                    observed_offset_micros: input.observed_offset_micros,
+                    observed_at_utc: input.observed_at_utc,
+                    component: "evaluation_summary".to_string(),
+                    redacted_code: "SUMMARY_AGGREGATION_FAILED".to_string(),
+                    work_id: None,
+                    evidence_id: None,
+                };
+                Self::append_batch(
+                    pool,
+                    &input.run_id,
+                    &[EvaluationRecord::Error(aggregation_error)],
+                )
+                .await?;
+                Ok(EvaluationTerminalPersistResult {
+                    raw_records_inserted: result.inserted,
+                    raw_records_already_present: result.already_present,
+                    summary_written: false,
+                    aggregation_error_code: Some("SUMMARY_AGGREGATION_FAILED".to_string()),
+                })
+            }
+        }
     }
 
     pub async fn create_run(
@@ -241,6 +451,83 @@ enum AppendOutcome {
     AlreadyPresent,
 }
 
+fn accumulate_outcome(result: &mut AppendBatchResult, outcome: AppendOutcome) {
+    match outcome {
+        AppendOutcome::Inserted => result.inserted += 1,
+        AppendOutcome::AlreadyPresent => result.already_present += 1,
+    }
+}
+
+async fn run_id_for_meeting(
+    pool: &SqlitePool,
+    meeting_id: &str,
+) -> Result<String, EvaluationRepositoryError> {
+    sqlx::query_scalar("SELECT run_id FROM evaluation_runs WHERE meeting_id = ?")
+        .bind(meeting_id)
+        .fetch_optional(pool)
+        .await?
+        .ok_or(EvaluationRepositoryError::InvalidRecord)
+}
+
+async fn verify_run_identity(
+    transaction: &mut Transaction<'_, Sqlite>,
+    run_id: &str,
+    meeting_id: &str,
+) -> Result<(), EvaluationRepositoryError> {
+    let count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM evaluation_runs WHERE run_id = ? AND meeting_id = ?",
+    )
+    .bind(run_id)
+    .bind(meeting_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    if count != 1 {
+        return Err(EvaluationRepositoryError::IdentityConflict);
+    }
+    Ok(())
+}
+
+fn validate_terminal_input(
+    input: &EvaluationTerminalRunInput,
+) -> Result<(), EvaluationRepositoryError> {
+    validate_safe_identifier(&input.run_id)?;
+    validate_safe_identifier(&input.meeting_id)?;
+    validate_safe_identifier(&input.lifecycle)?;
+    parse_utc(input.deadline_at_utc.clone())?;
+    if input.deadline_ms == 0 {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    validate_queue(&input.queue)?;
+    for stage in &input.stages {
+        if stage.run_id != input.run_id || stage.meeting_id != input.meeting_id {
+            return Err(EvaluationRepositoryError::IdentityConflict);
+        }
+    }
+    for resource in &input.resources {
+        if resource.run_id != input.run_id {
+            return Err(EvaluationRepositoryError::IdentityConflict);
+        }
+    }
+    for route in &input.routes {
+        if route.run_id != input.run_id || route.meeting_id != input.meeting_id {
+            return Err(EvaluationRepositoryError::IdentityConflict);
+        }
+    }
+    for outbound in &input.outbound {
+        if outbound.run_id != input.run_id
+            || outbound.meeting_id.as_deref() != Some(input.meeting_id.as_str())
+        {
+            return Err(EvaluationRepositoryError::IdentityConflict);
+        }
+    }
+    for error in &input.errors {
+        if error.run_id != input.run_id {
+            return Err(EvaluationRepositoryError::IdentityConflict);
+        }
+    }
+    Ok(())
+}
+
 async fn append_record(
     transaction: &mut Transaction<'_, Sqlite>,
     record: &EvaluationRecord,
@@ -278,6 +565,210 @@ fn checked_existing(
         Some(_) => Err(EvaluationRepositoryError::IdentityConflict),
         None => Ok(None),
     }
+}
+
+async fn append_evidence_commit(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationEvidenceCommit,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    let existing_evidence = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM evaluation_evidence_commits
+         WHERE run_id = ? AND evidence_id = ?",
+    )
+    .bind(&record.run_id)
+    .bind(&record.evidence_id)
+    .fetch_one(&mut **transaction)
+    .await?;
+    if existing_evidence == 1 {
+        return Ok(AppendOutcome::AlreadyPresent);
+    }
+    let fingerprint = fingerprint(&(&record.run_id, record.sequence, &record.evidence_id))?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_evidence_commits",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_evidence_commits (
+            run_id, sequence, evidence_id, committed_at_utc, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(&record.evidence_id)
+    .bind(record.committed_at_utc.to_rfc3339())
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn append_gap_record(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationGapRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    validate_safe_identifier(&record.gap.work_id)?;
+    validate_safe_identifier(&record.gap.gap_kind)?;
+    validate_redacted_code(Some(&record.gap.reason_code))?;
+    if matches!(
+        (record.gap.audio_start_ms, record.gap.audio_end_ms),
+        (Some(start), Some(end)) if end < start
+    ) {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_gap_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_gap_records (
+            run_id, sequence, work_id, gap_kind, reason_code,
+            audio_start_ms, audio_end_ms, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(&record.gap.work_id)
+    .bind(&record.gap.gap_kind)
+    .bind(&record.gap.reason_code)
+    .bind(optional_i64(record.gap.audio_start_ms)?)
+    .bind(optional_i64(record.gap.audio_end_ms)?)
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn append_terminal_record(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationTerminalRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_terminal_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_terminal_records (
+            run_id, sequence, meeting_id, observed_offset_micros, observed_at_utc,
+            lifecycle, deadline_at_utc, deadline_ms, remaining_work_count,
+            gap_count, error_count, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(&record.meeting_id)
+    .bind(to_i64(record.observed_offset_micros)?)
+    .bind(record.observed_at_utc.to_rfc3339())
+    .bind(&record.lifecycle)
+    .bind(&record.deadline_at_utc)
+    .bind(to_i64(record.deadline_ms)?)
+    .bind(to_i64(record.remaining_work_count)?)
+    .bind(to_i64(record.gap_count)?)
+    .bind(to_i64(record.error_count)?)
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn write_summary_aggregate(
+    pool: &SqlitePool,
+    run_id: &str,
+) -> Result<(), EvaluationRepositoryError> {
+    let mut transaction = pool.begin().await?;
+    let tables = [
+        "evaluation_stage_records",
+        "evaluation_queue_records",
+        "evaluation_resource_records",
+        "evaluation_route_records",
+        "evaluation_outbound_records",
+        "evaluation_error_records",
+        "evaluation_evidence_commits",
+        "evaluation_gap_records",
+        "evaluation_terminal_records",
+    ];
+    let mut counts = Vec::with_capacity(tables.len());
+    for table in tables {
+        let sql = format!("SELECT COUNT(*) FROM {table} WHERE run_id = ?");
+        counts.push(
+            sqlx::query_scalar::<_, i64>(&sql)
+                .bind(run_id)
+                .fetch_one(&mut *transaction)
+                .await?,
+        );
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_run_summaries (
+            run_id, stage_count, queue_count, resource_count, route_count,
+            outbound_count, error_count, evidence_count, gap_count,
+            terminal_count, aggregated_at_utc
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(run_id) DO UPDATE SET
+            stage_count = excluded.stage_count,
+            queue_count = excluded.queue_count,
+            resource_count = excluded.resource_count,
+            route_count = excluded.route_count,
+            outbound_count = excluded.outbound_count,
+            error_count = excluded.error_count,
+            evidence_count = excluded.evidence_count,
+            gap_count = excluded.gap_count,
+            terminal_count = excluded.terminal_count,
+            aggregated_at_utc = excluded.aggregated_at_utc",
+    )
+    .bind(run_id)
+    .bind(counts[0])
+    .bind(counts[1])
+    .bind(counts[2])
+    .bind(counts[3])
+    .bind(counts[4])
+    .bind(counts[5])
+    .bind(counts[6])
+    .bind(counts[7])
+    .bind(counts[8])
+    .bind(Utc::now().to_rfc3339())
+    .execute(&mut *transaction)
+    .await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
+async fn next_error_sequence(
+    pool: &SqlitePool,
+    run_id: &str,
+) -> Result<u64, EvaluationRepositoryError> {
+    let current = sqlx::query_scalar::<_, Option<i64>>(
+        "SELECT MAX(sequence) FROM evaluation_error_records WHERE run_id = ?",
+    )
+    .bind(run_id)
+    .fetch_one(pool)
+    .await?
+    .unwrap_or(-1);
+    u64::try_from(current.saturating_add(1)).map_err(|_| EvaluationRepositoryError::InvalidRecord)
 }
 
 async fn append_stage(
@@ -1122,6 +1613,22 @@ mod evaluation_repository_tests {
         )
         .await
         .expect("product evidence commit");
+        TranscriptsRepository::upsert_final_evidence(
+            &pool,
+            &TranscriptEvidenceInput {
+                evidence_id: EVIDENCE_ID.to_string(),
+                meeting_id: MEETING_ID.to_string(),
+                source_track: "mixed".to_string(),
+                source_segment_key: "segment-42".to_string(),
+                sequence: 42,
+                transcript: "corrected private fixture stays in product storage".to_string(),
+                audio_start_time: 1.25,
+                audio_end_time: 2.75,
+                capture_completeness: CaptureCompleteness::Complete,
+            },
+        )
+        .await
+        .expect("idempotent product evidence redelivery");
 
         let joined = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*)
@@ -1135,6 +1642,15 @@ mod evaluation_repository_tests {
         .await
         .expect("post-commit evidence index");
         assert_eq!(joined, 1);
+        let indexing_errors = sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM evaluation_error_records
+             WHERE run_id = ? AND redacted_code = 'EVIDENCE_INDEX_FAILED'",
+        )
+        .bind(RUN_ID)
+        .fetch_one(&pool)
+        .await
+        .expect("idempotent evidence error count");
+        assert_eq!(indexing_errors, 0);
     }
 
     fn terminal_input() -> EvaluationTerminalRunInput {
@@ -1192,6 +1708,11 @@ mod evaluation_repository_tests {
             .await
             .expect("terminal evaluation run");
         assert!(persisted.summary_written);
+        let retry = EvaluationRepository::persist_terminal_run(&pool, &terminal_input())
+            .await
+            .expect("idempotent terminal retry");
+        assert_eq!(retry.raw_records_inserted, 0);
+        assert!(retry.raw_records_already_present >= 8);
 
         for table in [
             "evaluation_stage_records",
