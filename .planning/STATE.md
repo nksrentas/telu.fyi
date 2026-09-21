@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-12-PLAN.md
-last_updated: "2026-09-21T08:15:44.395Z"
+stopped_at: Completed 01-13-PLAN.md
+last_updated: "2026-09-21T08:44:22.409Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: 13d39fbadfe59caa877168957d2524f9c6e4dba4
+state_head: e73cea8e1eba319a077b8c975f66489246d142d1
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 13 of 19
+Plan: 14 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -70,6 +70,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P10 | 26m | 2 tasks | 9 files |
 | Phase 01 P11 | 20m | 2 tasks | 13 files |
 | Phase 01 P12 | 25m | 2 tasks | 11 files |
+| Phase 01 P13 | 21m | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Device-internal work stays outside the outbound ledger while loopback HTTP remains an attributed Local network attempt.
 - [Phase 01]: Summary inference and Ollama metadata reuse canonical meeting identity; analytics attaches it only when already present.
 - [Phase 01]: Each Ollama compatibility retry is a separate outbound attempt with its own stable sequence.
+- [Phase 01]: Canary start replaces only the process-active outbound ledger; stop restores the prior ledger while completed evidence remains queryable by run ID.
+- [Phase 01]: Automatic analytics and updater work is suppressed by default during canaries; allowed background work records a decision before dispatch.
+- [Phase 01]: Analytics reads active canary state before loading its store and skips canary-time persistent-setting migration.
+- [Phase 01]: Telu records application-level suppression intent; the Plan 19 OS or proxy method remains authoritative for packets.
 
 ### Pending Todos
 
@@ -146,6 +151,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-21T08:15:44.381Z
-Stopped at: Completed 01-12-PLAN.md
+Last session: 2026-09-21T08:44:22.394Z
+Stopped at: Completed 01-13-PLAN.md
 Resume file: None

@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 13
+open_count: 16
 waived_count: 0
 fixed_count: 0
-total_count: 13
-last_updated: 2026-09-21T08:15:17.491Z
+total_count: 16
+last_updated: 2026-09-21T08:44:06.281Z
 ---
 
 # Broken Windows Ledger
@@ -28,6 +28,9 @@ last_updated: 2026-09-21T08:15:17.491Z
 | 11 | 01 | deviation | frontend/src/app/page.tsx |  | Connected provider reconfiguration recovery to the existing focusable settings controls | open |  | 2026-09-21T07:45:23.226Z |  |
 | 12 | 01 | deviation | frontend/src-tauri/src/trust/provider_route.rs |  | Added Analytics as a first-class EffectiveRoute capability so analytics dispatch can be attributed | open |  | 2026-09-21T08:15:17.422Z |  |
 | 13 | 01 | deviation | frontend/src-tauri/src/ollama/metadata.rs |  | Threaded canonical meeting identity through summary work and attributed uncached Ollama metadata dispatch | open |  | 2026-09-21T08:15:17.491Z |  |
+| 14 | 01 | deviation | frontend/src-tauri/src/trust/provider_route.rs |  | Added a distinct updater route capability so canary evidence is accurately attributable | open |  | 2026-09-21T08:44:06.130Z |  |
+| 15 | 01 | deviation | frontend/src-tauri/src/lib.rs |  | Registered canary commands in the active Tauri invoke handler | open |  | 2026-09-21T08:44:06.214Z |  |
+| 16 | 01 | deviation | frontend/src/components/AnalyticsProvider.tsx |  | Loaded canary state before analytics store migration to prevent canary-time settings writes | open |  | 2026-09-21T08:44:06.281Z |  |
 
 ````json
 [
@@ -185,6 +188,42 @@ last_updated: 2026-09-21T08:15:17.491Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-21T08:15:17.491Z",
+    "resolved_at": null
+  },
+  {
+    "id": 14,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src-tauri/src/trust/provider_route.rs",
+    "line": null,
+    "description": "Added a distinct updater route capability so canary evidence is accurately attributable",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T08:44:06.130Z",
+    "resolved_at": null
+  },
+  {
+    "id": 15,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src-tauri/src/lib.rs",
+    "line": null,
+    "description": "Registered canary commands in the active Tauri invoke handler",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T08:44:06.214Z",
+    "resolved_at": null
+  },
+  {
+    "id": 16,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src/components/AnalyticsProvider.tsx",
+    "line": null,
+    "description": "Loaded canary state before analytics store migration to prevent canary-time settings writes",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T08:44:06.281Z",
     "resolved_at": null
   }
 ]
