@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml run_bundle_writer --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "running 3 tests\nnot ok 1 - observability::run_bundle::run_bundle_writer_tests::run_bundle_writer_contains_required_files_under_one_identity\nnot ok 2 - observability::run_bundle::run_bundle_writer_tests::run_bundle_writer_uses_atomic_directory_and_flags_interrupted_writes\nnot ok 3 - observability::run_bundle::run_bundle_writer_tests::run_bundle_writer_rejects_sensitive_defaults_and_unsafe_identity\n1..3\n# tests 3\n# pass 0\n# fail 3\n# cancelled 0",
+  "targetTest": "observability::run_bundle::run_bundle_writer_tests::run_bundle_writer_contains_required_files_under_one_identity",
+  "expected": "A versioned run bundle publishes every required file under one run and meeting identity through an atomic local-only directory write",
+  "actual": "The intentional RED RunBundleWriter returned RUN_BUNDLE_UNAVAILABLE before creating any bundle files"
+}
