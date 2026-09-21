@@ -2121,4 +2121,26 @@ mod run_bundle_writer_tests {
             "RUN_BUNDLE_UNSAFE_CONTENT"
         );
     }
+
+    #[test]
+    fn diagnostic_queries_list_exposes_redacted_run_summary_facts() {
+        let app_data = tempfile::tempdir().expect("temporary app data");
+        let writer = RunBundleWriter::new(app_data.path());
+        writer
+            .write_documents(RUN_ID, MEETING_ID, &fixture_documents())
+            .expect("write complete run bundle");
+
+        let listed = writer.list().expect("list local bundles");
+        let item = serde_json::to_value(&listed[0]).expect("serialize list projection");
+
+        assert_eq!(item["scenario"], "short-utterance-v1");
+        assert_eq!(item["startedAtUtc"], "2026-09-21T10:00:00Z");
+        assert_eq!(item["outcome"], "unknown");
+        assert_eq!(item["route"]["locationClass"], "local");
+        assert_eq!(item["route"]["sanitizedOrigin"], "This device");
+        assert_eq!(item["durationMs"], 0);
+        assert!(item.get("path").is_none());
+        assert!(item.get("transcript").is_none());
+        assert!(item.get("audio").is_none());
+    }
 }

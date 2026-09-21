@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml diagnostic_queries --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "running 1 test\nnot ok 1 - observability::run_bundle::run_bundle_writer_tests::diagnostic_queries_list_exposes_redacted_run_summary_facts\n1..1\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0",
+  "targetTest": "observability::run_bundle::run_bundle_writer_tests::diagnostic_queries_list_exposes_redacted_run_summary_facts",
+  "expected": "A validated local bundle list projection exposes scenario, start, outcome, sanitized route, and duration while omitting paths, transcript, and audio",
+  "actual": "The existing redacted list projection serialized scenario as null because diagnostics query fields are not implemented"
+}
