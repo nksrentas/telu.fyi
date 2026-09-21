@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml --test run_bundle_contract -- --nocapture",
+  "exitCode": 101,
+  "output": "running 4 tests\nnot ok 1 - rejects_malformed_timestamps_and_unsorted_evidence_commits\nok 2 - valid_fixture_preserves_unknowns_outliers_and_limitations\nok 3 - rejects_missing_files_reserved_stages_order_and_queue_conservation\nok 4 - interrupted_and_sensitive_bundles_are_invalid\n1..4\n# tests 4\n# pass 3\n# fail 1\n# assertion failed: report.error_codes.contains(&RUN_BUNDLE_MALFORMED.to_string())",
+  "targetTest": "rejects_malformed_timestamps_and_unsorted_evidence_commits",
+  "expected": "The bundle validator rejects malformed RFC 3339 timestamps and non-monotonic durable evidence commit sequences",
+  "actual": "The validator accepted a manifest whose startedAtUtc value was not a timestamp, so the intentional RED assertion failed before the evidence-order assertion"
+}
