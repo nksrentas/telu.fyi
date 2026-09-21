@@ -1,0 +1,8 @@
+{
+  "command": "node --test .github/verify-phase1-provider-boundary.test.cjs",
+  "exitCode": 1,
+  "output": "TAP version 13\nok 1 - settings refresh and render the Rust-owned route contract after selection\nok 2 - boundary renders neutral Local LAN Remote icon and text plus explicit transport state\nok 3 - long sanitized origins expand to a selectable full value without tooltip-only disclosure\nok 4 - loading or changed routes remain visible and unavailable before data-bearing action enablement\nnot ok 5 - recording and summary actions expose then freshly validate the Rust route\nnot ok 6 - route failures use the exact no-fallback recovery copy and ordered actions\nnot ok 7 - retry state disables only the affected action CTA and never changes provider selection\nnot ok 8 - active transcription failures disclose the Rust-confirmed capture outcome\nnot ok 9 - frontend action paths neither infer route locality nor silently fall back providers\n1..9\n# tests 9\n# pass 4\n# fail 5\n# cancelled 0",
+  "targetTest": "recording and summary actions expose then freshly validate the Rust route",
+  "expected": "Recording and summary surfaces display the authoritative Rust route before action, validate the same route immediately before work, preserve provider selection on failure, and offer exact accessible recovery actions without frontend fallback",
+  "actual": "Five named action-boundary assertions failed because recording and summary actions were not gated by the Rust route, recovery actions were absent, capture outcomes were undisclosed, and recording readiness silently fell back to Parakeet"
+}
