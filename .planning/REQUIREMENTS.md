@@ -21,7 +21,7 @@
 - [x] **IDENT-03**: Repeated recovery or retry operations reconcile to the same meeting and transcript evidence instead of creating duplicates.
 - [x] **PRIV-01**: A user can see whether each configured transcription, summary, document-processing, or generation path is local or remote and what destination receives data.
 - [x] **PRIV-02**: Telu never silently falls back from a local path to a hosted provider; an unavailable selected path fails visibly and preserves user choice.
-- [ ] **PRIV-03**: Local capture, storage, and evaluation work without undisclosed network calls, while every enabled remote or LAN destination remains explicit and configurable.
+- [x] **PRIV-03**: Local capture, storage, and evaluation work without undisclosed network calls, while every enabled remote or LAN destination remains explicit and configurable.
 
 ### Evidence-Linked Post-Meeting Knowledge
 
@@ -137,7 +137,7 @@
 | IDENT-03 | Phase 1 | Complete |
 | PRIV-01 | Phase 1 | Complete |
 | PRIV-02 | Phase 1 | Complete |
-| PRIV-03 | Phase 1 | Pending |
+| PRIV-03 | Phase 1 | Complete |
 | KNOW-01 | Phase 2 | Pending |
 | KNOW-02 | Phase 2 | Pending |
 | KNOW-03 | Phase 2 | Pending |

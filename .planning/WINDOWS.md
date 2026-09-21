@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 11
+open_count: 13
 waived_count: 0
 fixed_count: 0
-total_count: 11
-last_updated: 2026-09-21T07:45:23.226Z
+total_count: 13
+last_updated: 2026-09-21T08:15:17.491Z
 ---
 
 # Broken Windows Ledger
@@ -26,6 +26,8 @@ last_updated: 2026-09-21T07:45:23.226Z
 | 9 | 01 | deviation | frontend/src-tauri/src/lib.rs |  | Typed current-finalization read initially targeted the legacy queue-status command and was rewired to a dedicated authoritative IPC command | open |  | 2026-09-20T21:12:05.724Z |  |
 | 10 | 01 | deviation | frontend/src/hooks/useRecordingStart.ts |  | Removed frontend Parakeet fallback so absent transcription configuration fails without provider substitution | open |  | 2026-09-21T07:45:23.155Z |  |
 | 11 | 01 | deviation | frontend/src/app/page.tsx |  | Connected provider reconfiguration recovery to the existing focusable settings controls | open |  | 2026-09-21T07:45:23.226Z |  |
+| 12 | 01 | deviation | frontend/src-tauri/src/trust/provider_route.rs |  | Added Analytics as a first-class EffectiveRoute capability so analytics dispatch can be attributed | open |  | 2026-09-21T08:15:17.422Z |  |
+| 13 | 01 | deviation | frontend/src-tauri/src/ollama/metadata.rs |  | Threaded canonical meeting identity through summary work and attributed uncached Ollama metadata dispatch | open |  | 2026-09-21T08:15:17.491Z |  |
 
 ````json
 [
@@ -159,6 +161,30 @@ last_updated: 2026-09-21T07:45:23.226Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-21T07:45:23.226Z",
+    "resolved_at": null
+  },
+  {
+    "id": 12,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src-tauri/src/trust/provider_route.rs",
+    "line": null,
+    "description": "Added Analytics as a first-class EffectiveRoute capability so analytics dispatch can be attributed",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T08:15:17.422Z",
+    "resolved_at": null
+  },
+  {
+    "id": 13,
+    "kind": "deviation",
+    "phase": "01",
+    "file": "frontend/src-tauri/src/ollama/metadata.rs",
+    "line": null,
+    "description": "Threaded canonical meeting identity through summary work and attributed uncached Ollama metadata dispatch",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-21T08:15:17.491Z",
     "resolved_at": null
   }
 ]

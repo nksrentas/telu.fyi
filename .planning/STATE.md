@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Baseline Observability, Identity, and Trust Boundaries
 status: executing
-stopped_at: Completed 01-11-PLAN.md
-last_updated: "2026-09-21T07:45:54.247Z"
+stopped_at: Completed 01-12-PLAN.md
+last_updated: "2026-09-21T08:15:44.395Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 01 execution started
-state_head: 435014680830b1183483ff4424c58eb64f6539d7
+state_head: 13d39fbadfe59caa877168957d2524f9c6e4dba4
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 19
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 12 of 19
+Plan: 13 of 19
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 01 execution started
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P09 | 9h 7m | 2 tasks | 16 files |
 | Phase 01 P10 | 26m | 2 tasks | 9 files |
 | Phase 01 P11 | 20m | 2 tasks | 13 files |
+| Phase 01 P12 | 25m | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Recording and summary dispatch validate the exact route snapshot already shown to the user before data-bearing work.
 - [Phase 01]: Retry preserves provider choice, reconfigure focuses the existing provider control, and cancel dismisses only that capability attempt.
 - [Phase 01]: Active transcription route failures derive capture outcome from Rust-synchronized recording state.
+- [Phase 01]: Outbound evidence fails closed: invalid or overflowed records prevent dispatch and mark completeness false.
+- [Phase 01]: Device-internal work stays outside the outbound ledger while loopback HTTP remains an attributed Local network attempt.
+- [Phase 01]: Summary inference and Ollama metadata reuse canonical meeting identity; analytics attaches it only when already present.
+- [Phase 01]: Each Ollama compatibility retry is a separate outbound attempt with its own stable sequence.
 
 ### Pending Todos
 
@@ -141,6 +146,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-21T07:45:54.233Z
-Stopped at: Completed 01-11-PLAN.md
+Last session: 2026-09-21T08:15:44.381Z
+Stopped at: Completed 01-12-PLAN.md
 Resume file: None
