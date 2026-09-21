@@ -48,6 +48,9 @@ export type CanaryBackgroundService = 'analytics' | 'updater';
 export type CanaryAttemptTrigger = 'automatic' | 'manual';
 export type OutboundDisposition = 'permitted' | 'blocked' | 'failed' | 'suppressed';
 
+export const CANARY_PACKET_AUTHORITY_COPY =
+  'The selected OS or proxy method is authoritative for packets; Telu only records application decisions.';
+
 export interface CanaryModeState {
   runId: string;
   enabled: boolean;

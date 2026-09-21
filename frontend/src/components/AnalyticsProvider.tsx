@@ -3,6 +3,11 @@
 import React, { useEffect, ReactNode, useRef, useState, createContext } from 'react';
 import Analytics from '@/lib/analytics';
 import { load } from '@tauri-apps/plugin-store';
+import {
+  CANARY_PACKET_AUTHORITY_COPY,
+  evaluateCanaryBackgroundAttempt,
+  getCanaryMode,
+} from '@/services/providerRouteService';
 
 const ANALYTICS_DEFAULT_OFF_MIGRATION_KEY = 'analyticsDefaultOffMigrationV1';
 
@@ -23,14 +28,17 @@ export const AnalyticsContext = createContext<AnalyticsContextType>({
 export default function AnalyticsProvider({ children }: AnalyticsProviderProps) {
   const [isAnalyticsOptedIn, setIsAnalyticsOptedIn] = useState(false);
   const initialized = useRef(false);
+  const startupAttempted = useRef(false);
 
   useEffect(() => {
     // Prevent duplicate initialization in React StrictMode
-    if (initialized.current) {
+    if (initialized.current || startupAttempted.current) {
       return;
     }
+    startupAttempted.current = true;
 
     const initAnalytics = async () => {
+      const activeCanary = (await getCanaryMode())?.state.enabled === true;
       const store = await load('analytics.json', {
         autoSave: false,
         defaults: {
@@ -39,15 +47,19 @@ export default function AnalyticsProvider({ children }: AnalyticsProviderProps) 
       });
 
       if (!(await store.has('analyticsOptedIn'))) {
-        await store.set('analyticsOptedIn', false);
+        if (!activeCanary) {
+          await store.set('analyticsOptedIn', false);
+        }
       }
 
       let analyticsOptedIn = await store.get<boolean>('analyticsOptedIn');
       if (!(await store.has(ANALYTICS_DEFAULT_OFF_MIGRATION_KEY))) {
         analyticsOptedIn = false;
-        await store.set('analyticsOptedIn', false);
-        await store.set(ANALYTICS_DEFAULT_OFF_MIGRATION_KEY, true);
-        await store.save();
+        if (!activeCanary) {
+          await store.set('analyticsOptedIn', false);
+          await store.set(ANALYTICS_DEFAULT_OFF_MIGRATION_KEY, true);
+          await store.save();
+        }
       } else if (analyticsOptedIn !== true) {
         analyticsOptedIn = false;
       }
@@ -55,6 +67,24 @@ export default function AnalyticsProvider({ children }: AnalyticsProviderProps) 
       setIsAnalyticsOptedIn(analyticsOptedIn as boolean);
       // Fix: Use fresh value from store, not stale state
       if (analyticsOptedIn) {
+        const canaryDecision = await evaluateCanaryBackgroundAttempt('analytics', 'automatic');
+        if (!canaryDecision.allowDispatch) {
+          console.info('[Canary] Analytics startup suppressed (CANARY_SUPPRESSED).', {
+            runId: canaryDecision.runId,
+            evidenceCode: canaryDecision.redactedCode,
+            packetAuthority: canaryDecision.packetBlockerAuthority,
+            packetAuthorityNotice: CANARY_PACKET_AUTHORITY_COPY,
+          });
+          return;
+        }
+        if (canaryDecision.canaryEnabled) {
+          console.info('[Canary] Analytics startup explicitly permitted and attributed.', {
+            runId: canaryDecision.runId,
+            sequence: canaryDecision.sequence,
+            packetAuthority: canaryDecision.packetBlockerAuthority,
+            packetAuthorityNotice: CANARY_PACKET_AUTHORITY_COPY,
+          });
+        }
         await initAnalytics2();
       }
     }

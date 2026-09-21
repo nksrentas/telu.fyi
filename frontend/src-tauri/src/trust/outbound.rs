@@ -226,14 +226,8 @@ impl CanaryRuntime {
         service: CanaryBackgroundService,
         trigger: CanaryAttemptTrigger,
     ) -> Result<CanaryBackgroundDecision, CanaryModeError> {
-        let active = {
-            let runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
-            runtime
-                .active
-                .as_ref()
-                .map(|active| (active.state.clone(), Arc::clone(&active.ledger)))
-        };
-        let Some((state, ledger)) = active else {
+        let runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        let Some(active) = runtime.active.as_ref() else {
             return Ok(CanaryBackgroundDecision {
                 run_id: None,
                 canary_enabled: false,
@@ -248,7 +242,7 @@ impl CanaryRuntime {
         };
 
         let allow_dispatch = trigger == CanaryAttemptTrigger::Manual
-            || state.background_policy == CanaryBackgroundPolicy::PermitAttributed;
+            || active.state.background_policy == CanaryBackgroundPolicy::PermitAttributed;
         let disposition = if allow_dispatch {
             OutboundDisposition::Permitted
         } else {
@@ -260,23 +254,12 @@ impl CanaryRuntime {
             "CANARY_SUPPRESSED"
         };
         let route = canary_background_route(service);
-
-        let current_run_matches = {
-            let runtime = self.state.lock().unwrap_or_else(|error| error.into_inner());
-            runtime
-                .active
-                .as_ref()
-                .is_some_and(|active| active.state.run_id == state.run_id)
-        };
-        if !current_run_matches {
-            return Err(CanaryModeError::EvidenceMissing);
-        }
-
-        let sequence = ledger
+        let sequence = active
+            .ledger
             .record_canary_background_decision(&route, disposition, redacted_code)
             .map_err(|_| CanaryModeError::AttributionIncomplete)?;
         Ok(CanaryBackgroundDecision {
-            run_id: Some(state.run_id),
+            run_id: Some(active.state.run_id.clone()),
             canary_enabled: true,
             service,
             trigger,
@@ -1262,6 +1245,12 @@ mod tests {
     #[test]
     fn canary_background_analytics_policy_precedes_initialization() {
         let analytics_provider = include_str!("../../../src/components/AnalyticsProvider.tsx");
+        let policy_query = analytics_provider
+            .find("await getCanaryMode()")
+            .expect("analytics startup must load canary state before settings work");
+        let settings_load = analytics_provider
+            .find("await load('analytics.json'")
+            .expect("the analytics settings seam must remain visible");
         let policy_gate = analytics_provider
             .find("evaluateCanaryBackgroundAttempt('analytics', 'automatic')")
             .expect("analytics startup must evaluate the active canary first");
@@ -1273,6 +1262,11 @@ mod tests {
             policy_gate < initialization,
             "canary policy must be known before analytics initialization"
         );
+        assert!(
+            policy_query < settings_load,
+            "active canary state must prevent startup migrations from changing consent"
+        );
+        assert!(analytics_provider.contains("if (!activeCanary)"));
         assert!(analytics_provider.contains("if (!canaryDecision.allowDispatch)"));
         assert!(analytics_provider.contains("CANARY_SUPPRESSED"));
     }

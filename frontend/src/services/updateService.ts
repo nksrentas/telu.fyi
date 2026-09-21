@@ -8,6 +8,10 @@
 import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
+import {
+  CANARY_PACKET_AUTHORITY_COPY,
+  evaluateCanaryBackgroundAttempt,
+} from '@/services/providerRouteService';
 
 export interface UpdateInfo {
   available: boolean;
@@ -16,6 +20,10 @@ export interface UpdateInfo {
   date?: string;
   body?: string;
   downloadUrl?: string;
+  canarySuppressed?: boolean;
+  canaryRunId?: string;
+  canaryEvidenceCode?: string;
+  packetBlockerAuthority?: string;
 }
 
 export interface UpdateProgress {
@@ -57,9 +65,35 @@ export class UpdateService {
     }
 
     this.updateCheckInProgress = true;
-    this.lastCheckTime = Date.now();
 
     try {
+      const canaryDecision = await evaluateCanaryBackgroundAttempt('updater', force ? 'manual' : 'automatic');
+      if (!canaryDecision.allowDispatch) {
+        console.info('[Canary] Automatic update check suppressed (CANARY_SUPPRESSED).', {
+          runId: canaryDecision.runId,
+          evidenceCode: canaryDecision.redactedCode,
+          packetAuthority: canaryDecision.packetBlockerAuthority,
+          packetAuthorityNotice: CANARY_PACKET_AUTHORITY_COPY,
+        });
+        return {
+          available: false,
+          currentVersion: await getVersion(),
+          canarySuppressed: true,
+          canaryRunId: canaryDecision.runId ?? undefined,
+          canaryEvidenceCode: canaryDecision.redactedCode ?? undefined,
+          packetBlockerAuthority: canaryDecision.packetBlockerAuthority,
+        };
+      }
+      if (canaryDecision.canaryEnabled) {
+        console.info('[Canary] Update check explicitly permitted and attributed.', {
+          runId: canaryDecision.runId,
+          sequence: canaryDecision.sequence,
+          packetAuthority: canaryDecision.packetBlockerAuthority,
+          packetAuthorityNotice: CANARY_PACKET_AUTHORITY_COPY,
+        });
+      }
+
+      this.lastCheckTime = Date.now();
       const currentVersion = await getVersion();
       const update = await check();
 
