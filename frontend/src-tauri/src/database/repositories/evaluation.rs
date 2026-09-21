@@ -1,12 +1,13 @@
 //! Durable, content-redacted evaluation evidence for one canonical meeting run.
 
 use crate::audio::transcription::QueueSnapshot;
-use crate::observability::{ResourceSample, StageRecord};
+use crate::observability::{Observation, PowerSource, ResourceSample, StageRecord, UnknownReason};
 use crate::trust::outbound::{OutboundAttempt, OutboundRoute};
 use crate::trust::provider_route::EffectiveRoute;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Error as SqlxError, SqlitePool};
+use sqlx::{Error as SqlxError, Row, Sqlite, SqlitePool, Transaction};
+use std::hash::{Hash, Hasher};
 
 pub const EVALUATION_SCHEMA_VERSION: u16 = 1;
 
@@ -99,8 +100,6 @@ pub struct AppendBatchResult {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EvaluationRepositoryError {
-    #[error("evaluation repository is not implemented")]
-    RepositoryUnavailable,
     #[error("invalid evaluation record")]
     InvalidRecord,
     #[error("evaluation record conflicts with durable evidence")]
@@ -113,18 +112,613 @@ pub struct EvaluationRepository;
 
 impl EvaluationRepository {
     pub async fn create_run(
-        _pool: &SqlitePool,
-        _manifest: &EvaluationRunManifest,
+        pool: &SqlitePool,
+        manifest: &EvaluationRunManifest,
     ) -> Result<EvaluationRunManifest, EvaluationRepositoryError> {
-        Err(EvaluationRepositoryError::RepositoryUnavailable)
+        validate_manifest(manifest)?;
+        let mut transaction = pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO evaluation_runs (
+                run_id, schema_version, meeting_id, scenario_version,
+                started_at_utc, created_at_utc
+             ) VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(run_id) DO NOTHING",
+        )
+        .bind(&manifest.run_id)
+        .bind(i64::from(manifest.schema_version))
+        .bind(&manifest.meeting_id)
+        .bind(&manifest.scenario_version)
+        .bind(manifest.started_at_utc.to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *transaction)
+        .await?;
+
+        let row = sqlx::query(
+            "SELECT schema_version, run_id, meeting_id, scenario_version, started_at_utc
+             FROM evaluation_runs WHERE run_id = ?",
+        )
+        .bind(&manifest.run_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        let persisted = EvaluationRunManifest {
+            schema_version: u16::try_from(row.get::<i64, _>("schema_version"))
+                .map_err(|_| EvaluationRepositoryError::InvalidRecord)?,
+            run_id: row.get("run_id"),
+            meeting_id: row.get("meeting_id"),
+            scenario_version: row.get("scenario_version"),
+            started_at_utc: parse_utc(row.get::<String, _>("started_at_utc"))?,
+        };
+        if &persisted != manifest {
+            transaction.rollback().await?;
+            return Err(EvaluationRepositoryError::IdentityConflict);
+        }
+        transaction.commit().await?;
+        Ok(persisted)
     }
 
     pub async fn append_batch(
-        _pool: &SqlitePool,
-        _run_id: &str,
-        _records: &[EvaluationRecord],
+        pool: &SqlitePool,
+        run_id: &str,
+        records: &[EvaluationRecord],
     ) -> Result<AppendBatchResult, EvaluationRepositoryError> {
-        Err(EvaluationRepositoryError::RepositoryUnavailable)
+        validate_safe_identifier(run_id)?;
+        let mut transaction = pool.begin_with("BEGIN IMMEDIATE").await?;
+        let run_exists =
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM evaluation_runs WHERE run_id = ?")
+                .bind(run_id)
+                .fetch_one(&mut *transaction)
+                .await?;
+        if run_exists != 1 {
+            transaction.rollback().await?;
+            return Err(EvaluationRepositoryError::InvalidRecord);
+        }
+
+        let mut result = AppendBatchResult {
+            attempted: records.len(),
+            inserted: 0,
+            already_present: 0,
+        };
+        for record in records {
+            validate_record_run_id(record, run_id)?;
+            match append_record(&mut transaction, record).await? {
+                AppendOutcome::Inserted => result.inserted += 1,
+                AppendOutcome::AlreadyPresent => result.already_present += 1,
+            }
+        }
+        transaction.commit().await?;
+        Ok(result)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AppendOutcome {
+    Inserted,
+    AlreadyPresent,
+}
+
+async fn append_record(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    match record {
+        EvaluationRecord::Stage(record) => append_stage(transaction, record).await,
+        EvaluationRecord::Queue(record) => append_queue(transaction, record).await,
+        EvaluationRecord::Resource(record) => append_resource(transaction, record).await,
+        EvaluationRecord::Route(record) => append_route(transaction, record).await,
+        EvaluationRecord::Outbound(record) => append_outbound(transaction, record).await,
+        EvaluationRecord::Error(record) => append_error(transaction, record).await,
+    }
+}
+
+async fn existing_fingerprint(
+    transaction: &mut Transaction<'_, Sqlite>,
+    table: &str,
+    run_id: &str,
+    sequence: u64,
+) -> Result<Option<String>, EvaluationRepositoryError> {
+    let sql = format!("SELECT record_fingerprint FROM {table} WHERE run_id = ? AND sequence = ?");
+    Ok(sqlx::query_scalar(&sql)
+        .bind(run_id)
+        .bind(to_i64(sequence)?)
+        .fetch_optional(&mut **transaction)
+        .await?)
+}
+
+fn checked_existing(
+    existing: Option<String>,
+    fingerprint: &str,
+) -> Result<Option<AppendOutcome>, EvaluationRepositoryError> {
+    match existing {
+        Some(existing) if existing == fingerprint => Ok(Some(AppendOutcome::AlreadyPresent)),
+        Some(_) => Err(EvaluationRepositoryError::IdentityConflict),
+        None => Ok(None),
+    }
+}
+
+async fn append_stage(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &StageRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    validate_safe_identifier(&record.run_id)?;
+    validate_safe_identifier(&record.meeting_id)?;
+    validate_safe_identifier(&record.work_id)?;
+    validate_safe_identifier(&record.evidence_id)?;
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_stage_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_stage_records (
+            run_id, sequence, schema_version, meeting_id, work_id, evidence_id,
+            stage_name, observed_offset_micros, observed_at_utc, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(i64::from(record.schema_version))
+    .bind(&record.meeting_id)
+    .bind(&record.work_id)
+    .bind(&record.evidence_id)
+    .bind(serialized_name(&record.stage)?)
+    .bind(to_i64(record.offset_micros)?)
+    .bind(record.observed_at_utc.to_rfc3339())
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn append_queue(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationQueueRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    validate_queue(&record.snapshot)?;
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_queue_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    let queue = &record.snapshot;
+    sqlx::query(
+        "INSERT INTO evaluation_queue_records (
+            run_id, sequence, observed_offset_micros, observed_at_utc,
+            capacity, depth, active, oldest_age_ms, accepted, started,
+            completed, failed, cancelled, superseded, rejected, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(to_i64(record.observed_offset_micros)?)
+    .bind(record.observed_at_utc.to_rfc3339())
+    .bind(to_i64(queue.capacity as u64)?)
+    .bind(to_i64(queue.depth)?)
+    .bind(to_i64(queue.active)?)
+    .bind(optional_i64(queue.oldest_age_ms)?)
+    .bind(to_i64(queue.accepted)?)
+    .bind(to_i64(queue.started)?)
+    .bind(to_i64(queue.completed)?)
+    .bind(to_i64(queue.failed)?)
+    .bind(to_i64(queue.cancelled)?)
+    .bind(to_i64(queue.superseded)?)
+    .bind(to_i64(queue.rejected)?)
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn append_resource(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &ResourceSample,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    validate_resource(record)?;
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_resource_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    let (source_status, source_value, source_reason) = power_source_columns(&record.power.source)?;
+    let (battery_status, battery_percent, battery_reason) =
+        number_columns(&record.power.battery_percent)?;
+    let (energy_status, energy_impact, energy_reason) =
+        number_columns(&record.power.energy_impact)?;
+    sqlx::query(
+        "INSERT INTO evaluation_resource_records (
+            run_id, sequence, schema_version, interval_ms, observed_offset_micros,
+            observed_at_utc, process_cpu_percent, process_memory_bytes,
+            system_cpu_percent, system_memory_bytes, system_total_memory_bytes,
+            power_collector, power_method, power_source_status, power_source_value,
+            power_source_unknown_reason, battery_status, battery_percent,
+            battery_unknown_reason, energy_status, energy_impact,
+            energy_unknown_reason, uncertainty, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(i64::from(record.schema_version))
+    .bind(to_i64(record.interval_ms)?)
+    .bind(to_i64(record.observed_offset_micros)?)
+    .bind(record.observed_at_utc.to_rfc3339())
+    .bind(record.process.cpu_percent)
+    .bind(to_i64(record.process.memory_bytes)?)
+    .bind(record.system.cpu_percent)
+    .bind(to_i64(record.system.memory_bytes)?)
+    .bind(optional_i64(record.system.total_memory_bytes)?)
+    .bind(&record.power.collector)
+    .bind(&record.power.method)
+    .bind(source_status)
+    .bind(source_value)
+    .bind(source_reason)
+    .bind(battery_status)
+    .bind(battery_percent)
+    .bind(battery_reason)
+    .bind(energy_status)
+    .bind(energy_impact)
+    .bind(energy_reason)
+    .bind(&record.power.uncertainty)
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn append_route(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationRouteRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    validate_route(&record.route)?;
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_route_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_route_records (
+            run_id, sequence, meeting_id, observed_offset_micros, observed_at_utc,
+            capability, provider_id, model_id, location_class, sanitized_origin,
+            encrypted, validation_state, resolved_addresses, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(&record.meeting_id)
+    .bind(to_i64(record.observed_offset_micros)?)
+    .bind(record.observed_at_utc.to_rfc3339())
+    .bind(serialized_name(&record.route.capability)?)
+    .bind(&record.route.provider_id)
+    .bind(&record.route.model_id)
+    .bind(optional_serialized_name(
+        record.route.location_class.as_ref(),
+    )?)
+    .bind(&record.route.sanitized_origin)
+    .bind(record.route.encrypted)
+    .bind(serialized_name(&record.route.validation_state)?)
+    .bind(record.route.resolved_addresses.join(","))
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn append_outbound(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationOutboundRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    validate_safe_identifier(&record.source_run_id)?;
+    validate_redacted_code(record.redacted_code.as_deref())?;
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_outbound_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_outbound_records (
+            run_id, sequence, source_run_id, meeting_id, observed_offset_micros,
+            observed_at_utc, capability, provider_id, model_id, location_class,
+            sanitized_origin, encrypted, validation_state, resolved_addresses,
+            disposition, redacted_code, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(&record.source_run_id)
+    .bind(&record.meeting_id)
+    .bind(to_i64(record.observed_offset_micros)?)
+    .bind(record.observed_at_utc.to_rfc3339())
+    .bind(serialized_name(&record.route.capability)?)
+    .bind(&record.route.provider_id)
+    .bind(&record.route.model_id)
+    .bind(serialized_name(&record.route.location_class)?)
+    .bind(&record.route.sanitized_origin)
+    .bind(record.route.encrypted)
+    .bind(serialized_name(&record.route.validation_state)?)
+    .bind(record.route.resolved_addresses.join(","))
+    .bind(serialized_name(&record.disposition)?)
+    .bind(&record.redacted_code)
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+async fn append_error(
+    transaction: &mut Transaction<'_, Sqlite>,
+    record: &EvaluationErrorRecord,
+) -> Result<AppendOutcome, EvaluationRepositoryError> {
+    validate_safe_identifier(&record.component)?;
+    validate_redacted_code(Some(&record.redacted_code))?;
+    let fingerprint = fingerprint(record)?;
+    if let Some(outcome) = checked_existing(
+        existing_fingerprint(
+            transaction,
+            "evaluation_error_records",
+            &record.run_id,
+            record.sequence,
+        )
+        .await?,
+        &fingerprint,
+    )? {
+        return Ok(outcome);
+    }
+    sqlx::query(
+        "INSERT INTO evaluation_error_records (
+            run_id, sequence, observed_offset_micros, observed_at_utc,
+            component, redacted_code, work_id, evidence_id, record_fingerprint
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(&record.run_id)
+    .bind(to_i64(record.sequence)?)
+    .bind(to_i64(record.observed_offset_micros)?)
+    .bind(record.observed_at_utc.to_rfc3339())
+    .bind(&record.component)
+    .bind(&record.redacted_code)
+    .bind(&record.work_id)
+    .bind(&record.evidence_id)
+    .bind(fingerprint)
+    .execute(&mut **transaction)
+    .await?;
+    Ok(AppendOutcome::Inserted)
+}
+
+fn validate_manifest(manifest: &EvaluationRunManifest) -> Result<(), EvaluationRepositoryError> {
+    if manifest.schema_version != EVALUATION_SCHEMA_VERSION {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    validate_safe_identifier(&manifest.run_id)?;
+    validate_safe_identifier(&manifest.meeting_id)?;
+    validate_safe_identifier(&manifest.scenario_version)
+}
+
+fn validate_record_run_id(
+    record: &EvaluationRecord,
+    expected_run_id: &str,
+) -> Result<(), EvaluationRepositoryError> {
+    let run_id = match record {
+        EvaluationRecord::Stage(record) => &record.run_id,
+        EvaluationRecord::Queue(record) => &record.run_id,
+        EvaluationRecord::Resource(record) => &record.run_id,
+        EvaluationRecord::Route(record) => &record.run_id,
+        EvaluationRecord::Outbound(record) => &record.run_id,
+        EvaluationRecord::Error(record) => &record.run_id,
+    };
+    if run_id != expected_run_id {
+        return Err(EvaluationRepositoryError::IdentityConflict);
+    }
+    validate_safe_identifier(run_id)
+}
+
+fn validate_queue(snapshot: &QueueSnapshot) -> Result<(), EvaluationRepositoryError> {
+    if snapshot.capacity == 0
+        || snapshot.active > snapshot.depth
+        || snapshot.accepted
+            != snapshot.depth
+                + snapshot.completed
+                + snapshot.failed
+                + snapshot.cancelled
+                + snapshot.superseded
+    {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    Ok(())
+}
+
+fn validate_resource(record: &ResourceSample) -> Result<(), EvaluationRepositoryError> {
+    if record.process.scope != crate::observability::ResourceScope::Process
+        || record.system.scope != crate::observability::ResourceScope::System
+        || !record.process.cpu_percent.is_finite()
+        || record.process.cpu_percent < 0.0
+        || !record.system.cpu_percent.is_finite()
+        || record.system.cpu_percent < 0.0
+    {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    validate_safe_identifier(&record.run_id)?;
+    validate_safe_label(&record.power.collector)?;
+    validate_safe_label(&record.power.method)?;
+    if let Some(uncertainty) = &record.power.uncertainty {
+        validate_safe_label(uncertainty)?;
+    }
+    Ok(())
+}
+
+fn validate_route(route: &EffectiveRoute) -> Result<(), EvaluationRepositoryError> {
+    validate_safe_label(&route.provider_id)?;
+    validate_safe_label(&route.model_id)?;
+    if let Some(origin) = &route.sanitized_origin {
+        validate_sanitized_origin(origin)?;
+    }
+    for address in &route.resolved_addresses {
+        address
+            .parse::<std::net::IpAddr>()
+            .map_err(|_| EvaluationRepositoryError::InvalidRecord)?;
+    }
+    Ok(())
+}
+
+fn validate_safe_identifier(value: &str) -> Result<(), EvaluationRepositoryError> {
+    if value.is_empty()
+        || value.len() > 128
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
+    {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    Ok(())
+}
+
+fn validate_safe_label(value: &str) -> Result<(), EvaluationRepositoryError> {
+    if value.trim().is_empty()
+        || value.len() > 256
+        || value.contains(['\n', '\r', '\0'])
+        || value.contains("..")
+        || value.contains('@')
+        || value.contains('?')
+        || value.contains('#')
+    {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    Ok(())
+}
+
+fn validate_sanitized_origin(value: &str) -> Result<(), EvaluationRepositoryError> {
+    if value == "This device" {
+        return Ok(());
+    }
+    let parsed = url::Url::parse(value).map_err(|_| EvaluationRepositoryError::InvalidRecord)?;
+    if parsed.origin().ascii_serialization() != value {
+        return Err(EvaluationRepositoryError::InvalidRecord);
+    }
+    Ok(())
+}
+
+fn validate_redacted_code(value: Option<&str>) -> Result<(), EvaluationRepositoryError> {
+    if let Some(value) = value {
+        validate_safe_identifier(value)?;
+    }
+    Ok(())
+}
+
+fn to_i64(value: u64) -> Result<i64, EvaluationRepositoryError> {
+    i64::try_from(value).map_err(|_| EvaluationRepositoryError::InvalidRecord)
+}
+
+fn optional_i64(value: Option<u64>) -> Result<Option<i64>, EvaluationRepositoryError> {
+    value.map(to_i64).transpose()
+}
+
+fn parse_utc(value: String) -> Result<DateTime<Utc>, EvaluationRepositoryError> {
+    DateTime::parse_from_rfc3339(&value)
+        .map(|value| value.with_timezone(&Utc))
+        .map_err(|_| EvaluationRepositoryError::InvalidRecord)
+}
+
+fn serialized_name<T: Serialize>(value: &T) -> Result<String, EvaluationRepositoryError> {
+    serde_json::to_value(value)
+        .map_err(|_| EvaluationRepositoryError::InvalidRecord)?
+        .as_str()
+        .map(ToOwned::to_owned)
+        .ok_or(EvaluationRepositoryError::InvalidRecord)
+}
+
+fn optional_serialized_name<T: Serialize>(
+    value: Option<&T>,
+) -> Result<Option<String>, EvaluationRepositoryError> {
+    value.map(serialized_name).transpose()
+}
+
+fn unknown_reason(reason: UnknownReason) -> Result<String, EvaluationRepositoryError> {
+    serialized_name(&reason)
+}
+
+fn power_source_columns(
+    observation: &Observation<PowerSource>,
+) -> Result<(&'static str, Option<String>, Option<String>), EvaluationRepositoryError> {
+    match observation {
+        Observation::Observed { value } => Ok(("observed", Some(serialized_name(value)?), None)),
+        Observation::Unknown { reason } => Ok(("unknown", None, Some(unknown_reason(*reason)?))),
+    }
+}
+
+fn number_columns(
+    observation: &Observation<f32>,
+) -> Result<(&'static str, Option<f32>, Option<String>), EvaluationRepositoryError> {
+    match observation {
+        Observation::Observed { value } if value.is_finite() => {
+            Ok(("observed", Some(*value), None))
+        }
+        Observation::Observed { .. } => Err(EvaluationRepositoryError::InvalidRecord),
+        Observation::Unknown { reason } => Ok(("unknown", None, Some(unknown_reason(*reason)?))),
+    }
+}
+
+fn fingerprint<T: Serialize>(value: &T) -> Result<String, EvaluationRepositoryError> {
+    let bytes = serde_json::to_vec(value).map_err(|_| EvaluationRepositoryError::InvalidRecord)?;
+    let mut hasher = DeterministicFnv::default();
+    bytes.hash(&mut hasher);
+    Ok(format!("{:016x}", hasher.finish()))
+}
+
+#[derive(Default)]
+struct DeterministicFnv(u64);
+
+impl Hasher for DeterministicFnv {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let mut hash = if self.0 == 0 {
+            0xcbf29ce484222325
+        } else {
+            self.0
+        };
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+        self.0 = hash;
     }
 }
 
@@ -139,7 +733,7 @@ mod evaluation_repository_tests {
     };
     use crate::trust::outbound::{OutboundDisposition, OutboundRoute};
     use crate::trust::provider_route::{Capability, LocationClass, RouteValidationState};
-    use sqlx::{sqlite::SqlitePoolOptions, Row};
+    use sqlx::sqlite::SqlitePoolOptions;
 
     const MEETING_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141ae";
     const EVIDENCE_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141af";
@@ -204,7 +798,9 @@ mod evaluation_repository_tests {
     }
 
     fn records() -> Vec<EvaluationRecord> {
-        let observed_at_utc = Utc::now();
+        let observed_at_utc = DateTime::parse_from_rfc3339("2026-09-21T00:00:00Z")
+            .expect("fixed UTC fixture")
+            .with_timezone(&Utc);
         let route = route();
         let outbound_route = OutboundRoute {
             capability: route.capability,
