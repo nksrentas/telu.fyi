@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml evaluation_repository --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "running 4 tests\nnot ok 1 - database::repositories::evaluation::evaluation_repository_tests::evaluation_repository_fresh_and_legacy_migrations_preserve_product_ids\nnot ok 2 - database::repositories::evaluation::evaluation_repository_tests::evaluation_repository_joins_all_record_classes_by_run_and_stable_sequence\nnot ok 3 - database::repositories::evaluation::evaluation_repository_tests::evaluation_repository_interrupted_batch_retry_is_idempotent\nok 4 - database::repositories::evaluation::evaluation_repository_tests::evaluation_repository_default_rows_are_content_and_secret_redacted\n1..4\n# tests 4\n# pass 1\n# fail 3\n# cancelled 0",
+  "targetTest": "database::repositories::evaluation::evaluation_repository_tests::evaluation_repository_joins_all_record_classes_by_run_and_stable_sequence",
+  "expected": "A versioned evaluation run accepts stage, queue, resource, route, outbound, and redacted error records under one run ID with one stable sequence per record class",
+  "actual": "The intentional RED repository returned RepositoryUnavailable and the placeholder migration created no evaluation tables"
+}
