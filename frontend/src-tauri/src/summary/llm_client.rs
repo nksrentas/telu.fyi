@@ -1,3 +1,6 @@
+use crate::trust::outbound::{
+    active_outbound_ledger, authorize_and_record_dispatch, OutboundLedger,
+};
 use crate::trust::provider_route::{resolve_provider_route, Capability, RouteDestination};
 use reqwest::{header, Client};
 use serde::{Deserialize, Serialize};
@@ -22,6 +25,51 @@ async fn await_or_cancel<T>(
         _ = token.cancelled() => Err("Summary generation was cancelled".to_string()),
         result = operation => Ok(result),
     }
+}
+
+fn mark_outbound_failed(
+    ledger: &OutboundLedger,
+    sequence: u64,
+    code: &str,
+) -> Result<(), String> {
+    ledger
+        .mark_failed(sequence, code)
+        .map_err(|_| "OUTBOUND_ATTRIBUTION_INCOMPLETE".to_string())
+}
+
+async fn await_attributed_request(
+    ledger: &OutboundLedger,
+    sequence: u64,
+    operation: impl Future<Output = Result<reqwest::Response, reqwest::Error>>,
+    cancellation_token: Option<&CancellationToken>,
+    request_label: &str,
+) -> Result<reqwest::Response, String> {
+    let result = if let Some(token) = cancellation_token {
+        tokio::select! {
+            result = operation => result,
+            _ = token.cancelled() => {
+                mark_outbound_failed(ledger, sequence, "DISPATCH_CANCELLED")?;
+                return Err("Summary generation was cancelled".to_string());
+            }
+        }
+    } else {
+        operation.await
+    };
+
+    result.map_err(|error| {
+        let attribution_result = mark_outbound_failed(ledger, sequence, "NETWORK_SEND_FAILED");
+        if attribution_result.is_err() {
+            return "OUTBOUND_ATTRIBUTION_INCOMPLETE".to_string();
+        }
+        if error.is_timeout() {
+            format!(
+                "{request_label} timed out after {} seconds",
+                REQUEST_TIMEOUT_DURATION.as_secs()
+            )
+        } else {
+            format!("Failed to send {request_label}: {error}")
+        }
+    })
 }
 
 // Generic structure for OpenAI-compatible API chat messages
@@ -259,6 +307,7 @@ impl LLMProvider {
 /// The generated visible content and whether private reasoning was removed.
 pub(crate) async fn generate_summary(
     client: &Client,
+    meeting_id: Option<&str>,
     provider: &LLMProvider,
     model_name: &str,
     api_key: &str,
@@ -381,9 +430,6 @@ pub(crate) async fn generate_summary(
         RouteDestination::Url(Some(&api_url)),
     )
     .await;
-    crate::trust::provider_route::authorize_provider_dispatch(&route, &current_route, || ())
-        .map_err(|error| error.code)?;
-
     // Add authorization header for non-Claude providers
     if provider != &LLMProvider::Claude {
         headers.insert(
@@ -427,45 +473,33 @@ pub(crate) async fn generate_summary(
 
     info!("🐞 LLM Request to {}: model={}", provider_name(provider), model_name);
 
-    // Send request with timeout and cancellation support
-    let request_future = client
-        .post(api_url.clone())
-        .headers(headers.clone())
-        .json(&request_body)
-        .timeout(REQUEST_TIMEOUT_DURATION)
-        .send();
-
-    // Use tokio::select to race between cancellation and request completion
-    let response = if let Some(token) = cancellation_token {
-        tokio::select! {
-            result = request_future => {
-                result.map_err(|e| {
-                    if e.is_timeout() {
-                        format!(
-                            "LLM request timed out after {} seconds",
-                            REQUEST_TIMEOUT_DURATION.as_secs()
-                        )
-                    } else {
-                        format!("Failed to send request to LLM: {}", e)
-                    }
-                })?
-            }
-            _ = token.cancelled() => {
-                return Err("Summary generation was cancelled".to_string());
-            }
-        }
-    } else {
-        request_future.await.map_err(|e| {
-            if e.is_timeout() {
-                format!(
-                    "LLM request timed out after {} seconds",
-                    REQUEST_TIMEOUT_DURATION.as_secs()
-                )
-            } else {
-                format!("Failed to send request to LLM: {}", e)
-            }
-        })?
-    };
+    // The attribution write is synchronous and must succeed before the request
+    // future is created. An overflowed ledger therefore fails closed.
+    let outbound_ledger = active_outbound_ledger();
+    let authorized = authorize_and_record_dispatch(
+        &outbound_ledger,
+        meeting_id,
+        &route,
+        &current_route,
+        || {
+            client
+                .post(api_url.clone())
+                .headers(headers.clone())
+                .json(&request_body)
+                .timeout(REQUEST_TIMEOUT_DURATION)
+                .send()
+        },
+    )
+    .map_err(|error| error.code())?;
+    let mut response_sequence = authorized.sequence;
+    let response = await_attributed_request(
+        &outbound_ledger,
+        response_sequence,
+        authorized.value,
+        cancellation_token,
+        "LLM request",
+    )
+    .await?;
 
     let response = if response.status().is_success() {
         response
@@ -475,11 +509,18 @@ pub(crate) async fn generate_summary(
             .await?
             .unwrap_or_else(|error| format!("Failed to read LLM error response body: {error}"));
         if provider != &LLMProvider::Ollama || !ollama_rejects_reasoning_effort(status, &error_body) {
+            mark_outbound_failed(&outbound_ledger, response_sequence, "HTTP_STATUS_ERROR")?;
             return Err(format!(
                 "LLM API request failed with status {}: {}",
                 status, error_body
             ));
         }
+
+        mark_outbound_failed(
+            &outbound_ledger,
+            response_sequence,
+            "HTTP_COMPATIBILITY_RETRY",
+        )?;
 
         warn!("Ollama rejected reasoning_effort; retrying once without it");
         let mut retry_body = request_body;
@@ -487,28 +528,42 @@ pub(crate) async fn generate_summary(
             .as_object_mut()
             .ok_or_else(|| "Failed to prepare Ollama compatibility retry".to_string())?
             .remove("reasoning_effort");
-        let retry_future = client
-            .post(api_url)
-            .headers(headers)
-            .json(&retry_body)
-            .timeout(REQUEST_TIMEOUT_DURATION)
-            .send();
-        await_or_cancel(retry_future, cancellation_token)
-            .await?
-            .map_err(|e| {
-                if e.is_timeout() {
-                    format!(
-                        "LLM retry request timed out after {} seconds",
-                        REQUEST_TIMEOUT_DURATION.as_secs()
-                    )
-                } else {
-                    format!("Failed to send retry request to LLM: {}", e)
-                }
-            })?
+        let retry_route = resolve_provider_route(
+            Capability::Summary,
+            provider_route_id(provider),
+            model_name,
+            RouteDestination::Url(Some(&api_url)),
+        )
+        .await;
+        let retry = authorize_and_record_dispatch(
+            &outbound_ledger,
+            meeting_id,
+            &route,
+            &retry_route,
+            || {
+                client
+                    .post(api_url.clone())
+                    .headers(headers)
+                    .json(&retry_body)
+                    .timeout(REQUEST_TIMEOUT_DURATION)
+                    .send()
+            },
+        )
+        .map_err(|error| error.code())?;
+        response_sequence = retry.sequence;
+        await_attributed_request(
+            &outbound_ledger,
+            response_sequence,
+            retry.value,
+            cancellation_token,
+            "LLM retry request",
+        )
+        .await?
     };
 
     if !response.status().is_success() {
         let status = response.status();
+        mark_outbound_failed(&outbound_ledger, response_sequence, "HTTP_STATUS_ERROR")?;
         let error_body = await_or_cancel(response.text(), cancellation_token)
             .await?
             .unwrap_or_else(|error| format!("Failed to read LLM error response body: {error}"));
@@ -746,6 +801,7 @@ mod tests {
         let endpoint = format!("http://{address}");
         let generation = generate_summary(
             &client,
+            None,
             &LLMProvider::Ollama,
             "model",
             "",
@@ -832,6 +888,7 @@ mod tests {
         let endpoint = format!("http://{address}");
         let generation = generate_summary(
             &client,
+            None,
             &LLMProvider::Ollama,
             "model",
             "",
@@ -910,6 +967,7 @@ mod tests {
             Duration::from_secs(1),
             generate_summary(
                 &client,
+                None,
                 &LLMProvider::Ollama,
                 "model",
                 "",

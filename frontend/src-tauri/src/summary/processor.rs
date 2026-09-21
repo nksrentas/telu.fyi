@@ -363,6 +363,7 @@ pub(crate) struct GeneratedMeetingSummary {
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn generate_meeting_summary(
     client: &Client,
+    meeting_id: &str,
     provider: &LLMProvider,
     model_name: &str,
     api_key: &str,
@@ -410,7 +411,7 @@ pub(crate) async fn generate_meeting_summary(
                     let prompt = build_chunk_summary_user_prompt(chunk);
                     for attempt in 1..=MAX_CHUNK_ATTEMPTS {
                         let result = match generate_summary(
-                            client, provider, model_name, api_key, "You are an expert meeting summarizer.",
+                            client, Some(meeting_id), provider, model_name, api_key, "You are an expert meeting summarizer.",
                             &prompt, ollama_endpoint, custom_openai_endpoint, max_tokens, temperature,
                             top_p, app_data_dir, cancellation_token,
                         )
@@ -474,7 +475,7 @@ pub(crate) async fn generate_meeting_summary(
                 } else {
                     let prompt = build_combine_summary_user_prompt(&chunk_summaries.join("\n---\n"));
                     let completion = generate_summary(
-                        client, provider, model_name, api_key,
+                        client, Some(meeting_id), provider, model_name, api_key,
                         "You are an expert at synthesizing meeting summaries.", &prompt,
                         ollama_endpoint, custom_openai_endpoint, max_tokens, temperature, top_p,
                         app_data_dir, cancellation_token,
@@ -503,7 +504,7 @@ pub(crate) async fn generate_meeting_summary(
                 final_user_prompt.push_str("\n</user_context>");
             }
             let completion = generate_summary(
-                client, provider, model_name, api_key, &final_system_prompt, &final_user_prompt,
+                client, Some(meeting_id), provider, model_name, api_key, &final_system_prompt, &final_user_prompt,
                 ollama_endpoint, custom_openai_endpoint, max_tokens, temperature, top_p,
                 app_data_dir, cancellation_token,
             )
@@ -518,7 +519,7 @@ pub(crate) async fn generate_meeting_summary(
         match resolve_final_language_action(summary_language, detected_transcript_language) {
             FinalLanguageAction::Translate(language) => {
                 let translated = translate_markdown(
-                    client, provider, model_name, api_key, &english_markdown, language,
+                    client, meeting_id, provider, model_name, api_key, &english_markdown, language,
                     ollama_endpoint, custom_openai_endpoint, max_tokens, temperature, top_p,
                     app_data_dir, cancellation_token,
                 )
@@ -531,7 +532,7 @@ pub(crate) async fn generate_meeting_summary(
                 let (normalized, fallback) = english_markdown_after_normalization_result(
                     &english_markdown,
                     normalize_markdown_to_english(
-                        client, provider, model_name, api_key, &english_markdown, ollama_endpoint,
+                        client, meeting_id, provider, model_name, api_key, &english_markdown, ollama_endpoint,
                         custom_openai_endpoint, max_tokens, temperature, top_p, app_data_dir,
                         cancellation_token,
                     )
@@ -557,6 +558,7 @@ pub(crate) async fn generate_meeting_summary(
 #[allow(clippy::too_many_arguments)]
 async fn run_markdown_transform(
     client: &Client,
+    meeting_id: &str,
     provider: &LLMProvider,
     model_name: &str,
     api_key: &str,
@@ -575,7 +577,7 @@ async fn run_markdown_transform(
         return Err("Summary generation was cancelled".to_string());
     }
     let completion = generate_summary(
-        client, provider, model_name, api_key, system_prompt, user_prompt, ollama_endpoint,
+        client, Some(meeting_id), provider, model_name, api_key, system_prompt, user_prompt, ollama_endpoint,
         custom_openai_endpoint, max_tokens, temperature, top_p, app_data_dir, cancellation_token,
     )
     .await
@@ -588,6 +590,7 @@ async fn run_markdown_transform(
 #[allow(clippy::too_many_arguments)]
 async fn translate_markdown(
     client: &Client,
+    meeting_id: &str,
     provider: &LLMProvider,
     model_name: &str,
     api_key: &str,
@@ -606,7 +609,7 @@ async fn translate_markdown(
         "Translate the following Markdown document into {target_language}. Return ONLY the translated Markdown, nothing else.\n\n<document>\n{english_markdown}\n</document>"
     );
     let cleaned = run_markdown_transform(
-        client, provider, model_name, api_key, &system_prompt, &user_prompt, "Translation pass",
+        client, meeting_id, provider, model_name, api_key, &system_prompt, &user_prompt, "Translation pass",
         ollama_endpoint, custom_openai_endpoint, max_tokens, temperature, top_p, app_data_dir,
         cancellation_token,
     )
@@ -618,6 +621,7 @@ async fn translate_markdown(
 #[allow(clippy::too_many_arguments)]
 async fn normalize_markdown_to_english(
     client: &Client,
+    meeting_id: &str,
     provider: &LLMProvider,
     model_name: &str,
     api_key: &str,
@@ -634,7 +638,7 @@ async fn normalize_markdown_to_english(
         "Convert the following Markdown document into English. Return ONLY the English Markdown, nothing else.\n\n<document>\n{markdown}\n</document>"
     );
     run_markdown_transform(
-        client, provider, model_name, api_key, english_normalization_system_prompt(), &user_prompt,
+        client, meeting_id, provider, model_name, api_key, english_normalization_system_prompt(), &user_prompt,
         "English normalization pass", ollama_endpoint, custom_openai_endpoint, max_tokens,
         temperature, top_p, app_data_dir, cancellation_token,
     )

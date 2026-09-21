@@ -492,7 +492,10 @@ pub async fn get_ollama_model_context(
 ) -> Result<usize, String> {
     log::info!("Fetching context size for model: {}", model_name);
 
-    match METADATA_CACHE.get_or_fetch(&model_name, endpoint.as_deref()).await {
+    match METADATA_CACHE
+        .get_or_fetch(&model_name, endpoint.as_deref(), None)
+        .await
+    {
         Ok(metadata) => {
             log::info!(
                 "Model {} context size: {} tokens",

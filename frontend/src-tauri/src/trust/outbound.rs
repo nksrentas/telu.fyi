@@ -6,9 +6,11 @@ use super::provider_route::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::net::IpAddr;
-use std::sync::Mutex;
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use std::time::Instant;
 use url::Url;
+
+const DEFAULT_OUTBOUND_LEDGER_CAPACITY: usize = 4_096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -63,6 +65,8 @@ pub enum OutboundLedgerError {
     InvalidRoute,
     InProcessRoute,
     InvalidRedactedCode,
+    UnknownSequence(u64),
+    InvalidDispositionTransition(u64),
     CapacityExceeded { sequence: u64 },
     SequenceExhausted,
 }
@@ -77,6 +81,15 @@ pub enum OutboundDispatchError {
 pub struct AuthorizedOutbound<T> {
     pub sequence: u64,
     pub value: T,
+}
+
+impl OutboundDispatchError {
+    pub fn code(&self) -> String {
+        match self {
+            Self::Route(error) => error.code.clone(),
+            Self::Ledger(_) => "OUTBOUND_ATTRIBUTION_INCOMPLETE".to_string(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -186,26 +199,92 @@ impl OutboundLedger {
 
     pub fn mark_failed(
         &self,
-        _sequence: u64,
-        _redacted_code: &str,
+        sequence: u64,
+        redacted_code: &str,
     ) -> Result<(), OutboundLedgerError> {
-        // Intentional TDD RED stub: Task 2 tests define failure retention.
-        Ok(())
+        if !is_safe_code(redacted_code) {
+            return Err(OutboundLedgerError::InvalidRedactedCode);
+        }
+        let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
+        let attempt = state
+            .attempts
+            .iter_mut()
+            .find(|attempt| attempt.sequence == sequence)
+            .ok_or(OutboundLedgerError::UnknownSequence(sequence))?;
+        match attempt.disposition {
+            OutboundDisposition::Permitted => {
+                attempt.disposition = OutboundDisposition::Failed;
+                attempt.redacted_code = Some(redacted_code.to_string());
+                Ok(())
+            }
+            OutboundDisposition::Failed
+                if attempt.redacted_code.as_deref() == Some(redacted_code) =>
+            {
+                Ok(())
+            }
+            _ => Err(OutboundLedgerError::InvalidDispositionTransition(sequence)),
+        }
     }
 }
 
 pub fn authorize_and_record_dispatch<T>(
-    _ledger: &OutboundLedger,
-    _meeting_id: Option<&str>,
-    _expected_route: &EffectiveRoute,
-    _current_route: &EffectiveRoute,
+    ledger: &OutboundLedger,
+    meeting_id: Option<&str>,
+    expected_route: &EffectiveRoute,
+    current_route: &EffectiveRoute,
     dispatch: impl FnOnce() -> T,
 ) -> Result<AuthorizedOutbound<T>, OutboundDispatchError> {
-    // Intentional TDD RED stub: Task 2 tests require attribution before dispatch.
+    if let Err(error) =
+        super::provider_route::validate_route_contract(expected_route, current_route)
+    {
+        ledger
+            .record_network_attempt(
+                meeting_id,
+                expected_route,
+                OutboundDisposition::Blocked,
+                Some(&error.code),
+                Instant::now(),
+                Utc::now(),
+            )
+            .map_err(OutboundDispatchError::Ledger)?;
+        return Err(OutboundDispatchError::Route(error));
+    }
+
+    let sequence = ledger
+        .record_network_attempt(
+            meeting_id,
+            current_route,
+            OutboundDisposition::Permitted,
+            Some("DISPATCH_AUTHORIZED"),
+            Instant::now(),
+            Utc::now(),
+        )
+        .map_err(OutboundDispatchError::Ledger)?;
     Ok(AuthorizedOutbound {
-        sequence: 0,
+        sequence,
         value: dispatch(),
     })
+}
+
+static ACTIVE_OUTBOUND_LEDGER: LazyLock<RwLock<Arc<OutboundLedger>>> = LazyLock::new(|| {
+    let run_id = format!("process-{}", uuid::Uuid::new_v4());
+    let ledger = OutboundLedger::new(run_id, DEFAULT_OUTBOUND_LEDGER_CAPACITY, Instant::now())
+        .expect("the process outbound ledger configuration must be valid");
+    RwLock::new(Arc::new(ledger))
+});
+
+pub fn active_outbound_ledger() -> Arc<OutboundLedger> {
+    ACTIVE_OUTBOUND_LEDGER
+        .read()
+        .unwrap_or_else(|error| error.into_inner())
+        .clone()
+}
+
+pub fn replace_active_outbound_ledger(ledger: Arc<OutboundLedger>) -> Arc<OutboundLedger> {
+    let mut active = ACTIVE_OUTBOUND_LEDGER
+        .write()
+        .unwrap_or_else(|error| error.into_inner());
+    std::mem::replace(&mut *active, ledger)
 }
 
 fn sanitize_network_route(route: &EffectiveRoute) -> Result<OutboundRoute, OutboundLedgerError> {
@@ -626,6 +705,7 @@ mod tests {
     fn outbound_attribution_is_present_at_each_network_dispatch_seam() {
         let summary = include_str!("../summary/llm_client.rs");
         let analytics = include_str!("../analytics/analytics.rs");
+        let ollama_metadata = include_str!("../ollama/metadata.rs");
         let transcription = include_str!("../audio/transcription/engine.rs");
 
         let summary_attribution = summary
@@ -638,6 +718,10 @@ mod tests {
         assert!(
             analytics.contains("authorize_and_record_dispatch"),
             "analytics capture must use the shared attribution gate"
+        );
+        assert!(
+            ollama_metadata.contains("authorize_and_record_dispatch"),
+            "summary metadata requests must use the shared attribution gate"
         );
         assert!(
             transcription.contains("RouteDestination::Device"),

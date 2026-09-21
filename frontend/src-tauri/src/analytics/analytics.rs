@@ -1,10 +1,14 @@
+use crate::trust::outbound::{active_outbound_ledger, authorize_and_record_dispatch};
+use crate::trust::provider_route::{resolve_provider_route, Capability, RouteDestination};
+use chrono::{DateTime, Utc};
 use posthog_rs::{Client, Event};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
+
+const DEFAULT_ANALYTICS_ORIGIN: &str = "https://us.i.posthog.com";
 
 const SENSITIVE_ANALYTICS_KEYS: &[&str] = &[
     "meeting_title",
@@ -85,7 +89,22 @@ pub struct AnalyticsClient {
 impl AnalyticsClient {
     pub async fn new(config: AnalyticsConfig) -> Self {
         let client = if config.enabled && !config.api_key.is_empty() {
-            Some(Arc::new(posthog_rs::client(config.api_key.as_str()).await))
+            let options = posthog_rs::ClientOptionsBuilder::default()
+                .api_key(config.api_key.clone())
+                .api_endpoint(
+                    config
+                        .host
+                        .clone()
+                        .unwrap_or_else(|| DEFAULT_ANALYTICS_ORIGIN.to_string()),
+                )
+                .build();
+            match options {
+                Ok(options) => Some(Arc::new(posthog_rs::client(options).await)),
+                Err(error) => {
+                    log::warn!("Analytics configuration is unavailable: {error}");
+                    None
+                }
+            }
         } else {
             None
         };
@@ -95,6 +114,52 @@ impl AnalyticsClient {
             config,
             user_id: Arc::new(Mutex::new(None)),
             current_session: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    async fn capture_attributed(
+        &self,
+        client: Arc<Client>,
+        event: Event,
+        meeting_id: Option<&str>,
+    ) -> Result<(), String> {
+        let destination = self
+            .config
+            .host
+            .as_deref()
+            .unwrap_or(DEFAULT_ANALYTICS_ORIGIN);
+        let route = resolve_provider_route(
+            Capability::Analytics,
+            "posthog",
+            "events",
+            RouteDestination::Url(Some(destination)),
+        )
+        .await;
+        let current_route = resolve_provider_route(
+            Capability::Analytics,
+            "posthog",
+            "events",
+            RouteDestination::Url(Some(destination)),
+        )
+        .await;
+        let ledger = active_outbound_ledger();
+        let authorized = authorize_and_record_dispatch(
+            &ledger,
+            meeting_id,
+            &route,
+            &current_route,
+            || client.capture(event),
+        )
+        .map_err(|error| error.code())?;
+
+        match authorized.value.await {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                ledger
+                    .mark_failed(authorized.sequence, "ANALYTICS_CAPTURE_FAILED")
+                    .map_err(|_| "OUTBOUND_ATTRIBUTION_INCOMPLETE".to_string())?;
+                Err(error.to_string())
+            }
         }
     }
 
@@ -118,7 +183,7 @@ impl AnalyticsClient {
             }
         }
         
-        if let Err(e) = client.capture(event).await {
+        if let Err(e) = self.capture_attributed(client, event, None).await {
             eprintln!("Failed to identify user: {}", e);
         }
         
@@ -141,6 +206,10 @@ impl AnalyticsClient {
         };
 
         let event_name = event_name.to_string();
+        let meeting_id = properties
+            .as_ref()
+            .and_then(|properties| properties.get("meeting_id"))
+            .cloned();
         let mut properties = sanitize_analytics_properties(properties.unwrap_or_default());
 
         // Add app version to all events
@@ -161,7 +230,10 @@ impl AnalyticsClient {
             }
         }
         
-        if let Err(e) = client.capture(event).await {
+        if let Err(e) = self
+            .capture_attributed(client, event, meeting_id.as_deref())
+            .await
+        {
             log::warn!("Failed to track event {}: {}", event_name, e);
         }
         
@@ -447,7 +519,7 @@ impl AnalyticsClient {
             }
         }
         
-        if let Err(e) = client.capture(event).await {
+        if let Err(e) = self.capture_attributed(client, event, None).await {
             eprintln!("Failed to set user properties: {}", e);
         }
         

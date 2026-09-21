@@ -466,7 +466,10 @@ impl SummaryService {
 
         // Dynamically fetch context size based on provider and model
         let token_threshold = if provider == LLMProvider::Ollama {
-            match METADATA_CACHE.get_or_fetch(&model_name, ollama_endpoint.as_deref()).await {
+            match METADATA_CACHE
+                .get_or_fetch(&model_name, ollama_endpoint.as_deref(), Some(&meeting_id))
+                .await
+            {
                 Ok(metadata) => {
                     // Reserve 300 tokens for prompt overhead
                     let optimal = metadata.context_size.saturating_sub(300);
@@ -581,6 +584,7 @@ impl SummaryService {
         let client = reqwest::Client::new();
         let result = generate_meeting_summary(
             &client,
+            &meeting_id,
             &provider,
             &model_name,
             &final_api_key,

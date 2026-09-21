@@ -12,6 +12,7 @@ pub enum Capability {
     Summary,
     DocumentProcessing,
     Generation,
+    Analytics,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -93,6 +94,7 @@ impl fmt::Display for ProviderRouteError {
                 Capability::Summary => "Summary",
                 Capability::DocumentProcessing => "Document processing",
                 Capability::Generation => "Generation",
+                Capability::Analytics => "Analytics",
             },
             self.provider_id
         )
@@ -366,7 +368,7 @@ async fn configured_route(
             };
             (config.provider, config.model, destination)
         }
-        Capability::DocumentProcessing | Capability::Generation => {
+        Capability::DocumentProcessing | Capability::Generation | Capability::Analytics => {
             return Err(ProviderRouteError::unavailable(
                 capability,
                 "not_configured",

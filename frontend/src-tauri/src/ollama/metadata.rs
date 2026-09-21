@@ -1,11 +1,13 @@
+use crate::trust::outbound::{active_outbound_ledger, authorize_and_record_dispatch};
+use crate::trust::provider_route::{resolve_provider_route, Capability, RouteDestination};
+use once_cell::sync::Lazy;
+use regex::Regex;
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use reqwest::Client;
-use regex::Regex;
-use once_cell::sync::Lazy;
 
 /// Model metadata containing context size and other details
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,6 +69,7 @@ impl ModelMetadataCache {
         &self,
         model_name: &str,
         endpoint: Option<&str>,
+        meeting_id: Option<&str>,
     ) -> Result<ModelMetadata, String> {
         let cache_key = format!("{}::{}", model_name, endpoint.unwrap_or("default"));
 
@@ -88,7 +91,7 @@ impl ModelMetadataCache {
 
         // Cache miss or expired - fetch from API
         tracing::info!("Fetching metadata for model: {}", model_name);
-        let metadata = fetch_model_info(model_name, endpoint).await?;
+        let metadata = fetch_model_info(model_name, endpoint, meeting_id).await?;
 
         // Store in cache
         {
@@ -140,6 +143,7 @@ const ULTIMATE_FALLBACK: usize = 4000;
 async fn fetch_model_info(
     model_name: &str,
     endpoint: Option<&str>,
+    meeting_id: Option<&str>,
 ) -> Result<ModelMetadata, String> {
     let client = Client::new();
     let base_url = endpoint.unwrap_or("http://localhost:11434");
@@ -150,31 +154,66 @@ async fn fetch_model_info(
         "verbose": true
     });
 
-    let response = client
-        .post(&url)
-        .json(&payload)
-        .timeout(Duration::from_secs(5))
-        .send()
-        .await
-        .map_err(|e| {
-            if e.is_timeout() {
-                format!("Request timed out while fetching metadata for {}", model_name)
-            } else if e.is_connect() {
-                format!("Cannot connect to {}. Ollama server may not be running.", base_url)
-            } else {
-                format!("Network error: {}", e)
-            }
-        })?;
+    let route = resolve_provider_route(
+        Capability::Summary,
+        "ollama",
+        model_name,
+        RouteDestination::Url(Some(base_url)),
+    )
+    .await;
+    let current_route = resolve_provider_route(
+        Capability::Summary,
+        "ollama",
+        model_name,
+        RouteDestination::Url(Some(base_url)),
+    )
+    .await;
+    let ledger = active_outbound_ledger();
+    let authorized = authorize_and_record_dispatch(
+        &ledger,
+        meeting_id,
+        &route,
+        &current_route,
+        || {
+            client
+                .post(&url)
+                .json(&payload)
+                .timeout(Duration::from_secs(5))
+                .send()
+        },
+    )
+    .map_err(|error| error.code())?;
+    let sequence = authorized.sequence;
+    let response = authorized.value.await.map_err(|e| {
+        if ledger.mark_failed(sequence, "NETWORK_SEND_FAILED").is_err() {
+            return "OUTBOUND_ATTRIBUTION_INCOMPLETE".to_string();
+        }
+        if e.is_timeout() {
+            format!("Request timed out while fetching metadata for {}", model_name)
+        } else if e.is_connect() {
+            format!(
+                "Cannot connect to {}. Ollama server may not be running.",
+                base_url
+            )
+        } else {
+            format!("Network error: {}", e)
+        }
+    })?;
 
     if !response.status().is_success() {
+        ledger
+            .mark_failed(sequence, "HTTP_STATUS_ERROR")
+            .map_err(|_| "OUTBOUND_ATTRIBUTION_INCOMPLETE".to_string())?;
         // Try fallback based on model name
         return Ok(get_fallback_metadata(model_name));
     }
 
-    let show_response: OllamaShowResponse = response
-        .json()
-        .await
-        .map_err(|e| format!("Failed to parse API response: {}", e))?;
+    let show_response: OllamaShowResponse = response.json().await.map_err(|e| {
+        if ledger.mark_failed(sequence, "RESPONSE_DECODE_FAILED").is_err() {
+            return "OUTBOUND_ATTRIBUTION_INCOMPLETE".to_string();
+        }
+        format!("Failed to parse API response: {}", e)
+    })?;
 
     // Try to get context size from model_info (verbose mode) first
     let mut context_size = extract_context_from_model_info(&show_response.model_info, &show_response.details.family);
