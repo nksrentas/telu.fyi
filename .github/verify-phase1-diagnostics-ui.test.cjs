@@ -63,3 +63,51 @@ test('technical evidence is selectable and contained without a dashboard grid', 
   assert.match(panel, /overflow-x-auto/);
   assert.doesNotMatch(panel, /grid-cols-[234]/);
 });
+
+test('export review names categories destination and redaction with sensitive choices off', () => {
+  const dialog = source('frontend/src/components/DiagnosticExportDialog.tsx');
+
+  assert.match(dialog, /Review diagnostic export/);
+  assert.match(dialog, /Transcript text and audio are excluded unless you include them below\./);
+  assert.match(dialog, /Included categories/);
+  assert.match(dialog, /Destination folder/);
+  assert.match(dialog, /Redaction policy/);
+  assert.match(dialog, /Transcript text/);
+  assert.match(dialog, /Audio/);
+  assert.match(dialog, /Export local copy/);
+  assert.match(dialog, /useState\(false\)/);
+});
+
+test('closing and reopening export review resets transcript and audio independently off', () => {
+  const dialog = source('frontend/src/components/DiagnosticExportDialog.tsx');
+
+  assert.match(dialog, /setIncludeTranscript\(false\)/);
+  assert.match(dialog, /setIncludeAudio\(false\)/);
+  assert.match(dialog, /checked=\{includeTranscript\}/);
+  assert.match(dialog, /checked=\{includeAudio\}/);
+  assert.doesNotMatch(dialog, /defaultChecked/);
+});
+
+test('diagnostic export is a sanitized local copy with no upload or share path', () => {
+  const service = source('frontend/src/services/diagnosticsService.ts');
+  const dialog = source('frontend/src/components/DiagnosticExportDialog.tsx');
+  const rust = source('frontend/src-tauri/src/observability/run_bundle.rs');
+  const combined = `${service}\n${dialog}`;
+
+  assert.match(service, /select_diagnostic_export_folder/);
+  assert.match(service, /export_diagnostic_copy/);
+  assert.match(rust, /local_only/);
+  assert.match(rust, /transcript_requested/);
+  assert.match(rust, /audio_requested/);
+  assert.match(rust, /write_atomic_file/);
+  assert.doesNotMatch(combined, /\bfetch\s*\(|axios|XMLHttpRequest|navigator\.share|upload/i);
+});
+
+test('export success and filesystem recovery use the approved noun-bearing actions', () => {
+  const dialog = source('frontend/src/components/DiagnosticExportDialog.tsx');
+
+  assert.match(dialog, /Diagnostic copy exported locally/);
+  assert.match(dialog, /Show in folder/);
+  assert.match(dialog, /Retry export/);
+  assert.match(dialog, /Choose another folder/);
+});

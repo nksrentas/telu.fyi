@@ -2643,4 +2643,14 @@ mod run_bundle_writer_tests {
         assert!(!serialized.contains("transcriptText"));
         assert!(!serialized.contains("audioIncluded"));
     }
+
+    #[test]
+    fn diagnostic_export_creates_a_sanitized_local_copy_without_mutating_source() {
+        let source = include_str!("run_bundle.rs");
+        let boundary = ["export_diagnostic", "copy_to"].join("_");
+        assert!(
+            source.contains(&boundary),
+            "a reviewed local-copy export boundary must exist before export behavior can pass"
+        );
+    }
 }

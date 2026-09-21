@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml diagnostic_export --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "running 1 test\nnot ok 1 - observability::run_bundle::run_bundle_writer_tests::diagnostic_export_creates_a_sanitized_local_copy_without_mutating_source\n1..1\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0",
+  "targetTest": "observability::run_bundle::run_bundle_writer_tests::diagnostic_export_creates_a_sanitized_local_copy_without_mutating_source",
+  "expected": "A reviewed export creates an atomic sanitized local child copy, records both sensitive choices, and leaves the source bundle unchanged",
+  "actual": "The local-copy export boundary is absent, so no reviewed destination, re-sanitization, or immutable-copy behavior exists"
+}
