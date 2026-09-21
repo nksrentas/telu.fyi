@@ -1,0 +1,8 @@
+{
+  "command": "node --test .github/verify-phase1-egress-capabilities.test.cjs",
+  "exitCode": 1,
+  "output": "running 3 tests\nnot ok 1 - renderer filesystem access excludes global and download-wide authority\nnot ok 2 - app-owned and dialog-selected local flows retain explicit least-privilege scopes\nok 3 - content security policy contains only the declared renderer destinations\n1..3\n# tests 3\n# pass 1\n# fail 2\n# cancelled 0",
+  "targetTest": "renderer filesystem access excludes global and download-wide authority",
+  "expected": "The main renderer capability has no global or download-wide filesystem grants, keeps explicit app-data and dialog-selected flows, and declares no CSP wildcard destination",
+  "actual": "The existing capability still contains fs:read-all, fs:write-all, download-wide permissions, and no scoped renderer write permission"
+}
