@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml outbound_attribution --lib -- --nocapture",
+  "exitCode": 101,
+  "output": "TAP version 13\nnot ok 1 - trust::outbound::tests::outbound_attribution_records_permitted_attempt_before_dispatch\nnot ok 2 - trust::outbound::tests::outbound_attribution_retains_blocked_and_failed_attempts\nnot ok 3 - trust::outbound::tests::outbound_attribution_preserves_capability_routes_across_location_classes\nnot ok 4 - trust::outbound::tests::outbound_attribution_is_present_at_each_network_dispatch_seam\n1..4\n# tests 4\n# pass 0\n# fail 4\n# cancelled 0",
+  "targetTest": "trust::outbound::tests::outbound_attribution_records_permitted_attempt_before_dispatch",
+  "expected": "Summary and analytics network work records the active sanitized EffectiveRoute before dispatch, material route changes stay blocked and attributable, failed dispatch remains inspectable, and Local loopback, LAN, and Remote routes retain their capability identity",
+  "actual": "The intentional attribution wrapper dispatched without first recording, did not block changed routes or retain failure state, and the summary and analytics source seams did not invoke the shared attribution gate"
+}

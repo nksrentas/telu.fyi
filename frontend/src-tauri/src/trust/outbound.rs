@@ -1,7 +1,7 @@
 //! Bounded, content-free attribution for network-capable application attempts.
 
 use super::provider_route::{
-    Capability, EffectiveRoute, LocationClass, RouteValidationState,
+    Capability, EffectiveRoute, LocationClass, ProviderRouteError, RouteValidationState,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -65,6 +65,18 @@ pub enum OutboundLedgerError {
     InvalidRedactedCode,
     CapacityExceeded { sequence: u64 },
     SequenceExhausted,
+}
+
+#[derive(Debug)]
+pub enum OutboundDispatchError {
+    Route(ProviderRouteError),
+    Ledger(OutboundLedgerError),
+}
+
+#[derive(Debug)]
+pub struct AuthorizedOutbound<T> {
+    pub sequence: u64,
+    pub value: T,
 }
 
 #[derive(Debug)]
@@ -171,6 +183,29 @@ impl OutboundLedger {
             attribution_complete: state.overflow_count == 0,
         }
     }
+
+    pub fn mark_failed(
+        &self,
+        _sequence: u64,
+        _redacted_code: &str,
+    ) -> Result<(), OutboundLedgerError> {
+        // Intentional TDD RED stub: Task 2 tests define failure retention.
+        Ok(())
+    }
+}
+
+pub fn authorize_and_record_dispatch<T>(
+    _ledger: &OutboundLedger,
+    _meeting_id: Option<&str>,
+    _expected_route: &EffectiveRoute,
+    _current_route: &EffectiveRoute,
+    dispatch: impl FnOnce() -> T,
+) -> Result<AuthorizedOutbound<T>, OutboundDispatchError> {
+    // Intentional TDD RED stub: Task 2 tests require attribution before dispatch.
+    Ok(AuthorizedOutbound {
+        sequence: 0,
+        value: dispatch(),
+    })
 }
 
 fn sanitize_network_route(route: &EffectiveRoute) -> Result<OutboundRoute, OutboundLedgerError> {
@@ -460,6 +495,157 @@ mod tests {
         assert_eq!(
             snapshot.attempts[0].route.sanitized_origin,
             "http://127.0.0.1:8178"
+        );
+    }
+
+    #[test]
+    fn outbound_attribution_records_permitted_attempt_before_dispatch() {
+        let origin = Instant::now();
+        let ledger = OutboundLedger::new("run-dispatch", 4, origin).unwrap();
+        let route = remote_route("https://example.com/v1");
+
+        let authorized = authorize_and_record_dispatch(
+            &ledger,
+            Some("meeting-dispatch"),
+            &route,
+            &route,
+            || {
+                assert_eq!(
+                    ledger.snapshot().attempts.len(),
+                    1,
+                    "attribution must exist before dispatch begins"
+                );
+                "dispatched"
+            },
+        )
+        .unwrap();
+
+        assert_eq!(authorized.value, "dispatched");
+        let attempt = &ledger.snapshot().attempts[0];
+        assert_eq!(attempt.sequence, authorized.sequence);
+        assert_eq!(attempt.disposition, OutboundDisposition::Permitted);
+    }
+
+    #[test]
+    fn outbound_attribution_retains_blocked_and_failed_attempts() {
+        let origin = Instant::now();
+        let ledger = OutboundLedger::new("run-outcomes", 4, origin).unwrap();
+        let expected = remote_route("https://example.com/v1");
+        let changed = loopback_route();
+        let dispatched = std::cell::Cell::new(false);
+
+        let blocked = authorize_and_record_dispatch(
+            &ledger,
+            Some("meeting-outcomes"),
+            &expected,
+            &changed,
+            || dispatched.set(true),
+        );
+        assert!(
+            matches!(blocked, Err(OutboundDispatchError::Route(_))),
+            "materially changed route must be blocked"
+        );
+        assert!(!dispatched.get(), "blocked dispatch must not run");
+        assert_eq!(
+            ledger.snapshot().attempts[0].disposition,
+            OutboundDisposition::Blocked
+        );
+
+        let authorized = authorize_and_record_dispatch(
+            &ledger,
+            Some("meeting-outcomes"),
+            &expected,
+            &expected,
+            || (),
+        )
+        .unwrap();
+        ledger
+            .mark_failed(authorized.sequence, "NETWORK_SEND_FAILED")
+            .unwrap();
+        let snapshot = ledger.snapshot();
+        assert_eq!(snapshot.attempts.len(), 2);
+        assert_eq!(snapshot.attempts[1].disposition, OutboundDisposition::Failed);
+        assert_eq!(
+            snapshot.attempts[1].redacted_code.as_deref(),
+            Some("NETWORK_SEND_FAILED")
+        );
+    }
+
+    #[test]
+    fn outbound_attribution_preserves_capability_routes_across_location_classes() {
+        let origin = Instant::now();
+        let ledger = OutboundLedger::new("run-routes", 4, origin).unwrap();
+        let cases = [
+            (
+                Capability::Transcription,
+                "http://127.0.0.1:8178/transcribe",
+                IpAddr::V4(Ipv4Addr::LOCALHOST),
+                LocationClass::Local,
+            ),
+            (
+                Capability::Summary,
+                "http://192.168.1.10:11434/v1",
+                IpAddr::V4(Ipv4Addr::new(192, 168, 1, 10)),
+                LocationClass::Lan,
+            ),
+            (
+                Capability::Generation,
+                "https://203.0.113.10/v1",
+                IpAddr::V4(Ipv4Addr::new(203, 0, 113, 10)),
+                LocationClass::Remote,
+            ),
+        ];
+
+        for (capability, destination, address, _) in cases {
+            let route = resolve_route_from_addresses(
+                capability,
+                "configured-provider",
+                "configured-model",
+                RouteDestination::Url(Some(destination)),
+                &[address],
+            );
+            authorize_and_record_dispatch(&ledger, None, &route, &route, || ()).unwrap();
+        }
+
+        let snapshot = ledger.snapshot();
+        assert_eq!(snapshot.attempts.len(), 3);
+        assert_eq!(
+            snapshot
+                .attempts
+                .iter()
+                .map(|attempt| (attempt.route.capability, attempt.route.location_class))
+                .collect::<Vec<_>>(),
+            cases
+                .into_iter()
+                .map(|(capability, _, _, class)| (capability, class))
+                .collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn outbound_attribution_is_present_at_each_network_dispatch_seam() {
+        let summary = include_str!("../summary/llm_client.rs");
+        let analytics = include_str!("../analytics/analytics.rs");
+        let transcription = include_str!("../audio/transcription/engine.rs");
+
+        let summary_attribution = summary
+            .find("authorize_and_record_dispatch")
+            .expect("summary requests must use the shared attribution gate");
+        let summary_request = summary
+            .find(".post(api_url.clone())")
+            .expect("summary request seam must remain visible");
+        assert!(summary_attribution < summary_request);
+        assert!(
+            analytics.contains("authorize_and_record_dispatch"),
+            "analytics capture must use the shared attribution gate"
+        );
+        assert!(
+            transcription.contains("RouteDestination::Device"),
+            "current transcription remains explicitly device-internal"
+        );
+        assert!(
+            !transcription.contains("record_network_attempt"),
+            "device-internal transcription must not be mislabeled as network traffic"
         );
     }
 }
