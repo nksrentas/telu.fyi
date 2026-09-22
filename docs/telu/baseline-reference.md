@@ -1,39 +1,47 @@
 # Telu Phase 1 baseline reference
 
-status: unverified
+status: approved
 
-This record is the approval boundary for the Phase 1 physical matrix. `proposed` means the host was observed but has not been accepted as the primary reference machine. No matrix result, threshold, or downstream gate may treat this record as approved until every blocking field below is complete and the approval section records an explicit decision.
+This record is the approval boundary for the Phase 1 physical matrix. Nick approved reference configuration version `reference-2026-09-22.1` on 2026-09-22. Approval authorizes the matrix configuration and evidence procedures only; it does not assert that battery, packet, scenario, validation, or supported-platform evidence has been collected. Every such result remains `unverified` until its retained evidence passes review.
 
-## Proposed host captured 2026-09-22
+## Approved primary reference captured 2026-09-22
 
-| Field | Proposed value | State |
+| Field | Approved value | State |
 |---|---|---|
-| Machine | MacBook Pro, model identifier `Mac16,1` | proposed, not approved |
-| Processor | Apple M4, 10-core configuration reported by macOS | proposed, not approved |
-| Memory | 16 GB | proposed, not approved |
-| Architecture | arm64 / aarch64 | proposed, not approved |
-| Operating system | macOS 26.6.2, build 25G83 | proposed, not approved |
-| Source revision | pending | unknown until the exact tested packaged build revision is recorded |
-| Power snapshot | AC power, internal battery present at 99% and finishing charge | context only; not battery evidence |
-| Capture sample baseline | 48 kHz; actual channel/sample configuration must be recorded per run | proposed input, not a performance threshold |
-| Effective route | Local, this device | proposed; each run must retain its validated route record |
+| Machine | 14-inch MacBook Pro, canonical macOS model identifier `Mac16,1` | approved primary reference |
+| Processor | Apple M4, 10-core | approved |
+| Memory | 16 GB | approved |
+| Architecture | arm64 | approved |
+| Operating system | macOS 26.6.2, build 25G83 | approved |
+| Microphone | Built-in MacBook Pro microphone via CoreAudio | approved |
+| System audio | Built-in speakers/output captured via ScreenCaptureKit | approved |
+| Transcription | Parakeet TDT 0.6B v3 INT8; model ID `parakeet-tdt-0.6b-v3-int8`; ONNX Runtime CPU execution provider | approved |
+| Encoder model | `encoder-model.int8.onnx`; SHA-256 `6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09` | approved installed-model identifier |
+| Preprocessor model | `nemo128.onnx`; SHA-256 `a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f` | approved installed-model identifier |
+| Decoder/joint model | `decoder_joint-model.int8.onnx`; SHA-256 `eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70` | approved installed-model identifier |
+| Evaluation language | English; automatic language detection disabled | approved |
+| Packaged/source build revision | `da1ffc622efba4a9df55f369b2471c2cd15e34ca` | approved matrix input; packaged execution evidence not yet collected |
+| Queue capacity | 8 | approved experiment input, not a performance threshold |
+| Finalization deadline | 120000 ms | approved experiment input, not a performance threshold |
+| Power snapshot | Earlier capture reported AC power, internal battery present at 99%, finishing charge | context only; not battery evidence |
+| Capture sample baseline | 48 kHz; actual channel/sample configuration must be recorded per run | approved preflight baseline, not a performance threshold |
+| Effective route | Local, this device | approved expected route; each run must retain its validated route record |
 
-The generic `telu-baseline propose-reference` command independently reports the sanitized host class (`Apple M4; 16 GiB`, macOS/aarch64) and intentionally leaves the application revision unknown unless it was embedded at build time. The more specific model identifier above came from the local macOS hardware report. Serial numbers, platform UUIDs, UDIDs, usernames, and full paths are deliberately excluded.
+The generic `telu-baseline propose-reference` command independently reports the sanitized host class (`Apple M4; 16 GiB`, macOS/aarch64) and intentionally leaves the application revision unknown unless it was embedded at build time. The approved revision above is the exact revision selected for this matrix and must be compared with the packaged artifact before a run begins. The canonical model identifier came from the local macOS hardware report. Serial numbers, platform UUIDs, UDIDs, usernames, and full paths are deliberately excluded.
 
-## Blocking fields
+## Preflight comparison and still-unverified evidence
 
-The primary reference is not reproducible until all of these are supplied and approved:
+The reference configuration and procedures are approved. Before every measured run, preflight must compare the live machine and packaged artifact with every approved value above. A mismatch blocks that run rather than silently creating a new configuration.
 
-- Exact microphone device name and connection path.
-- Exact system-audio device or capture path; state `none` only if the matrix is deliberately narrowed and sustained/overlapping system-audio scenarios remain blocked.
-- Transcription engine, model filename/version, acceleration backend, and model checksum or other stable local identifier.
-- Evaluation language and any language-detection setting.
-- Packaged application build identifier that maps to the source revision above.
-- Authoritative battery/power evidence method, including power source, stabilization, sampling interval, idle control, repeat duration, uncertainty, and any privileges required.
-- Authoritative OS firewall/proxy observation method for the network-blocked canary, including block scope, capture interface, observation window, privilege requirements, and retained redacted evidence.
-- Exact queue-capacity and finalization-deadline experiment inputs. These are recorded inputs, not thresholds.
+The following evidence has not yet been collected and remains blocking/unverified:
 
-The versioned fixture therefore records `power`, `devices`, `model`, `language`, and `networkCanaryMethod` as `unknown`. macOS, Windows, and Linux smoke coverage remain `unverified` until executed on named configurations.
+- Live preflight proof that the packaged artifact maps to revision `da1ffc622efba4a9df55f369b2471c2cd15e34ca` and that the installed model files match all three approved SHA-256 values.
+- Raw P1 idle/workload samples, `pmset` snapshots, thermal state, repeat distributions, outliers, and battery-resolution/uncertainty review.
+- Raw N1 PF/tcpdump observation, redacted timestamps/destinations/dispositions/interface, outbound-ledger reconciliation, and proof that the original PF state was restored.
+- Warm-up, measured-repeat, packaged-app smoke, aggregate, threshold-declaration, and later validation-run evidence for every required scenario.
+- Any macOS combination other than this exact configuration and all Windows/Linux smoke coverage.
+
+The committed fixture remains a deliberately unapproved example: its `power`, `devices`, `model`, `language`, and `networkCanaryMethod` values stay `unknown`. Approved values belong in a new run-specific local experiment manifest, never in a rewritten fixture that could be mistaken for collected evidence.
 
 ## Defensible battery and power methods
 
@@ -59,6 +67,16 @@ Select one authoritative method and record its exact procedure. CPU percentage i
 
 If none is selected or the chosen method cannot produce defensible observations, battery evidence remains `unknown` and BASE-04 does not pass.
 
+### Approved procedure P1 — `power-method-p1-2026-09-22.1`
+
+- Run unplugged and stabilize for 10 minutes before each observation window.
+- Fix the display at 50%; keep Low Power Mode off; keep the approved model, devices, and background workload fixed.
+- Collect `powermetrics` samples every 5 seconds. Elevated local privileges are required.
+- Use matching 15-minute idle and workload windows with three measured repeats.
+- Retain `pmset` snapshots before and after each window, thermal state, all raw local samples, and all outliers.
+- Record the battery-percentage resolution and state explicitly that `powermetrics` observations are platform estimates, not laboratory joules.
+- Until those retained observations are collected and reviewed, battery outcome status is `unverified` and BASE-04 remains blocked.
+
 ## Defensible network canary methods
 
 Select one authoritative method and record its exact rules and capture procedure. The application ledger is necessary but is not independent packet evidence.
@@ -82,13 +100,25 @@ Select one authoritative method and record its exact rules and capture procedure
 
 A proxy-only method that can be bypassed by direct sockets is not authoritative unless direct traffic is independently blocked or captured.
 
+### Approved procedure N1 — `network-method-n1-2026-09-22.1`
+
+- Disable VPN and proxies before preflight and record that state.
+- On active physical interface `en0`, install a temporary, narrowly scoped PF deny ruleset for non-loopback egress.
+- Simultaneously capture `en0` with `tcpdump`, including DNS, for the complete observation window.
+- Retain only redacted timestamps, destinations, dispositions, and interface; do not retain packet payloads.
+- Reconcile every observed attempt with the Telu outbound ledger and record loopback/DNS handling explicitly.
+- Record that elevated local privileges are required.
+- Restore the original PF state after the window and retain proof that restoration succeeded.
+- Until block/capture, reconciliation, and restoration evidence are collected and reviewed, the network-canary outcome is `unverified` and PRIV-03 remains blocked.
+
 ## Approval
 
-- Primary reference decision: pending
-- Exact fingerprint approved: no
-- Battery/power method: pending
-- OS network-block/capture method: pending
-- Approval date: pending
-- Approver: pending
+- Primary reference decision: approved — captured 14-inch MacBook Pro configuration above
+- Exact fingerprint approved: yes, configuration version `reference-2026-09-22.1`
+- Battery/power method: approved — P1, procedure `power-method-p1-2026-09-22.1`
+- OS network-block/capture method: approved — N1, procedure `network-method-n1-2026-09-22.1`
+- Approval date: 2026-09-22
+- Approver: Nick
+- Evidence collection status: unverified — approval does not substitute for raw physical observations or validation
 
 Changing an approved machine, device, model, language, power method, or canary method creates a new version of this record and a new matrix plan. It does not rewrite prior run evidence.
