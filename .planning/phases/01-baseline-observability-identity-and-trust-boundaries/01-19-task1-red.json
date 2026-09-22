@@ -1,0 +1,8 @@
+{
+  "command": "cargo test --manifest-path frontend/src-tauri/Cargo.toml --test baseline_matrix valid_manifest_lists_the_complete_ordered_matrix -- --nocapture",
+  "exitCode": 101,
+  "output": "running 1 test\nnot ok 1 - valid_manifest_lists_the_complete_ordered_matrix\n1..1\n# tests 1\n# pass 0\n# fail 1\n# cancelled 0\n# assertion: valid manifest rejected: TELU_BASELINE_NOT_IMPLEMENTED",
+  "targetTest": "valid_manifest_lists_the_complete_ordered_matrix",
+  "expected": "The baseline runner validates the fixture manifest and returns the complete ten-scenario matrix in deterministic order",
+  "actual": "The runner exited 64 with TELU_BASELINE_NOT_IMPLEMENTED, causing the target behavior assertion to fail"
+}
