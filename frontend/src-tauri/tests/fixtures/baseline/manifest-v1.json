@@ -4,7 +4,7 @@
   "scenarioVersion": "phase1-baseline-v1",
   "referenceProfile": {
     "status": "proposed",
-    "appRevision": { "status": "observed", "value": "f0780df4e666" },
+    "appRevision": { "status": "unknown", "reason": "packaged_build_revision_not_recorded" },
     "os": { "status": "observed", "value": "macOS 26.6.2 (25G83); arm64" },
     "hardware": { "status": "observed", "value": "MacBook Pro Mac16,1; Apple M4; 16 GB" },
     "power": { "status": "unknown", "reason": "battery_evidence_method_not_approved" },

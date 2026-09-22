@@ -4,7 +4,7 @@ status: unverified
 
 This record is the approval boundary for the Phase 1 physical matrix. `proposed` means the host was observed but has not been accepted as the primary reference machine. No matrix result, threshold, or downstream gate may treat this record as approved until every blocking field below is complete and the approval section records an explicit decision.
 
-## Proposed host captured 2026-09-21
+## Proposed host captured 2026-09-22
 
 | Field | Proposed value | State |
 |---|---|---|
@@ -13,7 +13,7 @@ This record is the approval boundary for the Phase 1 physical matrix. `proposed`
 | Memory | 16 GB | proposed, not approved |
 | Architecture | arm64 / aarch64 | proposed, not approved |
 | Operating system | macOS 26.6.2, build 25G83 | proposed, not approved |
-| Source revision | `f0780df4e666f3d5e352fb9bfdf378be75c003b0` | observed; the packaged build revision must match |
+| Source revision | pending | unknown until the exact tested packaged build revision is recorded |
 | Power snapshot | AC power, internal battery present at 99% and finishing charge | context only; not battery evidence |
 | Capture sample baseline | 48 kHz; actual channel/sample configuration must be recorded per run | proposed input, not a performance threshold |
 | Effective route | Local, this device | proposed; each run must retain its validated route record |
