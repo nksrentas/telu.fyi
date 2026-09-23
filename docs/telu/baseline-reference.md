@@ -1,8 +1,8 @@
 # Telu Phase 1 baseline reference
 
-status: approved
+status: unverified — proposed revision requires renewed approval
 
-This record is the approval boundary for the Phase 1 physical matrix. Nick approved reference configuration version `reference-2026-09-22.1` on 2026-09-22. Approval authorizes the matrix configuration and evidence procedures only; it does not assert that battery, packet, scenario, validation, or supported-platform evidence has been collected. Every such result remains `unverified` until its retained evidence passes review.
+This record is the approval boundary for the Phase 1 physical matrix. Nick approved reference configuration version `reference-2026-09-22.1` and procedures P1/N1 on 2026-09-22. That historical approval remains the configuration and methods baseline, but its executable revision `da1ffc622efba4a9df55f369b2471c2cd15e34ca` is superseded for future execution. The renewed execution candidate is implementation revision `604f596d413ed88e64f8ed024da30ebd38d4871b`; it is proposed and unverified until Nick explicitly approves that exact revision. No physical P1 or N1 observation is authorized by this document alone.
 
 ## Approved primary reference captured 2026-09-22
 
@@ -20,22 +20,24 @@ This record is the approval boundary for the Phase 1 physical matrix. Nick appro
 | Preprocessor model | `nemo128.onnx`; SHA-256 `a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f` | approved installed-model identifier |
 | Decoder/joint model | `decoder_joint-model.int8.onnx`; SHA-256 `eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70` | approved installed-model identifier |
 | Evaluation language | English; automatic language detection disabled | approved |
-| Packaged/source build revision | `da1ffc622efba4a9df55f369b2471c2cd15e34ca` | approved matrix input; packaged execution evidence not yet collected |
+| Historical approved build revision | `da1ffc622efba4a9df55f369b2471c2cd15e34ca` | superseded for execution; retained as approval history only |
+| Proposed packaged/source build revision | `604f596d413ed88e64f8ed024da30ebd38d4871b` | proposed/unverified; renewed approval required before physical execution |
 | Queue capacity | 8 | approved experiment input, not a performance threshold |
 | Finalization deadline | 120000 ms | approved experiment input, not a performance threshold |
 | Power snapshot | Earlier capture reported AC power, internal battery present at 99%, finishing charge | context only; not battery evidence |
 | Capture sample baseline | 48 kHz; actual channel/sample configuration must be recorded per run | approved preflight baseline, not a performance threshold |
 | Effective route | Local, this device | approved expected route; each run must retain its validated route record |
 
-The generic `telu-baseline propose-reference` command independently reports the sanitized host class (`Apple M4; 16 GiB`, macOS/aarch64) and intentionally leaves the application revision unknown unless it was embedded at build time. The approved revision above is the exact revision selected for this matrix and must be compared with the packaged artifact before a run begins. The canonical model identifier came from the local macOS hardware report. Serial numbers, platform UUIDs, UDIDs, usernames, and full paths are deliberately excluded.
+The packaged `telu-baseline propose-reference` command independently reports the sanitized host class (`Apple M4; 16 GiB`, macOS/aarch64) and the application revision embedded at build time. The clean-snapshot approval candidate reports the full proposed revision `604f596d413ed88e64f8ed024da30ebd38d4871b` in both the CLI and main executable. The package corresponds to that implementation commit, not to later documentation-only or branding commits. The canonical model identifier came from the local macOS hardware report. Serial numbers, platform UUIDs, UDIDs, usernames, and full paths are deliberately excluded.
 
 ## Preflight comparison and still-unverified evidence
 
-The reference configuration and procedures are approved. Before every measured run, preflight must compare the live machine and packaged artifact with every approved value above. A mismatch blocks that run rather than silently creating a new configuration.
+The reference configuration and procedures retain their historical approval, but the proposed implementation revision does not. Before any measured run, renewed approval must name the exact full revision above. Preflight must then compare the live machine and packaged artifact with every approved value. A mismatch blocks that run rather than silently creating a new configuration.
 
 The following evidence has not yet been collected and remains blocking/unverified:
 
-- Live preflight proof that the packaged artifact maps to revision `da1ffc622efba4a9df55f369b2471c2cd15e34ca` and that the installed model files match all three approved SHA-256 values.
+- Explicit renewed human approval of implementation revision `604f596d413ed88e64f8ed024da30ebd38d4871b` for the existing reference fingerprint and P1/N1 procedures.
+- Live preflight proof that the packaged artifact maps to revision `604f596d413ed88e64f8ed024da30ebd38d4871b` and that the installed model files match all three approved SHA-256 values.
 - Raw P1 idle/workload samples, `pmset` snapshots, thermal state, repeat distributions, outliers, and battery-resolution/uncertainty review.
 - Raw N1 PF/tcpdump observation, redacted timestamps/destinations/dispositions/interface, outbound-ledger reconciliation, and proof that the original PF state was restored.
 - Warm-up, measured-repeat, packaged-app smoke, aggregate, threshold-declaration, and later validation-run evidence for every required scenario.
@@ -113,12 +115,14 @@ A proxy-only method that can be bypassed by direct sockets is not authoritative 
 
 ## Approval
 
-- Primary reference decision: approved — captured 14-inch MacBook Pro configuration above
-- Exact fingerprint approved: yes, configuration version `reference-2026-09-22.1`
-- Battery/power method: approved — P1, procedure `power-method-p1-2026-09-22.1`
-- OS network-block/capture method: approved — N1, procedure `network-method-n1-2026-09-22.1`
-- Approval date: 2026-09-22
-- Approver: Nick
+- Historical primary reference decision: approved — captured 14-inch MacBook Pro configuration above
+- Historical exact fingerprint approval: yes, configuration version `reference-2026-09-22.1`
+- Historical battery/power method approval: P1, procedure `power-method-p1-2026-09-22.1`
+- Historical OS network-block/capture method approval: N1, procedure `network-method-n1-2026-09-22.1`
+- Historical approval date and approver: 2026-09-22, Nick
+- Superseded execution revision: `da1ffc622efba4a9df55f369b2471c2cd15e34ca`
+- Proposed execution revision: `604f596d413ed88e64f8ed024da30ebd38d4871b`
+- Renewed revision approval: pending; do not run P1/N1 until explicitly approved
 - Evidence collection status: unverified — approval does not substitute for raw physical observations or validation
 
 Changing an approved machine, device, model, language, power method, or canary method creates a new version of this record and a new matrix plan. It does not rewrite prior run evidence.

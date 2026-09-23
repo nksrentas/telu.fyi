@@ -4,30 +4,47 @@ This protocol turns the Phase 1 instrumentation into repeatable local evidence. 
 
 ## Runner contract
 
-From the repository root:
+Use the `telu-baseline` executable bundled with the exact packaged application selected for approval, not a binary rebuilt from a later dirty working tree. For example:
 
 ```bash
-cargo run --manifest-path frontend/src-tauri/Cargo.toml --bin telu-baseline -- validate frontend/src-tauri/tests/fixtures/baseline/manifest-v1.json
-cargo run --manifest-path frontend/src-tauri/Cargo.toml --bin telu-baseline -- propose-reference
+BASELINE_CLI="/path/to/meetily.app/Contents/MacOS/telu-baseline"
+"$BASELINE_CLI" validate MANIFEST.json
+"$BASELINE_CLI" propose-reference
 ```
 
-After the reference decision, copy the versioned manifest to a run-specific local experiment directory, replace proposed/unknown fields only with approved values, and validate it. Do not edit the committed fixture into a false approval record.
+After the renewed revision decision, copy the versioned manifest to a run-specific local experiment directory, replace proposed/unknown fields only with approved values, and validate it. The manifest's observed `appRevision` must equal the full revision embedded in the packaged CLI. Do not edit the committed fixture into a false approval record.
 
 Create the immutable ordered run ledger once:
 
 ```bash
-cargo run --manifest-path frontend/src-tauri/Cargo.toml --bin telu-baseline -- plan MANIFEST.json MATRIX-PLAN.json
+"$BASELINE_CLI" plan MANIFEST.json MATRIX-PLAN.json
 ```
 
 `plan` creates one distinct UUID and `run-<uuid>` bundle identity for every warm-up and measured repetition in manifest order. It uses create-new semantics and refuses to overwrite an existing ledger.
 
+Immediately before each packaged-app run, authorize exactly one planned sequence into the packaged app's standard app-data directory:
+
+```bash
+"$BASELINE_CLI" authorize-run MANIFEST.json MATRIX-PLAN.json RUN_SEQUENCE
+```
+
+`authorize-run` fails closed unless the manifest is approved and complete, the plan is intact, the sequence exists, and the manifest revision exactly matches the revision embedded in the CLI. Its JSON response contains a one-time `assignmentId`, expiration, run/scenario identity, and a `launchEnvironment` entry named `TELU_BASELINE_ASSIGNMENT_ID`. Launch the packaged executable with that exact environment value and the matching app-data location. The app claims the assignment before native capture starts, injects the assigned run/scenario identity into the stage clock, and refuses malformed, expired, reused, tampered, unplanned, scenario-mismatched, or revision-mismatched assignments. Successful native finalization moves the assignment to finalized state and writes its provenance into the immutable run bundle.
+
 After physical runs have produced Plan 17 bundles under a local bundle root, aggregate them to a new path:
 
 ```bash
-cargo run --manifest-path frontend/src-tauri/Cargo.toml --bin telu-baseline -- aggregate MANIFEST.json MATRIX-PLAN.json BUNDLE-ROOT AGGREGATE.json
+"$BASELINE_CLI" aggregate MANIFEST.json MATRIX-PLAN.json BUNDLE-ROOT AGGREGATE.json
 ```
 
 Aggregation revalidates each present bundle with the Plan 17 schema, ordering, queue-conservation, identity, and redaction validator. A malformed present bundle fails the command. A missing bundle remains `unknown`/`bundle_missing`. The report preserves individual run IDs, relative bundle names, raw metric samples, min/max distributions, limitations, and outliers. It refuses to publish inside the raw bundle root or overwrite an existing report.
+
+After the threshold declaration and separate validation matrix exist, validate the gate artifact with the same packaged CLI:
+
+```bash
+"$BASELINE_CLI" verify-gate BASELINE-GATE.json
+```
+
+`verify-gate` is fail-closed: empty, missing, duplicated, reordered, late, lost, unknown, non-finite, aggregate-mismatched, or unsafe artifact evidence cannot produce `go`.
 
 ## Required preflight
 
@@ -67,14 +84,15 @@ If a required device, model, permission, method, or packaged build is unavailabl
 
 ## Per-run sequence
 
-1. Confirm the run ID and expected `run-<uuid>` directory from the immutable matrix plan.
-2. Capture preflight state and start the approved resource/power and, for the canary, OS network observers.
-3. Start the packaged app and verify the displayed effective route before data-bearing work.
-4. Execute only the named scenario and its declared injection. Do not tune VAD, ASR, model, queue capacity, or deadline between measured repetitions.
-5. Stop or force termination exactly as specified; wait only for the authoritative finalization/recovery state, never a fixed quiet delay.
-6. Finalize the Plan 17 bundle using the assigned run ID. Validate it locally and record any failure without replacing the directory.
-7. Stop observers, record end state/uncertainty, and reconcile canary OS evidence with the app ledger.
-8. Inspect Diagnostics for the same run ID. Retain unknowns, failures, limitations, and outliers.
+1. Confirm the run ID, run sequence, scenario, and expected `run-<uuid>` directory from the immutable matrix plan.
+2. Create a fresh one-time assignment with packaged `authorize-run`; verify its returned run/scenario/revision identity and expiration. Never reuse an assignment from an earlier launch.
+3. Capture preflight state and start the approved resource/power and, for the canary, OS network observers.
+4. Start the packaged executable with the returned `TELU_BASELINE_ASSIGNMENT_ID` and verify the displayed effective route before data-bearing work.
+5. Execute only the named scenario and its declared injection. Do not tune VAD, ASR, model, queue capacity, or deadline between measured repetitions.
+6. Stop or force termination exactly as specified; wait only for the authoritative finalization/recovery state, never a fixed quiet delay.
+7. Confirm native finalization created the immutable Plan 17 bundle with the assigned run ID and assignment provenance. Validate it locally and record any failure without replacing the directory.
+8. Stop observers, record end state/uncertainty, and reconcile canary OS evidence with the app ledger.
+9. Inspect Diagnostics for the same run ID. Retain unknowns, failures, limitations, and outliers.
 
 ## Crash and recovery safety
 
