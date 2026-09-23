@@ -31,9 +31,11 @@
 //! # Custom Templates
 //!
 //! Users can add custom templates to:
-//! - macOS: `~/Library/Application Support/Meetily/templates/`
-//! - Windows: `%APPDATA%\Meetily\templates\`
-//! - Linux: `~/.config/Meetily/templates/`
+//! - macOS: `~/Library/Application Support/Telu/templates/`
+//! - Windows: `%APPDATA%\Telu\templates\`
+//! - Linux: `~/.config/Telu/templates/`
+//!
+//! Existing Meetily template directories remain readable for compatibility.
 //!
 //! Custom templates must follow the JSON schema defined in `types::Template`.
 

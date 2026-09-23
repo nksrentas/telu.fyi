@@ -38,11 +38,11 @@ function autoDiscoveredBinaryNames() {
 test('the multi-binary Tauri package pins the desktop GUI as Cargo default-run', () => {
   const binaries = autoDiscoveredBinaryNames();
   assert.ok(binaries.length > 1, 'this regression requires a multi-binary package');
-  assert.ok(binaries.includes('meetily'));
+  assert.ok(binaries.includes('telu'));
   assert.ok(binaries.includes('telu-baseline'));
   assert.equal(
     packageField('default-run'),
-    'meetily',
+    'telu',
     'Tauri requires an explicit Cargo default-run once src/bin adds an auxiliary executable',
   );
 });

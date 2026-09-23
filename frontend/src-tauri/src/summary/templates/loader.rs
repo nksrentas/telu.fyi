@@ -19,14 +19,22 @@ pub fn set_bundled_templates_dir(path: PathBuf) {
 /// Get the user's custom templates directory path
 ///
 /// Returns the platform-specific application data directory for custom templates:
-/// - macOS: ~/Library/Application Support/Meetily/templates/
-/// - Windows: %APPDATA%\Meetily\templates\
-/// - Linux: ~/.config/Meetily/templates/
+/// - macOS: ~/Library/Application Support/Telu/templates/
+/// - Windows: %APPDATA%\Telu\templates\
+/// - Linux: ~/.config/Telu/templates/
+///
+/// An existing Meetily directory remains readable so custom templates survive
+/// the product rename.
 fn get_custom_templates_dir() -> Option<PathBuf> {
-    let mut path = dirs::data_dir()?;
-    path.push("Meetily");
-    path.push("templates");
-    Some(path)
+    let data_dir = dirs::data_dir()?;
+    let telu_dir = data_dir.join("Telu").join("templates");
+    let legacy_dir = data_dir.join("Meetily").join("templates");
+
+    if !telu_dir.exists() && legacy_dir.exists() {
+        Some(legacy_dir)
+    } else {
+        Some(telu_dir)
+    }
 }
 
 /// Load a template from the bundled resources directory

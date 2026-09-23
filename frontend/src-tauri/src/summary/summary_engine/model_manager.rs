@@ -142,12 +142,16 @@ impl ModelManager {
             } else {
                 // Production mode fallback (caller should provide path)
                 log::warn!("ModelManager: No models directory provided, using fallback path");
-                dirs::data_dir()
+                let data_dir = dirs::data_dir()
                     .or_else(|| dirs::home_dir())
-                    .ok_or_else(|| anyhow!("Could not find system data directory"))?
-                    .join("Meetily")
-                    .join("models")
-                    .join("summary")
+                    .ok_or_else(|| anyhow!("Could not find system data directory"))?;
+                let telu_dir = data_dir.join("Telu").join("models").join("summary");
+                let legacy_dir = data_dir.join("Meetily").join("models").join("summary");
+                if !telu_dir.exists() && legacy_dir.exists() {
+                    legacy_dir
+                } else {
+                    telu_dir
+                }
             }
         };
 

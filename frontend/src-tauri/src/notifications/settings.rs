@@ -112,11 +112,16 @@ impl<R: Runtime> ConsentManager<R> {
 
     /// Get the path where notification settings are stored
     fn get_settings_path() -> Result<PathBuf> {
-        let mut path = dirs::config_dir()
+        let config_dir = dirs::config_dir()
             .ok_or_else(|| anyhow!("Could not find config directory"))?;
 
-        path.push("meetily");
-        path.push("notifications.json");
+        let telu_path = config_dir.join("telu").join("notifications.json");
+        let legacy_path = config_dir.join("meetily").join("notifications.json");
+        let path = if !telu_path.exists() && legacy_path.exists() {
+            legacy_path
+        } else {
+            telu_path
+        };
 
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {

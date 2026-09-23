@@ -106,13 +106,16 @@ impl SidecarManager {
 
     /// Resolve the path to llama-helper binary
     fn resolve_helper_binary() -> Result<PathBuf> {
-        // 1. Check environment variable (dev mode or manual override)
-        if let Ok(env_path) = std::env::var("MEETILY_LLAMA_HELPER") {
-            if !env_path.is_empty() {
-                let path = PathBuf::from(env_path);
-                if path.exists() {
-                    log::info!("Using llama-helper from MEETILY_LLAMA_HELPER: {}", path.display());
-                    return Ok(path);
+        // 1. Check environment variables (dev mode or manual override). Keep the
+        // Meetily name as a compatibility alias for existing developer setups.
+        for env_name in ["TELU_LLAMA_HELPER", "MEETILY_LLAMA_HELPER"] {
+            if let Ok(env_path) = std::env::var(env_name) {
+                if !env_path.is_empty() {
+                    let path = PathBuf::from(env_path);
+                    if path.exists() {
+                        log::info!("Using llama-helper from {}: {}", env_name, path.display());
+                        return Ok(path);
+                    }
                 }
             }
         }
@@ -255,7 +258,7 @@ impl SidecarManager {
         }
 
         Err(anyhow!(
-            "llama-helper binary not found. Build with 'cd llama-helper && cargo build --release' or set MEETILY_LLAMA_HELPER env var."
+            "llama-helper binary not found. Build with 'cd llama-helper && cargo build --release' or set TELU_LLAMA_HELPER. MEETILY_LLAMA_HELPER remains supported as a compatibility alias."
         ))
     }
 

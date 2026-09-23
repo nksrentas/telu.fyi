@@ -1,8 +1,8 @@
 [package]
-name = "meetily"
-default-run = "meetily"
+name = "telu"
+default-run = "telu"
 version = "0.4.1"
-description = "A Tauri App for meeting minutes"
+description = "A local-first, context-aware desktop companion for recurring conversations"
 authors = ["Sujith S"]
 license = "MIT"
 repository = "https://github.com/Zackriya-Solutions/meeting-minutes"

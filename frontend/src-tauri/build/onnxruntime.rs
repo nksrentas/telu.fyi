@@ -120,11 +120,8 @@ pub fn ensure_onnxruntime_runtime() {
     )
     .expect("Failed to create ONNX Runtime binaries directory");
 
-    let temporary_archive = env::temp_dir().join(format!(
-        "meetily-onnxruntime-{}-{}.zip",
-        process::id(),
-        target
-    ));
+    let temporary_archive =
+        env::temp_dir().join(format!("telu-onnxruntime-{}-{}.zip", process::id(), target));
     let temporary_destination =
         destination.with_file_name(format!(".onnxruntime-{}-{}", process::id(), target));
     let _ = fs::remove_file(&temporary_archive);
@@ -211,11 +208,8 @@ fn copy_exact<R: Read, W: Write>(
     destination: &mut W,
     expected_size: u64,
 ) -> Result<(), String> {
-    let copied = std::io::copy(
-        &mut source.by_ref().take(expected_size),
-        destination,
-    )
-    .map_err(|error| format!("failed to copy ONNX Runtime download: {error}"))?;
+    let copied = std::io::copy(&mut source.by_ref().take(expected_size), destination)
+        .map_err(|error| format!("failed to copy ONNX Runtime download: {error}"))?;
     if copied != expected_size {
         return Err(format!(
             "downloaded ONNX Runtime archive has size {copied}, expected {expected_size}"

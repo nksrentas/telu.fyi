@@ -2,7 +2,7 @@
 """
 Meeting Transcript Database Injector
 
-Injects CSV-based transcript data into the Meetily SQLite database,
+Injects CSV-based transcript data into the Telu SQLite database,
 creating meeting entries identical to those from normal recordings.
 
 Usage:
@@ -31,17 +31,24 @@ def get_default_db_path() -> Path:
     system = platform.system()
 
     if system == "Darwin":  # macOS
-        base_path = Path.home() / "Library" / "Application Support" / "Meetily"
+        data_root = Path.home() / "Library" / "Application Support"
     elif system == "Windows":
         appdata = os.environ.get("APPDATA", "")
         if appdata:
-            base_path = Path(appdata) / "Meetily"
+            data_root = Path(appdata)
         else:
-            base_path = Path.home() / "AppData" / "Roaming" / "Meetily"
+            data_root = Path.home() / "AppData" / "Roaming"
     else:  # Linux and others
-        base_path = Path.home() / ".config" / "Meetily"
+        data_root = Path.home() / ".config"
 
-    return base_path / "meeting_minutes.sqlite"
+    # com.meetily.ai is intentionally retained as the installed app's stable
+    # data identifier. The older display-name folders are compatibility paths.
+    candidates = [
+        data_root / "com.meetily.ai" / "meeting_minutes.sqlite",
+        data_root / "Telu" / "meeting_minutes.sqlite",
+        data_root / "Meetily" / "meeting_minutes.sqlite",
+    ]
+    return next((path for path in candidates if path.exists()), candidates[0])
 
 
 def estimate_duration(text: str) -> float:
@@ -227,7 +234,7 @@ def verify_injection(db_path: str, meeting_id: str) -> dict:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Inject CSV transcript data into Meetily database",
+        description="Inject CSV transcript data into the Telu database",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 CSV Format (minimal - just 'text' column required):
@@ -281,7 +288,7 @@ Example usage:
 
     if not db_path.exists():
         print(f"Error: Database not found at {db_path}", file=sys.stderr)
-        print("Make sure Meetily has been run at least once to create the database.", file=sys.stderr)
+        print("Make sure Telu has been run at least once to create the database.", file=sys.stderr)
         sys.exit(1)
 
     # Resolve CSV path
@@ -344,7 +351,7 @@ Example usage:
     except Exception as e:
         print(f"Warning: Verification failed: {e}", file=sys.stderr)
 
-    print("\nThe meeting should now appear in the Meetily sidebar.")
+    print("\nThe meeting should now appear in the Telu sidebar.")
 
 
 if __name__ == "__main__":

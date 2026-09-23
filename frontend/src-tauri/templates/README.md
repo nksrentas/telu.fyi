@@ -47,9 +47,11 @@ Each template JSON file follows this schema:
 
 Users can add custom templates to the application data directory:
 
-- **macOS**: `~/Library/Application Support/Meetily/templates/`
-- **Windows**: `%APPDATA%\Meetily\templates\`
-- **Linux**: `~/.config/Meetily/templates/`
+- **macOS**: `~/Library/Application Support/Telu/templates/`
+- **Windows**: `%APPDATA%\Telu\templates\`
+- **Linux**: `~/.config/Telu/templates/`
+
+Existing Meetily template directories remain readable for compatibility.
 
 Custom templates override built-in templates with the same filename.
 

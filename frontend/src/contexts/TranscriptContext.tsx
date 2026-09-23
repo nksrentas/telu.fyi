@@ -160,7 +160,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
         receivedMeetingId: payload.meeting_id,
       });
       toast.error('Recording identity conflict', {
-        description: 'Meetily kept the active meeting unchanged. Reload the app before continuing.',
+        description: 'Telu kept the active meeting unchanged. Reload the app before continuing.',
       });
       return false;
     }

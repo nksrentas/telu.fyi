@@ -1,6 +1,6 @@
 # Contributing to Meeting Minutes Updates
 
-Thank you for your interest in contributing to Meetily! This document provides guidelines and instructions for contributing to this project.
+Thank you for your interest in contributing to Telu! This document provides guidelines and instructions for contributing to this project.
 
 ## Development Workflow
 
@@ -149,4 +149,4 @@ Types:
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's MIT License. 
+By contributing, you agree that your contributions will be licensed under the project's MIT License.
