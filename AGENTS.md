@@ -234,6 +234,13 @@ Use these entry points:
 Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
 <!-- GSD:workflow-end -->
 
+## Build Artifact Cleanup
+
+- Before creating a fresh packaged/release build, remove stale generated outputs from prior builds: `target/`, `frontend/.next/`, and `frontend/out/`.
+- These directories are disposable and may also be removed whenever they are consuming substantial disk space; the build tools recreate them as needed.
+- Do not delete `frontend/src-tauri/build/`: despite its name, it contains tracked Rust source code used by the build.
+- Keep `frontend/node_modules/` unless dependency reinstallation is intentionally part of the cleanup.
+
 <!-- GSD:profile-start -->
 
 ## Developer Profile
