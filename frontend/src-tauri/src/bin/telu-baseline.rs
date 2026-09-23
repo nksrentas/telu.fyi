@@ -1,8 +1,14 @@
+use app_lib::observability::baseline_assignment::{
+    embedded_app_revision, write_pending_assignment, AssignmentEnvironment, AssignmentFact,
+    AssignmentFactStatus, BaselineRunAssignment, BASELINE_ASSIGNMENT_ENV,
+    BASELINE_ASSIGNMENT_SCHEMA_VERSION,
+};
 use app_lib::observability::run_bundle::validate_run_bundle_dir;
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -32,6 +38,13 @@ const REQUIRED_REFERENCE_FIELDS: [&str; 5] = [
     "networkCanaryMethod",
 ];
 const REQUIRED_PLATFORMS: [&str; 3] = ["macos", "windows", "linux"];
+const REQUIRED_METRICS: [&str; 5] = [
+    "endToEndMicros",
+    "queueOldestAgeMs",
+    "queueDepth",
+    "processCpuPercent",
+    "processMemoryBytes",
+];
 
 #[derive(Debug, Parser)]
 #[command(name = "telu-baseline")]
@@ -55,6 +68,18 @@ enum Command {
         plan: PathBuf,
         bundle_root: PathBuf,
         output: PathBuf,
+    },
+    AuthorizeRun {
+        manifest: PathBuf,
+        plan: PathBuf,
+        sequence: usize,
+        #[arg(long)]
+        app_data_dir: Option<PathBuf>,
+        #[arg(long, default_value_t = 60)]
+        ttl_minutes: i64,
+    },
+    VerifyGate {
+        gate: PathBuf,
     },
     ProposeReference,
 }
@@ -81,6 +106,10 @@ enum BaselineError {
     OutputUnsafe,
     #[error("BASELINE_STORAGE_FAILED")]
     StorageFailed,
+    #[error("BASELINE_ASSIGNMENT_UNAUTHORIZED")]
+    AssignmentUnauthorized,
+    #[error("BASELINE_GATE_INVALID")]
+    GateInvalid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -251,6 +280,57 @@ struct MatrixPlan {
     runs: Vec<MatrixRun>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GateArtifact {
+    path: String,
+    sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ThresholdMetric {
+    id: String,
+    limit: f64,
+    operator: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ThresholdDeclaration {
+    declared_at_utc: String,
+    validation_started_at_utc: String,
+    metrics: Vec<ThresholdMetric>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GateStatusRecord {
+    id: String,
+    status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GateDisposition {
+    disposition: String,
+    evidence_status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct BaselineGate {
+    schema_version: u16,
+    review_aggregate: GateArtifact,
+    validation_aggregate: GateArtifact,
+    threshold_declaration: ThresholdDeclaration,
+    scenario_results: Vec<GateStatusRecord>,
+    metric_results: Vec<GateStatusRecord>,
+    retained_outliers: BTreeMap<String, Vec<Value>>,
+    phase_2: GateDisposition,
+    phase_4: GateDisposition,
+}
+
 fn main() {
     if let Err(error) = execute(Cli::parse().command) {
         eprintln!("{}", json!({"error": error.to_string()}));
@@ -291,6 +371,23 @@ fn execute(command: Command) -> Result<(), BaselineError> {
                 "outcome": aggregate["outcome"],
                 "runCount": plan.runs.len(),
             }))
+        }
+        Command::AuthorizeRun {
+            manifest,
+            plan,
+            sequence,
+            app_data_dir,
+            ttl_minutes,
+        } => authorize_run(
+            &manifest,
+            &plan,
+            sequence,
+            app_data_dir.as_deref(),
+            ttl_minutes,
+        ),
+        Command::VerifyGate { gate } => {
+            let report = verify_gate(&gate)?;
+            print_json(&report)
         }
         Command::ProposeReference => print_json(&proposed_reference()),
     }
@@ -459,6 +556,519 @@ fn validate_plan(manifest: &MatrixManifest, plan: &MatrixPlan) -> Result<(), Bas
         }
     }
     Ok(())
+}
+
+fn authorize_run(
+    manifest_path: &Path,
+    plan_path: &Path,
+    sequence: usize,
+    app_data_dir: Option<&Path>,
+    ttl_minutes: i64,
+) -> Result<(), BaselineError> {
+    let manifest = load_manifest(manifest_path)?;
+    let plan: MatrixPlan = read_json(plan_path)?;
+    validate_plan(&manifest, &plan)?;
+    let revision = embedded_app_revision();
+    let approved_revision = manifest
+        .reference_profile
+        .app_revision
+        .value
+        .as_deref()
+        .ok_or(BaselineError::AssignmentUnauthorized)?;
+    if manifest.reference_profile.status != ReferenceStatus::Approved
+        || !manifest
+            .reference_profile
+            .missing_required_fields()
+            .is_empty()
+        || manifest
+            .reference_profile
+            .facts()
+            .iter()
+            .any(|(_, fact)| fact.status != FactStatus::Observed)
+        || revision == "unverified"
+        || approved_revision != revision
+        || !(1..=1_440).contains(&ttl_minutes)
+    {
+        return Err(BaselineError::AssignmentUnauthorized);
+    }
+    let run = plan
+        .runs
+        .get(sequence)
+        .filter(|run| run.sequence == sequence as u64)
+        .ok_or(BaselineError::PlanInvalid)?;
+    let issued_at_utc = Utc::now();
+    let assignment = BaselineRunAssignment {
+        schema_version: BASELINE_ASSIGNMENT_SCHEMA_VERSION,
+        assignment_id: Uuid::new_v4().to_string(),
+        authorization: "approved".to_string(),
+        source: "telu-baseline-authorize-run-v1".to_string(),
+        matrix_id: manifest.matrix_id.clone(),
+        matrix_plan_sha256: sha256_file(plan_path)?,
+        run_sequence: run.sequence,
+        run_id: run.run_id.clone(),
+        scenario_id: run.scenario_id.clone(),
+        scenario_version: manifest.scenario_version.clone(),
+        run_kind: run.run_kind.clone(),
+        repeat_index: run.repeat_index,
+        bundle_directory: run.bundle_directory.clone(),
+        app_revision: revision.to_string(),
+        issued_at_utc,
+        expires_at_utc: issued_at_utc + Duration::minutes(ttl_minutes),
+        environment: AssignmentEnvironment {
+            os: assignment_fact(&manifest.reference_profile.os)?,
+            hardware: assignment_fact(&manifest.reference_profile.hardware)?,
+            power: assignment_fact(&manifest.reference_profile.power)?,
+            devices: assignment_fact(&manifest.reference_profile.devices)?,
+            sample_configuration: assignment_fact(
+                &manifest.reference_profile.sample_configuration,
+            )?,
+            model: assignment_fact(&manifest.reference_profile.model)?,
+            route: assignment_fact(&manifest.reference_profile.route)?,
+            language: assignment_fact(&manifest.reference_profile.language)?,
+            network_canary_method: assignment_fact(
+                &manifest.reference_profile.network_canary_method,
+            )?,
+        },
+        integrity_sha256: String::new(),
+    }
+    .seal()
+    .map_err(|_| BaselineError::AssignmentUnauthorized)?;
+    let app_data_dir = app_data_dir
+        .map(Path::to_path_buf)
+        .or_else(default_app_data_dir)
+        .ok_or(BaselineError::OutputUnsafe)?;
+    write_pending_assignment(&app_data_dir, &assignment)
+        .map_err(|_| BaselineError::AssignmentUnauthorized)?;
+    print_json(&json!({
+        "authorized": true,
+        "assignmentId": assignment.assignment_id,
+        "runId": assignment.run_id,
+        "scenarioId": assignment.scenario_id,
+        "scenarioVersion": assignment.scenario_version,
+        "runSequence": assignment.run_sequence,
+        "expiresAtUtc": assignment.expires_at_utc,
+        "launchEnvironment": {
+            "name": BASELINE_ASSIGNMENT_ENV,
+            "value": assignment.assignment_id,
+        },
+    }))
+}
+
+fn assignment_fact(fact: &ReferenceFact) -> Result<AssignmentFact, BaselineError> {
+    if fact.status != FactStatus::Observed || !fact.validate() {
+        return Err(BaselineError::AssignmentUnauthorized);
+    }
+    Ok(AssignmentFact {
+        status: AssignmentFactStatus::Observed,
+        value: fact.value.clone(),
+        reason: None,
+    })
+}
+
+fn default_app_data_dir() -> Option<PathBuf> {
+    dirs::data_dir().map(|root| root.join("com.meetily.ai"))
+}
+
+fn sha256_file(path: &Path) -> Result<String, BaselineError> {
+    let metadata = fs::symlink_metadata(path).map_err(|_| BaselineError::InputNotFound)?;
+    if !metadata.file_type().is_file()
+        || metadata.file_type().is_symlink()
+        || metadata.len() == 0
+        || metadata.len() > MAX_INPUT_BYTES
+    {
+        return Err(BaselineError::InputUnsafe);
+    }
+    let bytes = fs::read(path).map_err(|_| BaselineError::StorageFailed)?;
+    Ok(format!("{:x}", Sha256::digest(bytes)))
+}
+
+fn verify_gate(path: &Path) -> Result<Value, BaselineError> {
+    let gate = read_gate(path)?;
+    if gate.schema_version != MATRIX_SCHEMA_VERSION {
+        return Err(BaselineError::GateInvalid);
+    }
+    let parent = path.parent().ok_or(BaselineError::GateInvalid)?;
+    let review_path = resolve_gate_artifact(parent, &gate.review_aggregate)?;
+    let validation_path = resolve_gate_artifact(parent, &gate.validation_aggregate)?;
+    let review: Value = read_json(&review_path)?;
+    let validation: Value = read_json(&validation_path)?;
+    validate_gate_aggregate(&review)?;
+    validate_gate_aggregate(&validation)?;
+    if review.get("matrixId") != validation.get("matrixId")
+        || review.get("scenarioVersion") != validation.get("scenarioVersion")
+    {
+        return Err(BaselineError::GateInvalid);
+    }
+
+    let review_created = aggregate_timestamp(&review, "createdAtUtc")?;
+    let declared =
+        chrono::DateTime::parse_from_rfc3339(&gate.threshold_declaration.declared_at_utc)
+            .map_err(|_| BaselineError::GateInvalid)?;
+    let validation_started =
+        chrono::DateTime::parse_from_rfc3339(&gate.threshold_declaration.validation_started_at_utc)
+            .map_err(|_| BaselineError::GateInvalid)?;
+    let validation_created = aggregate_timestamp(&validation, "createdAtUtc")?;
+    if !(review_created < declared
+        && declared < validation_started
+        && validation_started <= validation_created)
+    {
+        return Err(BaselineError::GateInvalid);
+    }
+    validate_threshold_metrics(&gate.threshold_declaration.metrics)?;
+    validate_gate_statuses(&gate.scenario_results, &REQUIRED_SCENARIOS)?;
+    validate_gate_statuses(&gate.metric_results, &REQUIRED_METRICS)?;
+    let (computed_scenarios, computed_metrics) =
+        compute_validation_statuses(&validation, &gate.threshold_declaration.metrics)?;
+    for result in &gate.scenario_results {
+        if computed_scenarios.get(&result.id) != Some(&result.status) {
+            return Err(BaselineError::GateInvalid);
+        }
+    }
+    for result in &gate.metric_results {
+        if computed_metrics.get(&result.id) != Some(&result.status) {
+            return Err(BaselineError::GateInvalid);
+        }
+    }
+    let expected_outliers = BTreeMap::from([
+        ("review".to_string(), aggregate_outliers(&review)?),
+        ("validation".to_string(), aggregate_outliers(&validation)?),
+    ]);
+    if canonical_outliers(&gate.retained_outliers)? != canonical_outliers(&expected_outliers)? {
+        return Err(BaselineError::GateInvalid);
+    }
+    let all_pass = gate
+        .scenario_results
+        .iter()
+        .chain(gate.metric_results.iter())
+        .all(|result| result.status == "pass");
+    validate_disposition(&gate.phase_2, all_pass)?;
+    validate_disposition(&gate.phase_4, all_pass)?;
+
+    Ok(json!({
+        "valid": true,
+        "reviewRunCount": review["runs"].as_array().map_or(0, Vec::len),
+        "validationRunCount": validation["runs"].as_array().map_or(0, Vec::len),
+        "scenarioCount": gate.scenario_results.len(),
+        "metricCount": gate.metric_results.len(),
+        "phase2": gate.phase_2.disposition,
+        "phase4": gate.phase_4.disposition,
+    }))
+}
+
+fn read_gate(path: &Path) -> Result<BaselineGate, BaselineError> {
+    let metadata = fs::symlink_metadata(path).map_err(|_| BaselineError::InputNotFound)?;
+    if !metadata.file_type().is_file()
+        || metadata.file_type().is_symlink()
+        || metadata.len() == 0
+        || metadata.len() > MAX_INPUT_BYTES
+    {
+        return Err(BaselineError::InputUnsafe);
+    }
+    let text = fs::read_to_string(path).map_err(|_| BaselineError::StorageFailed)?;
+    let start = text.find("```json").ok_or(BaselineError::GateInvalid)? + "```json".len();
+    let end = text[start..]
+        .find("```")
+        .map(|offset| start + offset)
+        .ok_or(BaselineError::GateInvalid)?;
+    serde_json::from_str(&text[start..end]).map_err(|_| BaselineError::GateInvalid)
+}
+
+fn resolve_gate_artifact(parent: &Path, artifact: &GateArtifact) -> Result<PathBuf, BaselineError> {
+    let relative = Path::new(&artifact.path);
+    if relative.is_absolute()
+        || artifact.path.is_empty()
+        || relative.components().count() != 1
+        || !is_sha256(&artifact.sha256)
+    {
+        return Err(BaselineError::GateInvalid);
+    }
+    let path = parent.join(relative);
+    if sha256_file(&path)? != artifact.sha256 {
+        return Err(BaselineError::GateInvalid);
+    }
+    Ok(path)
+}
+
+fn validate_gate_aggregate(aggregate: &Value) -> Result<(), BaselineError> {
+    if aggregate["schemaVersion"].as_u64() != Some(u64::from(MATRIX_SCHEMA_VERSION))
+        || !aggregate["matrixId"].as_str().is_some_and(is_safe_reason)
+        || !aggregate["scenarioVersion"]
+            .as_str()
+            .is_some_and(is_safe_reason)
+        || aggregate_timestamp(aggregate, "createdAtUtc").is_err()
+    {
+        return Err(BaselineError::GateInvalid);
+    }
+    let runs = aggregate["runs"]
+        .as_array()
+        .filter(|runs| !runs.is_empty())
+        .ok_or(BaselineError::GateInvalid)?;
+    let scenarios = aggregate["scenarioAggregates"]
+        .as_array()
+        .ok_or(BaselineError::GateInvalid)?;
+    if scenarios.len() != REQUIRED_SCENARIOS.len() {
+        return Err(BaselineError::GateInvalid);
+    }
+
+    let mut run_ids = BTreeSet::new();
+    let mut run_slots = BTreeSet::new();
+    let mut previous_scenario_index = 0_usize;
+    for (index, run) in runs.iter().enumerate() {
+        let scenario_id = run["scenarioId"]
+            .as_str()
+            .ok_or(BaselineError::GateInvalid)?;
+        let scenario_index = REQUIRED_SCENARIOS
+            .iter()
+            .position(|required| *required == scenario_id)
+            .ok_or(BaselineError::GateInvalid)?;
+        let run_kind = run["runKind"]
+            .as_str()
+            .filter(|kind| matches!(*kind, "warmup" | "measured"))
+            .ok_or(BaselineError::GateInvalid)?;
+        let repeat_index = run["repeatIndex"]
+            .as_u64()
+            .ok_or(BaselineError::GateInvalid)?;
+        let run_id = run["runId"]
+            .as_str()
+            .filter(|value| Uuid::parse_str(value).is_ok())
+            .ok_or(BaselineError::GateInvalid)?;
+        let status = run["status"]
+            .as_str()
+            .filter(|status| matches!(*status, "pass" | "fail" | "unknown"))
+            .ok_or(BaselineError::GateInvalid)?;
+        if run["sequence"].as_u64() != Some(index as u64)
+            || scenario_index < previous_scenario_index
+            || !run_ids.insert(run_id)
+            || !run_slots.insert((scenario_id, run_kind, repeat_index))
+            || run["outliers"].as_array().is_none()
+            || run["reason"].as_str() == Some("bundle_missing")
+            || status == "unknown" && run["reason"].as_str().is_none()
+        {
+            return Err(BaselineError::GateInvalid);
+        }
+        previous_scenario_index = scenario_index;
+    }
+
+    for (expected, scenario) in REQUIRED_SCENARIOS.iter().zip(scenarios) {
+        if scenario["scenarioId"].as_str() != Some(*expected) {
+            return Err(BaselineError::GateInvalid);
+        }
+        let measured = runs
+            .iter()
+            .filter(|run| {
+                run["scenarioId"].as_str() == Some(*expected)
+                    && run["runKind"].as_str() == Some("measured")
+            })
+            .collect::<Vec<_>>();
+        if measured.len() < 2
+            || measured
+                .iter()
+                .enumerate()
+                .any(|(index, run)| run["repeatIndex"].as_u64() != Some(index as u64))
+            || scenario["runIds"].as_array()
+                != Some(
+                    &measured
+                        .iter()
+                        .map(|run| run["runId"].clone())
+                        .collect::<Vec<_>>(),
+                )
+            || scenario["status"].as_str()
+                != Some(combined_outcome(
+                    measured.iter().filter_map(|run| run["status"].as_str()),
+                ))
+        {
+            return Err(BaselineError::GateInvalid);
+        }
+        let distributions = scenario["distributions"]
+            .as_object()
+            .ok_or(BaselineError::GateInvalid)?;
+        for metric in REQUIRED_METRICS {
+            let distribution = distributions
+                .get(metric)
+                .ok_or(BaselineError::GateInvalid)?;
+            let count = distribution["count"].as_u64().unwrap_or(0);
+            let values = distribution["values"]
+                .as_array()
+                .ok_or(BaselineError::GateInvalid)?;
+            let numeric_values = values
+                .iter()
+                .map(|value| {
+                    value
+                        .as_f64()
+                        .filter(|value| value.is_finite())
+                        .ok_or(BaselineError::GateInvalid)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            let min = numeric_values.iter().copied().reduce(f64::min);
+            let max = numeric_values.iter().copied().reduce(f64::max);
+            if count == 0
+                || count as usize != values.len()
+                || distribution["min"].as_f64() != min
+                || distribution["max"].as_f64() != max
+            {
+                return Err(BaselineError::GateInvalid);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn aggregate_timestamp(
+    aggregate: &Value,
+    field: &str,
+) -> Result<chrono::DateTime<chrono::FixedOffset>, BaselineError> {
+    aggregate[field]
+        .as_str()
+        .ok_or(BaselineError::GateInvalid)
+        .and_then(|value| {
+            chrono::DateTime::parse_from_rfc3339(value).map_err(|_| BaselineError::GateInvalid)
+        })
+}
+
+fn validate_threshold_metrics(metrics: &[ThresholdMetric]) -> Result<(), BaselineError> {
+    if metrics.len() != REQUIRED_METRICS.len() {
+        return Err(BaselineError::GateInvalid);
+    }
+    for (expected, metric) in REQUIRED_METRICS.iter().zip(metrics) {
+        if metric.id != *expected
+            || !metric.limit.is_finite()
+            || metric.limit < 0.0
+            || !matches!(metric.operator.as_str(), "max" | "min")
+        {
+            return Err(BaselineError::GateInvalid);
+        }
+    }
+    Ok(())
+}
+
+fn compute_validation_statuses(
+    aggregate: &Value,
+    thresholds: &[ThresholdMetric],
+) -> Result<(BTreeMap<String, String>, BTreeMap<String, String>), BaselineError> {
+    let runs = aggregate["runs"]
+        .as_array()
+        .ok_or(BaselineError::GateInvalid)?;
+    let scenarios = aggregate["scenarioAggregates"]
+        .as_array()
+        .ok_or(BaselineError::GateInvalid)?;
+    let mut scenario_statuses = BTreeMap::new();
+    let mut metric_statuses = REQUIRED_METRICS
+        .iter()
+        .map(|metric| ((*metric).to_string(), "pass".to_string()))
+        .collect::<BTreeMap<_, _>>();
+    for scenario in scenarios {
+        let scenario_id = scenario["scenarioId"]
+            .as_str()
+            .ok_or(BaselineError::GateInvalid)?;
+        let scenario_runs = runs
+            .iter()
+            .filter(|run| {
+                run["scenarioId"].as_str() == Some(scenario_id)
+                    && run["runKind"].as_str() == Some("measured")
+            })
+            .collect::<Vec<_>>();
+        let mut scenario_status = if scenario_runs
+            .iter()
+            .any(|run| run["status"].as_str() == Some("fail"))
+        {
+            "fail"
+        } else if scenario_runs.iter().any(|run| {
+            run["status"].as_str() == Some("unknown")
+                && run["reason"].as_str() != Some("thresholds_not_declared")
+        }) {
+            "unknown"
+        } else {
+            "pass"
+        };
+        for threshold in thresholds {
+            let values = scenario["distributions"][&threshold.id]["values"]
+                .as_array()
+                .ok_or(BaselineError::GateInvalid)?;
+            let passes = values.iter().all(|value| {
+                value
+                    .as_f64()
+                    .is_some_and(|value| match threshold.operator.as_str() {
+                        "max" => value <= threshold.limit,
+                        "min" => value >= threshold.limit,
+                        _ => false,
+                    })
+            });
+            if !passes {
+                scenario_status = "fail";
+                metric_statuses.insert(threshold.id.clone(), "fail".to_string());
+            }
+        }
+        if scenario_status == "unknown" {
+            for status in metric_statuses.values_mut() {
+                if status == "pass" {
+                    *status = "unknown".to_string();
+                }
+            }
+        }
+        scenario_statuses.insert(scenario_id.to_string(), scenario_status.to_string());
+    }
+    Ok((scenario_statuses, metric_statuses))
+}
+
+fn validate_gate_statuses(
+    results: &[GateStatusRecord],
+    required: &[&str],
+) -> Result<(), BaselineError> {
+    if results.len() != required.len() {
+        return Err(BaselineError::GateInvalid);
+    }
+    for (expected, result) in required.iter().zip(results) {
+        if result.id != *expected || !matches!(result.status.as_str(), "pass" | "fail" | "unknown")
+        {
+            return Err(BaselineError::GateInvalid);
+        }
+    }
+    Ok(())
+}
+
+fn aggregate_outliers(aggregate: &Value) -> Result<Vec<Value>, BaselineError> {
+    Ok(aggregate["runs"]
+        .as_array()
+        .ok_or(BaselineError::GateInvalid)?
+        .iter()
+        .flat_map(|run| run["outliers"].as_array().into_iter().flatten().cloned())
+        .collect())
+}
+
+fn canonical_outliers(
+    outliers: &BTreeMap<String, Vec<Value>>,
+) -> Result<BTreeMap<String, Vec<String>>, BaselineError> {
+    outliers
+        .iter()
+        .map(|(key, values)| {
+            let mut serialized = values
+                .iter()
+                .map(|value| serde_json::to_string(value).map_err(|_| BaselineError::GateInvalid))
+                .collect::<Result<Vec<_>, _>>()?;
+            serialized.sort();
+            Ok((key.clone(), serialized))
+        })
+        .collect()
+}
+
+fn validate_disposition(
+    disposition: &GateDisposition,
+    all_pass: bool,
+) -> Result<(), BaselineError> {
+    if !matches!(disposition.disposition.as_str(), "go" | "no_go" | "unknown")
+        || !matches!(
+            disposition.evidence_status.as_str(),
+            "pass" | "fail" | "unknown"
+        )
+        || (disposition.disposition == "go" && (!all_pass || disposition.evidence_status != "pass"))
+    {
+        return Err(BaselineError::GateInvalid);
+    }
+    Ok(())
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn aggregate(
@@ -776,7 +1386,7 @@ fn proposed_reference() -> Value {
         .unwrap_or("unknown cpu");
     let memory_gib = system.total_memory() / (1024 * 1024 * 1024);
     let app_revision = option_env!("TELU_APP_REVISION")
-        .filter(|value| is_safe_reason(value))
+        .filter(|value| *value != "unverified" && is_safe_reason(value))
         .map(ReferenceFact::observed)
         .unwrap_or_else(|| ReferenceFact::unknown("app_revision_not_embedded"));
     let profile = ReferenceProfile {

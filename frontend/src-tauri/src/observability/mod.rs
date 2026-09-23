@@ -1,5 +1,6 @@
-pub mod run_bundle;
+pub mod baseline_assignment;
 pub mod resource_sampler;
+pub mod run_bundle;
 pub mod stage_clock;
 
 pub use resource_sampler::{

@@ -7,6 +7,7 @@ use tokio::sync::mpsc;
 use super::buffer_pool::AudioBufferPool;
 use super::devices::AudioDevice;
 use super::transcription::queue_ledger::{QueueLedger, QueueTransitionError};
+use crate::observability::baseline_assignment::BaselineRunAssignment;
 
 /// Device type for audio chunks
 #[derive(Debug, Clone, PartialEq)]
@@ -276,6 +277,7 @@ impl RecordingState {
         &self,
         meeting_id: impl Into<String>,
         capacity: usize,
+        baseline_assignment: Option<BaselineRunAssignment>,
     ) -> Result<Arc<QueueLedger>, QueueTransitionError> {
         let meeting_id = meeting_id.into();
         let mut slot = self
@@ -289,7 +291,11 @@ impl RecordingState {
             return Err(QueueTransitionError::MeetingIdConflict(meeting_id));
         }
 
-        let ledger = Arc::new(QueueLedger::new(meeting_id, capacity)?);
+        let ledger = Arc::new(QueueLedger::new_with_baseline_assignment(
+            meeting_id,
+            capacity,
+            baseline_assignment,
+        )?);
         *slot = Some(ledger.clone());
         Ok(ledger)
     }

@@ -2,6 +2,7 @@
 
 use crate::audio::recording_saver::write_atomic_file;
 use crate::database::repositories::evaluation::EVALUATION_SCHEMA_VERSION;
+use crate::observability::baseline_assignment::BaselineAssignmentProvenance;
 use crate::observability::resource_sampler::RESOURCE_SCHEMA_VERSION;
 use crate::observability::stage_clock::STAGE_SCHEMA_VERSION;
 use chrono::{DateTime, FixedOffset, Utc};
@@ -76,6 +77,8 @@ pub struct RunEnvironmentInput {
     pub route: EnvironmentFact,
     pub language: EnvironmentFact,
     pub limitations: Vec<String>,
+    #[serde(default)]
+    pub baseline_assignment: Option<BaselineAssignmentProvenance>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1206,6 +1209,15 @@ async fn load_documents(
     {
         return Err(RunBundleError::InvalidBundle);
     }
+    match environment.baseline_assignment.as_ref() {
+        Some(assignment)
+            if assignment.run_id == run_id && assignment.scenario_version == scenario_version => {}
+        Some(_) => return Err(RunBundleError::InvalidBundle),
+        None if scenario_version != "recording_runtime_v1" => {
+            return Err(RunBundleError::InvalidBundle)
+        }
+        None => {}
+    }
 
     let stages = load_stages(pool, run_id).await?;
     let queues = load_queues(pool, run_id).await?;
@@ -1274,6 +1286,7 @@ async fn load_documents(
         "model": environment_value["model"].clone(),
         "route": environment_value["route"].clone(),
         "language": environment_value["language"].clone(),
+        "baselineAssignment": environment_value["baselineAssignment"].clone(),
         "configuration": {
             "queueCapacity": queue_capacity,
             "finalizationDeadlineMs": deadline_ms,
@@ -2042,6 +2055,18 @@ fn validate_environment(
             errors.insert("RUN_BUNDLE_UNKNOWN_SEMANTICS".to_string());
         }
     }
+    if let Some(assignment) = environment
+        .get("baselineAssignment")
+        .filter(|value| !value.is_null())
+    {
+        if !valid_baseline_assignment(assignment)
+            || assignment.get("runId").and_then(Value::as_str) != Some(run_id)
+            || assignment.get("scenarioVersion").and_then(Value::as_str)
+                != environment.get("scenarioVersion").and_then(Value::as_str)
+        {
+            errors.insert("RUN_BUNDLE_SCHEMA_IDENTITY".to_string());
+        }
+    }
     let config = environment.get("configuration");
     if config
         .and_then(|value| value.get("queueCapacity"))
@@ -2088,6 +2113,79 @@ fn valid_fact(value: &Value) -> bool {
     }
 }
 
+fn valid_baseline_assignment(assignment: &Value) -> bool {
+    assignment.as_object().is_some_and(|object| {
+        object.len() == 13
+            && [
+                "assignmentId",
+                "source",
+                "matrixId",
+                "matrixPlanSha256",
+                "runSequence",
+                "runId",
+                "scenarioId",
+                "scenarioVersion",
+                "runKind",
+                "repeatIndex",
+                "assignedAtUtc",
+                "appRevision",
+                "networkCanaryMethod",
+            ]
+            .iter()
+            .all(|field| object.contains_key(*field))
+    }) && assignment
+        .get("assignmentId")
+        .and_then(Value::as_str)
+        .is_some_and(|value| validate_uuid(value).is_ok())
+        && assignment
+            .get("runId")
+            .and_then(Value::as_str)
+            .is_some_and(|value| validate_uuid(value).is_ok())
+        && assignment
+            .get("matrixPlanSha256")
+            .and_then(Value::as_str)
+            .is_some_and(|value| {
+                value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+        && [
+            "matrixId",
+            "scenarioId",
+            "scenarioVersion",
+            "networkCanaryMethod",
+        ]
+        .iter()
+        .all(|field| {
+            assignment
+                .get(*field)
+                .and_then(Value::as_str)
+                .is_some_and(is_safe_display)
+        })
+        && assignment.get("source").and_then(Value::as_str)
+            == Some("telu-baseline-authorize-run-v1")
+        && assignment
+            .get("runKind")
+            .and_then(Value::as_str)
+            .is_some_and(|value| matches!(value, "warmup" | "measured"))
+        && assignment
+            .get("appRevision")
+            .and_then(Value::as_str)
+            .is_some_and(|value| {
+                value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
+        && assignment
+            .get("assignedAtUtc")
+            .and_then(Value::as_str)
+            .is_some_and(|value| DateTime::parse_from_rfc3339(value).is_ok())
+        && assignment
+            .get("runSequence")
+            .and_then(Value::as_u64)
+            .is_some()
+        && assignment
+            .get("repeatIndex")
+            .and_then(Value::as_u64)
+            .is_some()
+}
+
 fn validate_environment_input(input: &RunEnvironmentInput) -> Result<(), RunBundleError> {
     let value = serde_json::to_value(input).map_err(|_| RunBundleError::InvalidBundle)?;
     for field in [
@@ -2110,6 +2208,14 @@ fn validate_environment_input(input: &RunEnvironmentInput) -> Result<(), RunBund
     }
     if input.limitations.iter().any(|item| !is_safe_display(item)) {
         return Err(RunBundleError::UnsafeContent);
+    }
+    if let Some(assignment) = value
+        .get("baselineAssignment")
+        .filter(|value| !value.is_null())
+    {
+        if !valid_baseline_assignment(assignment) {
+            return Err(RunBundleError::InvalidBundle);
+        }
     }
     Ok(())
 }
@@ -2756,6 +2862,7 @@ mod run_bundle_writer_tests {
             route: EnvironmentFact::observed("local:this-device"),
             language: EnvironmentFact::observed("en"),
             limitations: vec!["energy_impact_not_measured".to_string()],
+            baseline_assignment: None,
         }
     }
 
@@ -2829,12 +2936,28 @@ mod run_bundle_writer_tests {
         .expect("terminal record");
 
         let app_data = tempfile::tempdir().expect("temporary app data");
+        let mut environment = environment_input();
+        environment.baseline_assignment = Some(BaselineAssignmentProvenance {
+            assignment_id: "44444444-4444-4444-8444-444444444444".to_string(),
+            source: "telu-baseline-authorize-run-v1".to_string(),
+            matrix_id: "phase1-matrix".to_string(),
+            matrix_plan_sha256: "a".repeat(64),
+            run_sequence: 0,
+            run_id: run_id.clone(),
+            scenario_id: "short_utterance".to_string(),
+            scenario_version: "short-utterance-v1".to_string(),
+            run_kind: "measured".to_string(),
+            repeat_index: 0,
+            assigned_at_utc: Utc::now(),
+            app_revision: "b".repeat(40),
+            network_canary_method: "network-method-n1".to_string(),
+        });
         let finalized = finalize_run_bundle_with_pool(
             &pool,
             app_data.path(),
             FinalizeRunBundleRequest {
                 run_id: run_id.clone(),
-                environment: environment_input(),
+                environment,
             },
         )
         .await
@@ -2842,6 +2965,20 @@ mod run_bundle_writer_tests {
         assert_eq!(finalized.run_id, run_id);
         assert_eq!(finalized.meeting_id, meeting.meeting_id);
         assert!(finalized.validation.valid);
+
+        let environment: Value = read_json_file(
+            &app_data
+                .path()
+                .join(RUN_BUNDLE_DIRECTORY)
+                .join(format!("run-{run_id}"))
+                .join("environment.json"),
+        )
+        .expect("bundle environment");
+        assert_eq!(
+            environment["baselineAssignment"]["scenarioId"],
+            "short_utterance"
+        );
+        assert_eq!(environment["baselineAssignment"]["runSequence"], 0);
 
         let writer = RunBundleWriter::new(app_data.path());
         let summary = writer.read_summary(&run_id).expect("redacted summary");

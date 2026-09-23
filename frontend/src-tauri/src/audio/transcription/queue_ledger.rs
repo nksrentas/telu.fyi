@@ -5,8 +5,10 @@
 //! in [`QueueSnapshot`] are derived from the authoritative work records so
 //! conservation cannot drift from separately maintained counters.
 
-use serde::{Deserialize, Serialize};
+use crate::observability::baseline_assignment::BaselineRunAssignment;
 use crate::observability::{StageClock, StageIdentity, DEFAULT_STAGE_CHANNEL_CAPACITY};
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Instant;
@@ -105,6 +107,7 @@ pub struct QueueLedger {
     meeting_id: String,
     capacity: usize,
     stage_clock: Arc<StageClock>,
+    baseline_assignment: Option<BaselineRunAssignment>,
     state: Mutex<QueueLedgerState>,
 }
 
@@ -120,6 +123,14 @@ impl QueueLedger {
         meeting_id: impl Into<String>,
         capacity: usize,
     ) -> Result<Self, QueueTransitionError> {
+        Self::new_with_baseline_assignment(meeting_id, capacity, None)
+    }
+
+    pub fn new_with_baseline_assignment(
+        meeting_id: impl Into<String>,
+        capacity: usize,
+        baseline_assignment: Option<BaselineRunAssignment>,
+    ) -> Result<Self, QueueTransitionError> {
         let meeting_id = meeting_id.into();
         if meeting_id.trim().is_empty() {
             return Err(QueueTransitionError::InvalidMeetingId);
@@ -127,10 +138,21 @@ impl QueueLedger {
         if capacity == 0 {
             return Err(QueueTransitionError::InvalidCapacity);
         }
+        let stage_clock = match baseline_assignment.as_ref() {
+            Some(assignment) => StageClock::new_at(
+                assignment.run_id.clone(),
+                meeting_id.clone(),
+                DEFAULT_STAGE_CHANNEL_CAPACITY,
+                Instant::now(),
+                Utc::now(),
+            ),
+            None => StageClock::new(meeting_id.clone(), DEFAULT_STAGE_CHANNEL_CAPACITY),
+        };
         Ok(Self {
-            stage_clock: StageClock::new(meeting_id.clone(), DEFAULT_STAGE_CHANNEL_CAPACITY),
+            stage_clock,
             meeting_id,
             capacity,
+            baseline_assignment,
             state: Mutex::new(QueueLedgerState::default()),
         })
     }
@@ -145,6 +167,17 @@ impl QueueLedger {
 
     pub fn stage_clock(&self) -> Arc<StageClock> {
         self.stage_clock.clone()
+    }
+
+    pub fn scenario_version(&self) -> &str {
+        self.baseline_assignment
+            .as_ref()
+            .map(|assignment| assignment.scenario_version.as_str())
+            .unwrap_or("recording_runtime_v1")
+    }
+
+    pub fn baseline_assignment(&self) -> Option<&BaselineRunAssignment> {
+        self.baseline_assignment.as_ref()
     }
 
     pub fn accept(

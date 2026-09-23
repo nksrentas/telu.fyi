@@ -160,6 +160,11 @@ fn aggregate(created_at: &str, outlier: Option<Value>) -> Value {
     let scenario_aggregates = REQUIRED_SCENARIOS
         .iter()
         .map(|scenario| {
+            let run_ids = runs
+                .iter()
+                .filter(|run| run["scenarioId"].as_str() == Some(*scenario))
+                .map(|run| run["runId"].clone())
+                .collect::<Vec<_>>();
             let distributions = REQUIRED_METRICS
                 .iter()
                 .map(|metric| {
@@ -172,6 +177,7 @@ fn aggregate(created_at: &str, outlier: Option<Value>) -> Value {
             json!({
                 "scenarioId": scenario,
                 "status": "pass",
+                "runIds": run_ids,
                 "distributions": distributions,
                 "outliers": [],
             })
@@ -521,6 +527,19 @@ fn authorize_run_binds_one_approved_planned_identity_and_rejects_duplicate_or_mi
         "same planned run authorized twice"
     );
 
+    let unplanned = run(&[
+        "authorize-run",
+        manifest.to_str().expect("manifest path"),
+        plan.to_str().expect("plan path"),
+        "999",
+        "--app-data-dir",
+        app_data.to_str().expect("app data path"),
+    ]);
+    assert!(
+        !unplanned.status.success(),
+        "unplanned sequence was authorized"
+    );
+
     let mut mismatched_plan = plan_value;
     mismatched_plan["runs"][1]["scenarioId"] = json!("overload");
     let mismatch_path = root.path().join("mismatched-plan.json");
@@ -568,6 +587,38 @@ fn authorize_run_rejects_unapproved_reference_and_unknown_build_binding() {
     assert!(
         !output.status.success(),
         "unapproved reference authorized a run"
+    );
+
+    let mismatched_manifest = approved_manifest(root.path());
+    let mut manifest_value: Value =
+        serde_json::from_slice(&fs::read(&mismatched_manifest).expect("approved manifest"))
+            .expect("approved manifest JSON");
+    manifest_value["referenceProfile"]["appRevision"] =
+        json!({"status":"observed","value":"c".repeat(40)});
+    fs::write(
+        &mismatched_manifest,
+        serde_json::to_vec_pretty(&manifest_value).expect("mismatched manifest JSON"),
+    )
+    .expect("write mismatched manifest");
+    let mismatch_plan = root.path().join("mismatch-plan.json");
+    assert!(run(&[
+        "plan",
+        mismatched_manifest.to_str().expect("manifest path"),
+        mismatch_plan.to_str().expect("plan path"),
+    ])
+    .status
+    .success());
+    let mismatch = run(&[
+        "authorize-run",
+        mismatched_manifest.to_str().expect("manifest path"),
+        mismatch_plan.to_str().expect("plan path"),
+        "0",
+        "--app-data-dir",
+        app_data.to_str().expect("app data path"),
+    ]);
+    assert!(
+        !mismatch.status.success(),
+        "revision-mismatched reference authorized a run"
     );
 }
 
@@ -622,10 +673,9 @@ fn assignment_claim_rejects_absent_malformed_stale_revision_mismatch_tamper_and_
     );
 
     let assignment_path = pending.join(format!("{}.json", assignment.assignment_id));
-    let mut tampered: Value = serde_json::from_slice(
-        &fs::read(&assignment_path).expect("read pending assignment"),
-    )
-    .expect("assignment JSON");
+    let mut tampered: Value =
+        serde_json::from_slice(&fs::read(&assignment_path).expect("read pending assignment"))
+            .expect("assignment JSON");
     tampered["scenarioId"] = json!("overload");
     fs::write(
         &assignment_path,
@@ -734,15 +784,14 @@ fn verify_gate_fails_closed_for_empty_missing_late_lost_or_unknown_go_evidence()
                     json!("2026-09-23T11:00:00Z");
             }
             "lost-outlier" => gate["retainedOutliers"]["review"] = json!([]),
-                "unknown-go" => {
+            "unknown-go" => {
                 gate["metricResults"][0]["status"] = json!("unknown");
                 gate["phase2"] = json!({"disposition":"go","evidenceStatus":"unknown"});
-                }
-                "fail-go" => {
-                    gate["metricResults"][0]["status"] = json!("fail");
-                    gate["phase4"] =
-                        json!({"disposition":"go","evidenceStatus":"fail"});
-                }
+            }
+            "fail-go" => {
+                gate["metricResults"][0]["status"] = json!("fail");
+                gate["phase4"] = json!({"disposition":"go","evidenceStatus":"fail"});
+            }
             _ => {}
         });
         let output = run(&["verify-gate", gate.to_str().expect("gate path")]);

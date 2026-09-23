@@ -20,28 +20,34 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
+use crate::database::repositories::evaluation::{
+    EvaluationErrorRecord, EvaluationOutboundRecord, EvaluationRepository, EvaluationRouteRecord,
+    EvaluationRunManifest, EvaluationTerminalRunInput, EVALUATION_SCHEMA_VERSION,
+};
+pub use crate::database::repositories::meeting::FinalizationSnapshot;
+pub use crate::database::repositories::meeting::StartMeetingResult;
 use crate::database::repositories::meeting::{
     FinalizationGapInput, FinalizeMeetingInput, MeetingCompleteness, MeetingsRepository,
 };
-use crate::database::repositories::evaluation::{
-    EvaluationErrorRecord, EvaluationOutboundRecord, EvaluationRepository,
-    EvaluationRouteRecord, EvaluationRunManifest, EvaluationTerminalRunInput,
-    EVALUATION_SCHEMA_VERSION,
+use crate::observability::baseline_assignment::{
+    claim_assignment, embedded_app_revision, mark_assignment_finalized, AssignmentFact,
+    AssignmentFactStatus, BaselineRunAssignment, BASELINE_ASSIGNMENT_ENV,
 };
-pub use crate::database::repositories::meeting::StartMeetingResult;
-pub use crate::database::repositories::meeting::FinalizationSnapshot;
+use crate::observability::run_bundle::{
+    finalize_run_bundle_with_pool, EnvironmentFact, FinalizeRunBundleRequest, RunEnvironmentInput,
+};
 use crate::observability::ResourceSampler;
 use crate::state::AppState;
 use crate::trust::provider_route::EffectiveRoute;
 
+use super::device_monitor::{DeviceEvent, DeviceMonitorType};
 use super::{
-    recording_manager::RecordingStartError,
+    default_input_device,  // Get default microphone
+    default_output_device, // Get default system audio
     parse_audio_device,
-    default_input_device,   // Get default microphone
-    default_output_device,  // Get default system audio
+    recording_manager::RecordingStartError,
     RecordingManager,
 };
-use super::device_monitor::{DeviceEvent, DeviceMonitorType};
 
 // Import transcription modules
 use super::transcription::{
@@ -128,8 +134,7 @@ fn finalize_recording_start() {
 // Global recording manager and transcription task to keep them alive during recording
 static RECORDING_MANAGER: Mutex<Option<RecordingManager>> = Mutex::new(None);
 static TRANSCRIPTION_TASK: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
-static STOP_SERIALIZER: Lazy<tokio::sync::Mutex<()>> =
-    Lazy::new(|| tokio::sync::Mutex::new(()));
+static STOP_SERIALIZER: Lazy<tokio::sync::Mutex<()>> = Lazy::new(|| tokio::sync::Mutex::new(()));
 static LAST_FINALIZATION: Mutex<Option<FinalizationSnapshot>> = Mutex::new(None);
 
 // Listener ID for proper cleanup - prevents microphone from staying active after recording stops
@@ -421,7 +426,10 @@ impl DeliveryTracker {
         emitted_at: Instant,
         emitted_at_utc: DateTime<Utc>,
     ) -> std::result::Result<DeliveryToken, DeliveryAckError> {
-        let mut pending = self.pending.lock().map_err(|_| DeliveryAckError::TrackerPoisoned)?;
+        let mut pending = self
+            .pending
+            .lock()
+            .map_err(|_| DeliveryAckError::TrackerPoisoned)?;
         pending.retain(|_, delivery| {
             emitted_at
                 .checked_duration_since(delivery.emitted_at)
@@ -429,12 +437,15 @@ impl DeliveryTracker {
                 <= DELIVERY_TOKEN_TTL
         });
         let token = DeliveryToken::new();
-        pending.insert(token.0.clone(), PendingDelivery {
-            meeting_id: meeting_id.to_string(),
-            evidence_id: evidence_id.to_string(),
-            emitted_at,
-            emitted_at_utc,
-        });
+        pending.insert(
+            token.0.clone(),
+            PendingDelivery {
+                meeting_id: meeting_id.to_string(),
+                evidence_id: evidence_id.to_string(),
+                emitted_at,
+                emitted_at_utc,
+            },
+        );
         Ok(token)
     }
 
@@ -447,7 +458,10 @@ impl DeliveryTracker {
         acknowledged_at_utc: DateTime<Utc>,
     ) -> std::result::Result<UiAcknowledgement, DeliveryAckError> {
         validate_phase1_stage_name(UI_ACKNOWLEDGED_STAGE)?;
-        let mut pending = self.pending.lock().map_err(|_| DeliveryAckError::TrackerPoisoned)?;
+        let mut pending = self
+            .pending
+            .lock()
+            .map_err(|_| DeliveryAckError::TrackerPoisoned)?;
         let delivery = pending
             .get(token.as_str())
             .cloned()
@@ -508,9 +522,13 @@ pub(crate) fn emit_canonical_transcript<R: Runtime>(
     app: &AppHandle<R>,
     canonical: &TranscriptUpdate,
 ) -> std::result::Result<(), String> {
-    let meeting_id = canonical.meeting_id.as_deref()
+    let meeting_id = canonical
+        .meeting_id
+        .as_deref()
         .ok_or_else(|| "canonical_transcript_missing_meeting_id".to_string())?;
-    let evidence_id = canonical.evidence_id.as_deref()
+    let evidence_id = canonical
+        .evidence_id
+        .as_deref()
         .ok_or_else(|| "canonical_transcript_missing_evidence_id".to_string())?;
     if !canonical.is_final || !canonical.is_canonical {
         return Err("canonical_transcript_invalid_finality".to_string());
@@ -607,7 +625,7 @@ async fn initialize_evaluation_run(pool: &SqlitePool, queue_ledger: &QueueLedger
         schema_version: EVALUATION_SCHEMA_VERSION,
         run_id: stage_clock.run_id().to_string(),
         meeting_id: stage_clock.meeting_id().to_string(),
-        scenario_version: "recording_runtime_v1".to_string(),
+        scenario_version: queue_ledger.scenario_version().to_string(),
         started_at_utc: stage_clock.started_at_utc(),
     };
     if let Err(error) = EvaluationRepository::create_run(pool, &manifest).await {
@@ -616,6 +634,94 @@ async fn initialize_evaluation_run(pool: &SqlitePool, queue_ledger: &QueueLedger
             error.code()
         );
     }
+}
+
+fn claim_configured_baseline_assignment<R: Runtime>(
+    app: &AppHandle<R>,
+) -> Result<Option<BaselineRunAssignment>, String> {
+    let assignment_id = match std::env::var(BASELINE_ASSIGNMENT_ENV) {
+        Ok(value) if !value.trim().is_empty() => value,
+        Ok(_) => return Err("BASELINE_ASSIGNMENT_INVALID".to_string()),
+        Err(std::env::VarError::NotPresent) => return Ok(None),
+        Err(_) => return Err("BASELINE_ASSIGNMENT_INVALID".to_string()),
+    };
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| "BASELINE_ASSIGNMENT_STORAGE_FAILED".to_string())?;
+    claim_assignment(
+        app_data_dir,
+        &assignment_id,
+        embedded_app_revision(),
+        Utc::now(),
+    )
+    .map(Some)
+    .map_err(|error| error.to_string())
+}
+
+fn assignment_fact_to_environment(fact: &AssignmentFact) -> EnvironmentFact {
+    match fact.status {
+        AssignmentFactStatus::Observed => EnvironmentFact::observed(
+            fact.value
+                .clone()
+                .unwrap_or_else(|| "invalid_assignment_fact".to_string()),
+        ),
+        AssignmentFactStatus::Unknown => EnvironmentFact::unknown(
+            fact.reason
+                .clone()
+                .unwrap_or_else(|| "invalid_assignment_fact".to_string()),
+        ),
+    }
+}
+
+fn assigned_run_environment(assignment: &BaselineRunAssignment) -> RunEnvironmentInput {
+    RunEnvironmentInput {
+        app_revision: EnvironmentFact::observed(assignment.app_revision.clone()),
+        os: assignment_fact_to_environment(&assignment.environment.os),
+        hardware: assignment_fact_to_environment(&assignment.environment.hardware),
+        power: assignment_fact_to_environment(&assignment.environment.power),
+        devices: assignment_fact_to_environment(&assignment.environment.devices),
+        sample_configuration: assignment_fact_to_environment(
+            &assignment.environment.sample_configuration,
+        ),
+        model: assignment_fact_to_environment(&assignment.environment.model),
+        route: assignment_fact_to_environment(&assignment.environment.route),
+        language: assignment_fact_to_environment(&assignment.environment.language),
+        limitations: vec![
+            "thresholds_not_declared".to_string(),
+            "physical_observations_attached_outside_bundle".to_string(),
+        ],
+        baseline_assignment: Some(assignment.into()),
+    }
+}
+
+async fn finalize_assigned_baseline_bundle<R: Runtime>(
+    app: &AppHandle<R>,
+    pool: &SqlitePool,
+    queue_ledger: &QueueLedger,
+) -> Result<(), String> {
+    let Some(assignment) = queue_ledger.baseline_assignment() else {
+        return Ok(());
+    };
+    if queue_ledger.stage_clock().run_id() != assignment.run_id {
+        return Err("BASELINE_ASSIGNMENT_IDENTITY_MISMATCH".to_string());
+    }
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| "BASELINE_ASSIGNMENT_STORAGE_FAILED".to_string())?;
+    finalize_run_bundle_with_pool(
+        pool,
+        &app_data_dir,
+        FinalizeRunBundleRequest {
+            run_id: assignment.run_id.clone(),
+            environment: assigned_run_environment(assignment),
+        },
+    )
+    .await
+    .map_err(|error| error.code().to_string())?;
+    mark_assignment_finalized(&app_data_dir, &assignment.assignment_id)
+        .map_err(|error| error.to_string())
 }
 
 async fn persist_terminal_evaluation(
@@ -741,22 +847,22 @@ fn map_start_meeting_failure<R: Runtime>(
     }
 }
 
-fn map_recording_start_error<R: Runtime>(
-    app: &AppHandle<R>,
-    error: RecordingStartError,
-) -> String {
+fn map_recording_start_error<R: Runtime>(app: &AppHandle<R>, error: RecordingStartError) -> String {
     crate::tray::update_tray_menu(app);
 
     match error {
         RecordingStartError::TranscriptionRuntime(source) => {
             error!("Failed to initialize speech recognition: {source:#}");
             let error = RecordingStartError::TranscriptionRuntime(source);
-            if let Err(emit_error) = app.emit("transcription-error", serde_json::json!({
-                "error": error.to_string(),
-                "userMessage": TRANSCRIPTION_RUNTIME_USER_MESSAGE,
-                "actionable": false,
-                "phase": "startup"
-            })) {
+            if let Err(emit_error) = app.emit(
+                "transcription-error",
+                serde_json::json!({
+                    "error": error.to_string(),
+                    "userMessage": TRANSCRIPTION_RUNTIME_USER_MESSAGE,
+                    "actionable": false,
+                    "phase": "startup"
+                }),
+            ) {
                 error!("Failed to emit transcription runtime startup error: {emit_error}");
             }
             TRANSCRIPTION_RUNTIME_START_ERROR_CODE.to_string()
@@ -840,7 +946,10 @@ fn resolve_mic_or_default<R: Runtime>(
             Some(Arc::new(device))
         }
         Err(e) => {
-            warn!("❌ No microphone available: {} — recording system audio only", e);
+            warn!(
+                "❌ No microphone available: {} — recording system audio only",
+                e
+            );
             let _ = app.emit("mic-unavailable", serde_json::json!({}));
             None
         }
@@ -875,7 +984,10 @@ fn resolve_system_or_default(requested_name: Option<&str>) -> Option<Arc<super::
             Some(Arc::new(device))
         }
         Err(e) => {
-            warn!("⚠️ No system audio available: {} — recording will continue with microphone only", e);
+            warn!(
+                "⚠️ No system audio available: {} — recording will continue with microphone only",
+                e
+            );
             None
         }
     }
@@ -889,13 +1001,11 @@ async fn prepare_audio_for_recording(
 ) -> Result<(), String> {
     use cpal::traits::{DeviceTrait, HostTrait};
 
-    let wake_name = system_device
-        .map(|s| s.name.clone())
-        .or_else(|| {
-            cpal::default_host()
-                .default_output_device()
-                .and_then(|d| d.name().ok())
-        });
+    let wake_name = system_device.map(|s| s.name.clone()).or_else(|| {
+        cpal::default_host()
+            .default_output_device()
+            .and_then(|d| d.name().ok())
+    });
     if let Some(name) = wake_name {
         if let Err(e) = super::recording_manager::wake_audio_connection(&name).await {
             warn!("[AUDIO_WAKE] Wake failed: {} — proceeding anyway", e);
@@ -914,9 +1024,7 @@ async fn prepare_audio_for_recording(
 // ============================================================================
 
 /// Start recording with default devices
-pub async fn start_recording<R: Runtime>(
-    app: AppHandle<R>,
-) -> Result<StartMeetingResult, String> {
+pub async fn start_recording<R: Runtime>(app: AppHandle<R>) -> Result<StartMeetingResult, String> {
     start_recording_with_meeting_name(app, None).await
 }
 
@@ -953,21 +1061,28 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
 
         // Emit error event for frontend - actionable: false to show toast instead of modal
         // (download progress is already shown in top-right toast)
-        let _ = app.emit("transcription-error", serde_json::json!({
-            "error": validation_error,
-            "userMessage": format!("Recording cannot start: {}", validation_error),
-            "actionable": false,
-            "phase": "startup"
-        }));
+        let _ = app.emit(
+            "transcription-error",
+            serde_json::json!({
+                "error": validation_error,
+                "userMessage": format!("Recording cannot start: {}", validation_error),
+                "actionable": false,
+                "phase": "startup"
+            }),
+        );
 
         return Err(validation_error);
     }
     info!("✅ Transcription model validation passed");
 
     // Notify frontend that startup has begun (surfaces STARTING state)
-    app.emit("recording-starting", serde_json::json!({
-        "message": "Recording initialization started"
-    })).map_err(|e| e.to_string())?;
+    app.emit(
+        "recording-starting",
+        serde_json::json!({
+            "message": "Recording initialization started"
+        }),
+    )
+    .map_err(|e| e.to_string())?;
 
     // Load recording preferences to get auto_save AND device preferences
     let (auto_save, preferred_mic_name, preferred_system_name) =
@@ -975,10 +1090,17 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
             Ok(prefs) => {
                 info!("📋 Loaded recording preferences: auto_save={}, preferred_mic={:?}, preferred_system={:?}",
                       prefs.auto_save, prefs.preferred_mic_device, prefs.preferred_system_device);
-                (prefs.auto_save, prefs.preferred_mic_device, prefs.preferred_system_device)
+                (
+                    prefs.auto_save,
+                    prefs.preferred_mic_device,
+                    prefs.preferred_system_device,
+                )
             }
             Err(e) => {
-                warn!("Failed to load recording preferences, using defaults: {}", e);
+                warn!(
+                    "Failed to load recording preferences, using defaults: {}",
+                    e
+                );
                 (true, None, None)
             }
         };
@@ -1001,13 +1123,11 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     let effective_meeting_name = meeting_name.clone().unwrap_or_else(|| {
         // Example: Meeting 2025-10-03_08-25-23
         let now = chrono::Local::now();
-        format!(
-            "Meeting {}",
-            now.format("%Y-%m-%d_%H-%M-%S")
-        )
+        format!("Meeting {}", now.format("%Y-%m-%d_%H-%M-%S"))
     });
 
     let database_pool = recording_database_pool(&app)?;
+    let baseline_assignment = claim_configured_baseline_assignment(&app)?;
 
     // Constructing/configuring the manager is side-effect free. The helper
     // below commits identity before its closure may start capture.
@@ -1021,21 +1141,25 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     });
 
     // Persist the canonical meeting before native capture can accept audio.
-    let (start_result, (mut manager, transcription_receiver)) =
-        persist_session_before_capture(&database_pool, effective_meeting_name, move |start_result| async move {
+    let (start_result, (mut manager, transcription_receiver)) = persist_session_before_capture(
+        &database_pool,
+        effective_meeting_name,
+        move |start_result| async move {
             manager.set_meeting_identity(
                 start_result.meeting_id,
                 start_result.lifecycle.as_str().to_string(),
                 MeetingCompleteness::Pending.as_str().to_string(),
                 None,
+                baseline_assignment,
             )?;
             let transcription_receiver = manager
                 .start_recording(microphone_device, system_device, auto_save)
                 .await?;
             Ok((manager, transcription_receiver))
-        })
-        .await
-        .map_err(|failure| map_start_meeting_failure(&app, failure))?;
+        },
+    )
+    .await
+    .map_err(|failure| map_start_meeting_failure(&app, failure))?;
 
     // Take the device event receiver BEFORE storing manager globally.
     // A background task will process device events (hot-swap) without frontend polling.
@@ -1168,21 +1292,28 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
 
         // Emit error event for frontend - actionable: false to show toast instead of modal
         // (download progress is already shown in top-right toast)
-        let _ = app.emit("transcription-error", serde_json::json!({
-            "error": validation_error,
-            "userMessage": format!("Recording cannot start: {}", validation_error),
-            "actionable": false,
-            "phase": "startup"
-        }));
+        let _ = app.emit(
+            "transcription-error",
+            serde_json::json!({
+                "error": validation_error,
+                "userMessage": format!("Recording cannot start: {}", validation_error),
+                "actionable": false,
+                "phase": "startup"
+            }),
+        );
 
         return Err(validation_error);
     }
     info!("✅ Transcription model validation passed");
 
     // Notify frontend that startup has begun (surfaces STARTING state)
-    app.emit("recording-starting", serde_json::json!({
-        "message": "Recording initialization started"
-    })).map_err(|e| e.to_string())?;
+    app.emit(
+        "recording-starting",
+        serde_json::json!({
+            "message": "Recording initialization started"
+        }),
+    )
+    .map_err(|e| e.to_string())?;
 
     #[cfg(not(target_os = "macos"))]
     let mic_device = resolve_mic_or_default(&app, mic_device_name.as_deref());
@@ -1201,11 +1332,17 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     // Load recording preferences to check auto_save setting
     let auto_save = match super::recording_preferences::load_recording_preferences(&app).await {
         Ok(prefs) => {
-            info!("📋 Loaded recording preferences: auto_save={}", prefs.auto_save);
+            info!(
+                "📋 Loaded recording preferences: auto_save={}",
+                prefs.auto_save
+            );
             prefs.auto_save
         }
         Err(e) => {
-            warn!("Failed to load recording preferences, defaulting to auto_save=true: {}", e);
+            warn!(
+                "Failed to load recording preferences, defaulting to auto_save=true: {}",
+                e
+            );
             true // Default to saving if preferences can't be loaded
         }
     };
@@ -1213,13 +1350,11 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     // Always ensure a meeting name is set so incremental saver initializes
     let effective_meeting_name = meeting_name.clone().unwrap_or_else(|| {
         let now = chrono::Local::now();
-        format!(
-            "Meeting {}",
-            now.format("%Y-%m-%d_%H-%M-%S")
-        )
+        format!("Meeting {}", now.format("%Y-%m-%d_%H-%M-%S"))
     });
 
     let database_pool = recording_database_pool(&app)?;
+    let baseline_assignment = claim_configured_baseline_assignment(&app)?;
 
     let mut manager = RecordingManager::new();
     manager.set_meeting_name(Some(effective_meeting_name.clone()));
@@ -1231,21 +1366,25 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     });
 
     // Persist the canonical meeting before native capture can accept audio.
-    let (start_result, (mut manager, transcription_receiver)) =
-        persist_session_before_capture(&database_pool, effective_meeting_name, move |start_result| async move {
+    let (start_result, (mut manager, transcription_receiver)) = persist_session_before_capture(
+        &database_pool,
+        effective_meeting_name,
+        move |start_result| async move {
             manager.set_meeting_identity(
                 start_result.meeting_id,
                 start_result.lifecycle.as_str().to_string(),
                 MeetingCompleteness::Pending.as_str().to_string(),
                 None,
+                baseline_assignment,
             )?;
             let transcription_receiver = manager
                 .start_recording(mic_device, system_device, auto_save)
                 .await?;
             Ok((manager, transcription_receiver))
-        })
-        .await
-        .map_err(|failure| map_start_meeting_failure(&app, failure))?;
+        },
+    )
+    .await
+    .map_err(|failure| map_start_meeting_failure(&app, failure))?;
 
     // Take the device event receiver BEFORE storing manager globally.
     // A background task will process device events (hot-swap) without frontend polling.
@@ -1377,15 +1516,12 @@ fn emit_finalization_progress<R: Runtime>(
 }
 
 async fn unload_transcription_model<R: Runtime>(app: AppHandle<R>) {
-    let provider = crate::api::api::api_get_transcript_config(
-        app.clone(),
-        app.clone().state(),
-        None,
-    )
-    .await
-    .ok()
-    .flatten()
-    .map(|config| config.provider);
+    let provider =
+        crate::api::api::api_get_transcript_config(app.clone(), app.clone().state(), None)
+            .await
+            .ok()
+            .flatten()
+            .map(|config| config.provider);
 
     if provider.as_deref() == Some("parakeet") {
         let engine = crate::parakeet_engine::commands::PARAKEET_ENGINE
@@ -1477,18 +1613,14 @@ pub async fn stop_recording<R: Runtime>(
         }
     }
 
-    let finalizing_persisted = match MeetingsRepository::mark_finalizing(
-        &database_pool,
-        &meeting.meeting_id,
-    )
-    .await
-    {
-        Ok(()) => true,
-        Err(error) => {
-            error!("Failed to persist finalizing lifecycle: {error}");
-            false
-        }
-    };
+    let finalizing_persisted =
+        match MeetingsRepository::mark_finalizing(&database_pool, &meeting.meeting_id).await {
+            Ok(()) => true,
+            Err(error) => {
+                error!("Failed to persist finalizing lifecycle: {error}");
+                false
+            }
+        };
     emit_finalization_progress(
         &app,
         &meeting.meeting_id,
@@ -1539,22 +1671,20 @@ pub async fn stop_recording<R: Runtime>(
 
     let meeting_folder = manager.get_meeting_folder();
     let meeting_name = manager.get_meeting_name();
-    let durable_file_write = match tokio::time::timeout(
-        remaining_until(deadline),
-        manager.save_recording_only(&app),
-    )
-    .await
-    {
-        Ok(Ok(())) => true,
-        Ok(Err(error)) => {
-            error!("Recording mirror save failed: {error}");
-            false
-        }
-        Err(_) => {
-            warn!("Finalization deadline elapsed during recording mirror save");
-            false
-        }
-    };
+    let durable_file_write =
+        match tokio::time::timeout(remaining_until(deadline), manager.save_recording_only(&app))
+            .await
+        {
+            Ok(Ok(())) => true,
+            Ok(Err(error)) => {
+                error!("Recording mirror save failed: {error}");
+                false
+            }
+            Err(_) => {
+                warn!("Finalization deadline elapsed during recording mirror save");
+                false
+            }
+        };
 
     let mut input = build_finalize_meeting_input(
         &meeting.meeting_id,
@@ -1581,11 +1711,10 @@ pub async fn stop_recording<R: Runtime>(
     let finalization = finalization_result?;
     persist_terminal_evaluation(&database_pool, &queue_ledger, &input, &finalization).await;
     if let Err(error) = manager.mirror_committed_finalization(&finalization) {
-        warn!(
-            "Terminal finalization committed but recording metadata mirror failed: {error}"
-        );
+        warn!("Terminal finalization committed but recording metadata mirror failed: {error}");
     }
     *LAST_FINALIZATION.lock().unwrap() = Some(finalization.clone());
+    finalize_assigned_baseline_bundle(&app, &database_pool, &queue_ledger).await?;
 
     let folder_path = meeting_folder.map(|path| path.to_string_lossy().to_string());
     if let Err(error) = app.emit(
@@ -1721,8 +1850,10 @@ async fn legacy_stop_recording<R: Runtime>(
         // Wait up to 10 minutes for transcription completion to prevent indefinite hangs
         match tokio::time::timeout(
             tokio::time::Duration::from_secs(600), // 10 minutes max
-            task_handle
-        ).await {
+            task_handle,
+        )
+        .await
+        {
             Ok(Ok(())) => {
                 info!("✅ ALL transcription chunks processed successfully - no data lost");
             }
@@ -1757,11 +1888,7 @@ async fn legacy_stop_recording<R: Runtime>(
     // Determine which provider was used and unload the appropriate model (with timeout)
     let config = match tokio::time::timeout(
         tokio::time::Duration::from_secs(30), // 30 seconds max for DB operation
-        crate::api::api::api_get_transcript_config(
-            app.clone(),
-            app.clone().state(),
-            None,
-        )
+        crate::api::api::api_get_transcript_config(app.clone(), app.clone().state(), None),
     )
     .await
     {
@@ -1795,7 +1922,10 @@ async fn legacy_stop_recording<R: Runtime>(
                 info!("Current Parakeet model before unload: '{}'", current_model);
 
                 if engine.unload_model().await {
-                    info!("✅ Parakeet model '{}' unloaded successfully", current_model);
+                    info!(
+                        "✅ Parakeet model '{}' unloaded successfully",
+                        current_model
+                    );
                 } else {
                     warn!("⚠️ Failed to unload Parakeet model '{}'", current_model);
                 }
@@ -1852,7 +1982,17 @@ async fn legacy_stop_recording<R: Runtime>(
     };
 
     // Now perform async analytics tracking without holding manager reference
-    if let Some((total_duration, active_duration, pause_duration, transcript_segments_count, had_fatal_error, mic_device_name, sys_device_name, chunks_processed)) = analytics_data {
+    if let Some((
+        total_duration,
+        active_duration,
+        pause_duration,
+        transcript_segments_count,
+        had_fatal_error,
+        mic_device_name,
+        sys_device_name,
+        chunks_processed,
+    )) = analytics_data
+    {
         info!("📊 Collecting analytics for meeting end");
 
         // Helper function to classify device type from device name (privacy-safe)
@@ -1864,7 +2004,8 @@ async fn legacy_stop_recording<R: Runtime>(
                 || name_lower.contains("beats")
                 || name_lower.contains("headphones")
                 || name_lower.contains("bt ")
-                || name_lower.contains("wireless") {
+                || name_lower.contains("wireless")
+            {
                 "Bluetooth"
             } else {
                 "Wired"
@@ -1883,23 +2024,20 @@ async fn legacy_stop_recording<R: Runtime>(
             _ => None,
         };
 
-        let (transcription_provider, transcription_model) = transcription_config
-            .unwrap_or_else(|| ("unknown".to_string(), "unknown".to_string()));
+        let (transcription_provider, transcription_model) =
+            transcription_config.unwrap_or_else(|| ("unknown".to_string(), "unknown".to_string()));
 
         // Get summary model info from API
-        let summary_config = match crate::api::api::api_get_model_config(
-            app.clone(),
-            app.clone().state(),
-            None,
-        )
-        .await
-        {
-            Ok(Some(config)) => Some((config.provider, config.model)),
-            _ => None,
-        };
+        let summary_config =
+            match crate::api::api::api_get_model_config(app.clone(), app.clone().state(), None)
+                .await
+            {
+                Ok(Some(config)) => Some((config.provider, config.model)),
+                _ => None,
+            };
 
-        let (summary_provider, summary_model) = summary_config
-            .unwrap_or_else(|| ("unknown".to_string(), "unknown".to_string()));
+        let (summary_provider, summary_model) =
+            summary_config.unwrap_or_else(|| ("unknown".to_string(), "unknown".to_string()));
 
         // Classify device types (privacy-safe)
         let microphone_device_type = mic_device_name
@@ -1954,8 +2092,10 @@ async fn legacy_stop_recording<R: Runtime>(
 
         match tokio::time::timeout(
             tokio::time::Duration::from_secs(300), // 5 minutes max for file I/O
-            manager.save_recording_only(&app)
-        ).await {
+            manager.save_recording_only(&app),
+        )
+        .await
+        {
             Ok(Ok(_)) => {
                 info!("✅ Recording data saved successfully during cleanup");
             }
@@ -1988,10 +2128,7 @@ async fn legacy_stop_recording<R: Runtime>(
     // NOTE: We do NOT save to database here. The frontend will save after all transcripts are displayed.
     // This ensures the user sees all transcripts streaming in before the database save happens.
     let (folder_path_str, meeting_name_str) = match (&meeting_folder, &meeting_name) {
-        (Some(path), Some(name)) => (
-            Some(path.to_string_lossy().to_string()),
-            Some(name.clone()),
-        ),
+        (Some(path), Some(name)) => (Some(path.to_string_lossy().to_string()), Some(name.clone())),
         _ => (None, None),
     };
 
@@ -2164,7 +2301,9 @@ pub async fn get_recording_state() -> serde_json::Value {
 pub async fn get_meeting_folder_path() -> Result<Option<String>, String> {
     let manager_guard = RECORDING_MANAGER.lock().unwrap();
     if let Some(manager) = manager_guard.as_ref() {
-        Ok(manager.get_meeting_folder().map(|p| p.to_string_lossy().to_string()))
+        Ok(manager
+            .get_meeting_folder()
+            .map(|p| p.to_string_lossy().to_string()))
     } else {
         Ok(None)
     }
@@ -2173,7 +2312,8 @@ pub async fn get_meeting_folder_path() -> Result<Option<String>, String> {
 /// Get accumulated transcript segments from current recording session
 /// Used for syncing frontend state after page reload during active recording
 #[tauri::command]
-pub async fn get_transcript_history() -> Result<Vec<crate::audio::recording_saver::TranscriptSegment>, String> {
+pub async fn get_transcript_history(
+) -> Result<Vec<crate::audio::recording_saver::TranscriptSegment>, String> {
     let manager_guard = RECORDING_MANAGER.lock().unwrap();
 
     if let Some(manager) = manager_guard.as_ref() {
@@ -2209,7 +2349,6 @@ pub async fn get_active_audio_output() -> Result<super::playback_monitor::AudioO
         .map_err(|e| format!("Failed to get audio output info: {}", e))
 }
 
-
 // ============================================================================
 // MIC HOT-SWAP (disconnect recovery)
 // ============================================================================
@@ -2217,11 +2356,13 @@ pub async fn get_active_audio_output() -> Result<super::playback_monitor::AudioO
 // Guard against concurrent mic hot-swap tasks. Only used by the disconnect
 // fallback path (trigger_mic_fallback_to_default) — the "chase the new
 // default" auto-swap has been removed.
-static MIC_SWAP_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static MIC_SWAP_IN_PROGRESS: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 // Bounded retry budget for the disconnect fallback (P1 #2). Counts COMPLETED
 // failed attempts; MIC_SWAP_IN_PROGRESS still prevents overlapping swaps.
-static MIC_FALLBACK_FAILED_ATTEMPTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static MIC_FALLBACK_FAILED_ATTEMPTS: std::sync::atomic::AtomicU32 =
+    std::sync::atomic::AtomicU32::new(0);
 const MAX_MIC_FALLBACK_ATTEMPTS: u32 = 3;
 
 /// Perform mic hot-swap using phased locking — never holds RECORDING_MANAGER during I/O
@@ -2237,9 +2378,12 @@ async fn perform_mic_hot_swap_task<R: Runtime>(
     match do_mic_swap(&new_device_name, session).await {
         Ok(()) => {
             info!("[HOT_SWAP] Mic switched to '{}'", new_device_name);
-            let _ = app.emit("mic-device-switched", serde_json::json!({
-                "device_name": new_device_name
-            }));
+            let _ = app.emit(
+                "mic-device-switched",
+                serde_json::json!({
+                    "device_name": new_device_name
+                }),
+            );
             Ok(())
         }
         Err(e) => {
@@ -2252,18 +2396,24 @@ async fn perform_mic_hot_swap_task<R: Runtime>(
             match do_mic_swap(&new_device_name, session).await {
                 Ok(()) => {
                     info!("[HOT_SWAP] Mic switched to '{}' on retry", new_device_name);
-                    let _ = app.emit("mic-device-switched", serde_json::json!({
-                        "device_name": new_device_name
-                    }));
+                    let _ = app.emit(
+                        "mic-device-switched",
+                        serde_json::json!({
+                            "device_name": new_device_name
+                        }),
+                    );
                     Ok(())
                 }
                 Err(e) => {
                     error!("[HOT_SWAP] Mic swap failed after retry: {}", e);
                     if session_live(session) {
-                        let _ = app.emit("mic-swap-failed", serde_json::json!({
-                            "error": e,
-                            "device_name": new_device_name
-                        }));
+                        let _ = app.emit(
+                            "mic-swap-failed",
+                            serde_json::json!({
+                                "error": e,
+                                "device_name": new_device_name
+                            }),
+                        );
                     }
                     Err(e)
                 }
@@ -2273,11 +2423,16 @@ async fn perform_mic_hot_swap_task<R: Runtime>(
 }
 
 /// Phased mic swap — lock is never held during async I/O.
-async fn do_mic_swap(device_name: &str, session: &Arc<super::RecordingState>) -> Result<(), String> {
+async fn do_mic_swap(
+    device_name: &str,
+    session: &Arc<super::RecordingState>,
+) -> Result<(), String> {
     // Phase 1: Lock briefly — verify identity, take old stream OUT (no teardown under lock)
     let old_mic = {
         let mut guard = RECORDING_MANAGER.lock().unwrap();
-        let manager = guard.as_mut().ok_or_else(|| "Recording manager not available".to_string())?;
+        let manager = guard
+            .as_mut()
+            .ok_or_else(|| "Recording manager not available".to_string())?;
         if !manager.is_recording() {
             return Err("Recording stopped — aborting mic hot-swap".to_string());
         }
@@ -2294,7 +2449,10 @@ async fn do_mic_swap(device_name: &str, session: &Arc<super::RecordingState>) ->
     // teardown error/stall on the already-dead device must not abort the swap.
     if let Some(s) = old_mic {
         if let Err(e) = s.stop() {
-            warn!("[HOT_SWAP] Failed to stop old mic stream (proceeding): {}", e);
+            warn!(
+                "[HOT_SWAP] Failed to stop old mic stream (proceeding): {}",
+                e
+            );
         }
     }
 
@@ -2313,13 +2471,18 @@ async fn do_mic_swap(device_name: &str, session: &Arc<super::RecordingState>) ->
         super::DeviceType::Input,
     ));
 
-    info!("[HOT_SWAP] Creating new mic stream for '{}' (lock released)", device_name);
+    info!(
+        "[HOT_SWAP] Creating new mic stream for '{}' (lock released)",
+        device_name
+    );
     let new_stream = super::stream::AudioStream::create(
         device_arc.clone(),
         session.clone(),
         super::recording_state::DeviceType::Microphone,
         None,
-    ).await.map_err(|e| format!("Failed to create mic stream: {}", e))?;
+    )
+    .await
+    .map_err(|e| format!("Failed to create mic stream: {}", e))?;
 
     // Resolve the current default output OUTSIDE the lock — a CoreAudio stall here
     // must not block stop_recording (which needs RECORDING_MANAGER). (P1 #1)
@@ -2334,7 +2497,9 @@ async fn do_mic_swap(device_name: &str, session: &Arc<super::RecordingState>) ->
                 info!("[HOT_SWAP] Mic hot-swap to '{}' completed", device_name);
             }
             Some(_) => {
-                return Err("Session changed during hot-swap — discarding stale mic stream".to_string());
+                return Err(
+                    "Session changed during hot-swap — discarding stale mic stream".to_string(),
+                );
             }
             None => {
                 return Err("Recording manager gone during hot-swap".to_string());
@@ -2371,13 +2536,22 @@ fn spawn_device_event_processor<R: Runtime>(
         while let Some(event) = receiver.recv().await {
             // Skip if recording has stopped
             if !recording_live() {
-                info!("[DEVICE_EVENTS] Recording stopped — ignoring event: {:?}", event);
+                info!(
+                    "[DEVICE_EVENTS] Recording stopped — ignoring event: {:?}",
+                    event
+                );
                 continue;
             }
 
             match event {
-                DeviceEvent::DeviceDisconnected { ref device_name, ref device_type } => {
-                    info!("[DEVICE_EVENTS] Device disconnected: '{}' ({:?})", device_name, device_type);
+                DeviceEvent::DeviceDisconnected {
+                    ref device_name,
+                    ref device_type,
+                } => {
+                    info!(
+                        "[DEVICE_EVENTS] Device disconnected: '{}' ({:?})",
+                        device_name, device_type
+                    );
                     // The only automatic mid-recording mic change allowed:
                     // when the active microphone dies, fall back to the
                     // system default input. Triggered after the device
@@ -2391,7 +2565,10 @@ fn spawn_device_event_processor<R: Runtime>(
                         });
                     }
                 }
-                DeviceEvent::DeviceReconnected { ref device_name, ref device_type } => {
+                DeviceEvent::DeviceReconnected {
+                    ref device_name,
+                    ref device_type,
+                } => {
                     // Per product decision: once we have fallen back to the
                     // built-in mic we stay there for the rest of the meeting.
                     // This is intentional — just log and do nothing.
@@ -2475,7 +2652,10 @@ async fn trigger_mic_fallback_to_default<R: Runtime>(
     // emitting or spending the recovery budget here would fire against B with
     // A's device. Covers the default_input_device() error branch below.
     if !session_live(&session) {
-        info!("[MIC_FALLBACK] Session no longer live after wait — aborting fallback for '{}'", disconnected_name);
+        info!(
+            "[MIC_FALLBACK] Session no longer live after wait — aborting fallback for '{}'",
+            disconnected_name
+        );
         return;
     }
 
@@ -2538,7 +2718,10 @@ async fn trigger_mic_fallback_to_default<R: Runtime>(
                 return;
             }
             Err(e) => {
-                error!("[MIC_FALLBACK] Failed to re-query default input device: {}", e);
+                error!(
+                    "[MIC_FALLBACK] Failed to re-query default input device: {}",
+                    e
+                );
                 let _ = app.emit(
                     "mic-swap-failed",
                     serde_json::json!({
@@ -2604,7 +2787,10 @@ async fn trigger_mic_fallback_to_default<R: Runtime>(
     // Stop may have started during the sleeps above — bail before touching
     // the (possibly already taken) manager.
     if !session_live(&session) {
-        info!("[MIC_FALLBACK] Recording stopping — aborting fallback for '{}'", disconnected_name);
+        info!(
+            "[MIC_FALLBACK] Recording stopping — aborting fallback for '{}'",
+            disconnected_name
+        );
         return;
     }
 
@@ -2807,12 +2993,16 @@ mod ui_acknowledgement_contract_tests {
             Err(DeliveryAckError::UnknownToken),
         );
 
-        let token = tracker.register_at("meeting-1", "evidence-1", now, now_utc).unwrap();
+        let token = tracker
+            .register_at("meeting-1", "evidence-1", now, now_utc)
+            .unwrap();
         assert_eq!(
             tracker.acknowledge_at(&token, "other-meeting", "evidence-1", now, now_utc),
             Err(DeliveryAckError::IdentityMismatch),
         );
-        assert!(tracker.acknowledge_at(&token, "meeting-1", "evidence-1", now, now_utc).is_ok());
+        assert!(tracker
+            .acknowledge_at(&token, "meeting-1", "evidence-1", now, now_utc)
+            .is_ok());
         assert_eq!(
             tracker.acknowledge_at(&token, "meeting-1", "evidence-1", now, now_utc),
             Err(DeliveryAckError::UnknownToken),
@@ -2857,12 +3047,9 @@ mod ui_acknowledgement_contract_tests {
 #[cfg(test)]
 mod finalization_stop_contract_tests {
     use super::{
-        build_finalize_meeting_input, drain_transcription_to_deadline,
-        FinalizationDrainReport,
+        build_finalize_meeting_input, drain_transcription_to_deadline, FinalizationDrainReport,
     };
-    use crate::audio::transcription::queue_ledger::{
-        QueueLedger, WorkFailureReason, WorkOutcome,
-    };
+    use crate::audio::transcription::queue_ledger::{QueueLedger, WorkFailureReason, WorkOutcome};
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
@@ -2912,7 +3099,11 @@ mod finalization_stop_contract_tests {
             let worker = tokio::spawn(async move {
                 for id in 0..work_count {
                     worker_ledger
-                        .finish(&format!("work-{id}"), WorkOutcome::Completed, Instant::now())
+                        .finish(
+                            &format!("work-{id}"),
+                            WorkOutcome::Completed,
+                            Instant::now(),
+                        )
                         .unwrap();
                 }
             });
@@ -2956,7 +3147,10 @@ mod finalization_stop_contract_tests {
         );
 
         assert_eq!(input.queue.failed, 1);
-        assert!(input.reason_codes.iter().any(|reason| reason == "work_failed"));
+        assert!(input
+            .reason_codes
+            .iter()
+            .any(|reason| reason == "work_failed"));
     }
 
     #[tokio::test]
@@ -2983,7 +3177,10 @@ mod finalization_stop_contract_tests {
         assert!(report.deadline_expired);
         assert_eq!(report.remaining_work_ids, vec!["work-pending"]);
         assert_eq!(input.queue.cancelled, 1);
-        assert!(input.reason_codes.iter().any(|reason| reason == "deadline_exceeded"));
+        assert!(input
+            .reason_codes
+            .iter()
+            .any(|reason| reason == "deadline_exceeded"));
     }
 
     #[test]

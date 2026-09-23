@@ -4,6 +4,7 @@ mod ffmpeg;
 mod onnxruntime;
 
 fn main() {
+    embed_source_revision();
     // sqlx::migrate! embeds migrations at compile time, so changes beneath
     // this directory must invalidate the build script output.
     println!("cargo:rerun-if-changed=migrations");
@@ -28,6 +29,51 @@ fn main() {
     tauri_build::build()
 }
 
+fn embed_source_revision() {
+    println!("cargo:rerun-if-env-changed=TELU_APP_REVISION");
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").ok();
+    if let Some(manifest_dir) = manifest_dir.as_deref() {
+        if let Some(head_path) = git_value(manifest_dir, &["rev-parse", "--git-path", "HEAD"]) {
+            println!("cargo:rerun-if-changed={head_path}");
+        }
+        if let Some(head_ref) = git_value(manifest_dir, &["symbolic-ref", "-q", "HEAD"]) {
+            if let Some(ref_path) = git_value(manifest_dir, &["rev-parse", "--git-path", &head_ref])
+            {
+                println!("cargo:rerun-if-changed={ref_path}");
+            }
+        }
+    }
+    let revision = manifest_dir
+        .as_deref()
+        .and_then(|directory| git_value(directory, &["rev-parse", "HEAD"]))
+        .filter(|value| is_full_git_revision(value))
+        .or_else(|| {
+            std::env::var("TELU_APP_REVISION")
+                .ok()
+                .filter(|value| is_full_git_revision(value))
+        })
+        .unwrap_or_else(|| "unverified".to_string());
+    println!("cargo:rustc-env=TELU_APP_REVISION={revision}");
+}
+
+fn git_value(manifest_dir: &str, args: &[&str]) -> Option<String> {
+    let output = std::process::Command::new("git")
+        .arg("-C")
+        .arg(manifest_dir)
+        .args(args)
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+fn is_full_git_revision(value: &str) -> bool {
+    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
 /// Detects GPU acceleration capabilities and provides build guidance
 fn detect_and_report_gpu_capabilities() {
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
@@ -48,9 +94,13 @@ fn detect_and_report_gpu_capabilities() {
             } else if cfg!(feature = "openblas") {
                 println!("cargo:warning=✅ Windows: OpenBLAS CPU optimization ENABLED");
             } else {
-                println!("cargo:warning=⚠️  Windows: Using CPU-only mode (no GPU or BLAS acceleration)");
+                println!(
+                    "cargo:warning=⚠️  Windows: Using CPU-only mode (no GPU or BLAS acceleration)"
+                );
                 println!("cargo:warning=💡 For NVIDIA GPU: cargo build --release --features cuda");
-                println!("cargo:warning=💡 For AMD/Intel GPU: cargo build --release --features vulkan");
+                println!(
+                    "cargo:warning=💡 For AMD/Intel GPU: cargo build --release --features vulkan"
+                );
                 println!("cargo:warning=💡 For CPU optimization: cargo build --release --features openblas");
 
                 // Try to detect NVIDIA GPU
@@ -69,10 +119,14 @@ fn detect_and_report_gpu_capabilities() {
             } else if cfg!(feature = "openblas") {
                 println!("cargo:warning=✅ Linux: OpenBLAS CPU optimization ENABLED");
             } else {
-                println!("cargo:warning=⚠️  Linux: Using CPU-only mode (no GPU or BLAS acceleration)");
+                println!(
+                    "cargo:warning=⚠️  Linux: Using CPU-only mode (no GPU or BLAS acceleration)"
+                );
                 println!("cargo:warning=💡 For NVIDIA GPU: cargo build --release --features cuda");
                 println!("cargo:warning=💡 For AMD GPU: cargo build --release --features hipblas");
-                println!("cargo:warning=💡 For other GPUs: cargo build --release --features vulkan");
+                println!(
+                    "cargo:warning=💡 For other GPUs: cargo build --release --features vulkan"
+                );
                 println!("cargo:warning=💡 For CPU optimization: cargo build --release --features openblas");
 
                 // Try to detect NVIDIA GPU
@@ -92,7 +146,12 @@ fn detect_and_report_gpu_capabilities() {
     }
 
     // Performance guidance
-    if !cfg!(feature = "cuda") && !cfg!(feature = "vulkan") && !cfg!(feature = "hipblas") && !cfg!(feature = "openblas") && target_os != "macos" {
+    if !cfg!(feature = "cuda")
+        && !cfg!(feature = "vulkan")
+        && !cfg!(feature = "hipblas")
+        && !cfg!(feature = "openblas")
+        && target_os != "macos"
+    {
         println!("cargo:warning=📊 Performance: CPU-only builds are significantly slower than GPU/BLAS builds");
         println!("cargo:warning=📚 See README.md for GPU/BLAS setup instructions");
     }
