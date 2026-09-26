@@ -21,10 +21,21 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     // Pass can_record=true initially, will be updated by update_tray_menu immediately
     let menu = build_menu(app, RecordingState::Stopped, true)?;
 
-    TrayIconBuilder::with_id("main-tray")
+    #[cfg(target_os = "macos")]
+    let tray_icon = tauri::include_image!("./icons/TeluMenuBarTemplate@2x.png");
+
+    #[cfg(not(target_os = "macos"))]
+    let tray_icon = app.default_window_icon().unwrap().clone();
+
+    let tray_builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
         .tooltip("Telu")
-        .icon(app.default_window_icon().unwrap().clone())
+        .icon(tray_icon);
+
+    #[cfg(target_os = "macos")]
+    let tray_builder = tray_builder.icon_as_template(true);
+
+    tray_builder
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
         .build(app)?;
 
