@@ -144,7 +144,57 @@ Plans:
 **Verification approach:** Use representative held-out transcripts plus insufficient-evidence and degraded-capture cases; test exact evidence navigation and semantic support separately; exercise accept, reject, correct, restore, regenerate, delete, and retry scenarios; audit append-only lineage and future-context eligibility.
 **Exit gate:** Phase 3 may proceed only when item correctness, exact evidence-span support, abstention behavior, correction lineage, regeneration safety, and deletion effects meet the predeclared representative-review thresholds. If provenance or user actions do not deterministically control future eligibility, stop before preparation, live assistance, or series memory can amplify the defect.
 **Principal risks / stop conditions:** Fluent unsupported claims, reconstructed citations, destructive correction, rejected-item resurrection, incomplete evidence, mutable summary blobs, or one score conflating claim correctness with citation support. Stop when evidence lineage is ambiguous or review actions fail to propagate.
-**Plans:** TBD
+**Plans:** 26 plans
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Tracer: Find knowledge end-to-end from evidence to verified, quoted candidates on the meeting page.
+- [ ] 02-02-PLAN.md — Visual gallery harness (pinned Playwright WebKit after a legitimacy gate) and the before gallery.
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-03-PLAN.md — Full evidence rules, typed parsing, chunked and cancellable extraction runs.
+- [ ] 02-04-PLAN.md — Telu tokens, SF font, motion presets, glass toasts, palette gate/codemod and Telu primitives.
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-05-PLAN.md — Append-only reviews and revisions, eligibility and evidence validity, review commands.
+- [ ] 02-06-PLAN.md — Restyle shadcn overlays and controls.
+- [ ] 02-07-PLAN.md — Re-skin Settings and model managers.
+- [ ] 02-08-PLAN.md — Re-skin audio, analytics, language, form and warning components.
+- [ ] 02-09-PLAN.md — Re-skin onboarding, import and update surfaces.
+- [ ] 02-10-PLAN.md — Re-skin summary, transcript, title and progress surfaces.
+- [ ] 02-11-PLAN.md — Re-skin feedback surfaces, completeness surface, recovery sheet and grouped primitives.
+- [ ] 02-22-PLAN.md — Evidence-first summary input and the evidence transcript drawer (highlight, virtualization, legacy fallback).
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 02-12-PLAN.md — Regenerate matcher with rejection-first suppression and zero resurrection.
+- [ ] 02-13-PLAN.md — Agenda projection (Today/Review states and counts) and evidence-aware search.
+- [ ] 02-14-PLAN.md — Living-doc meeting page, header and doc toolbar mounting the transcript drawer.
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 02-15-PLAN.md — Knowledge run lifecycle: run notice, validated starts, auto-run gate, run states, regenerate and run details.
+- [ ] 02-16-PLAN.md — Overlay window chrome, AppShell and the real-data sidebar.
+- [ ] 02-17-PLAN.md — Explicit one-transaction meeting deletion and the counts-first delete Alert.
+- [ ] 02-18-PLAN.md — telu-knowledge-eval harness (score, replay run, export).
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 02-20-PLAN.md — Declare KNOW-07 thresholds (decision checkpoint), score the synthetic suite, record KNOW-07 as open until the representative evaluation passes.
+- [ ] 02-23-PLAN.md — Source chips, evidence popover with transcript navigation, and correction history.
+- [ ] 02-25-PLAN.md — Today agenda: EventCard states, day stepper and the completeness contract re-point.
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 02-19-PLAN.md — Recording in the shell: Record/capsule, single recording host, live transcript.
+- [ ] 02-24-PLAN.md — Review rows: accept, correct, reject, restore, Accept all and Undo with Rust-reported eligibility.
+- [ ] 02-26-PLAN.md — Review tab and the sidebar Review row.
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 02-21-PLAN.md — Side peek, search, context menu and the phase UI gate with the after gallery.
 **UI hint:** yes
 
 ### Phase 3: Bounded Sourced Preparation
@@ -239,7 +289,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6. Each phase's e
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Baseline Observability, Identity, and Trust Boundaries | 18/19 | In Progress|  |
-| 2. Evidence-Linked Post-Meeting Knowledge | 0/TBD | Not started | - |
+| 2. Evidence-Linked Post-Meeting Knowledge | 0/26 | Planned | - |
 | 3. Bounded Sourced Preparation | 0/TBD | Not started | - |
 | 4. Cancellable Live-Loop Validation | 0/TBD | Not started | - |
 | 5. Recurring-Series Memory | 0/TBD | Not started | - |

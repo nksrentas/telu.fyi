@@ -655,25 +655,27 @@ This mirrors `mockIPC` in `node_modules/@tauri-apps/api/mocks.js`, which is plai
 | A8 | An `Undo` on Accept implemented as an appended `reopen` event is desired | Pattern 1 | Low: omit if Undo is cut |
 | A9 | Quality thresholds (claim correctness, coverage, attribution) are **not** set by research; the user declares them before evaluation | Evaluation | High if skipped: violates the roadmap rule "do not invent numeric targets" |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Dark mode in Phase 2 scope?**
+Resolutions come from the approved 02-UI-SPEC.md Assumptions (A1–A10) and are carried into the plans as flagged assumptions.
+
+1. **Dark mode in Phase 2 scope?** — RESOLVED (UI-SPEC A1; plans 02-04, 02-21): dark tokens ship and the palette gate removes hard-coded classes; the window stays `Light` and `.dark` stays off until the dark after-gallery is approved in a follow-up.
    - What we know: D-01 says "light and dark" tokens. The window is forced `Light`. 70 files and 1,072 hard-coded palette classes don't respond to `.dark`.
    - Unclear: whether dark must pass visual regression this phase.
    - Recommendation: replace hard-coded palette classes anyway (the grep gate). Enable system appearance only after the dark screenshot gallery passes. Ask the user for a go/no-go at the Wave 1 checkpoint.
 
-2. **Legacy, imported and retranscribed meetings**
+2. **Legacy, imported and retranscribed meetings** — RESOLVED (UI-SPEC A2; plans 02-14, 02-15): no backfill; Knowledge shows the "No evidence" copy; Retranscribe is hidden on evidence-backed meetings; legacy transcript lines stay readable in the drawer as "Transcript only · no evidence".
    - What we know: they have no evidence rows. Retranscribe rewrites legacy `transcripts` only, so on canonical meetings the new evidence-based page won't reflect a retranscription.
    - Recommendation: Phase 2 shows "Knowledge needs a transcript Telu recorded with evidence" and does not backfill. Hide or disable Retranscribe on evidence-backed meetings until a later phase defines evidence re-versioning (it would also need knowledge invalidation). Confirm with the user.
 
-3. **Evaluation gold data provenance**
+3. **Evaluation gold data provenance** — RESOLVED (plans 02-18, 02-20): only synthetic fixtures are committed; real consented meetings are exported by `telu-knowledge-eval export` to a folder outside the repo; reports are content-free.
    - What we know: real meetings are sensitive, and Phase 1 evaluation tables are content-free by design (`evaluation_runs.meeting_id TEXT NOT NULL UNIQUE`, "deliberately have no transcript … columns" `[VERIFIED: frontend/src-tauri/migrations/20260920000400_phase1_evaluation_runs.sql:1-15]`).
    - Recommendation: commit only **synthetic** fixtures (representative, insufficient-evidence, degraded-capture). The CLI accepts `--gold-dir` outside the repo for the user's consented real meetings. Reports hold metrics and ids only, never text.
 
-4. **Accept-all and Undo**
+4. **Accept-all and Undo** — RESOLVED (UI-SPEC A3; plans 02-05, 02-15): Accept all ships (one accept event per pending item); Undo appends `reopen` (Accept) or `restore` (Reject); Correct has no Undo.
    - 002 has "Accept all" and Undo toasts. D-12..D-14 don't mention either. Accept-all is safe if it appends one `accept` per item. Undo = `reopen` (A8). Confirm.
 
-5. **Menu-bar status item behavior** (skill "Resolve before building")
+5. **Menu-bar status item behavior** (skill "Resolve before building") — RESOLVED (UI-SPEC A10; plan 02-19): the tray menu is unchanged in Phase 2, including pause/resume.
    - Out of Phase 2's explicit scope, but the shell changes `tray.rs` interactions. Recommendation: keep the current tray menu unchanged this phase.
 
 ## Environment Availability
