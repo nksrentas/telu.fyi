@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Telu · Companion</title>
+<link rel="icon" href="../kit/telu-icon.png">
+<link id="theme" rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../kit/mac-kit.css">
+<link rel="stylesheet" href="c-companion.css">
+</head>
+<body>
+<div class="desktop" id="desk">
+  <div class="window keynote" aria-hidden="true">
+    <div class="traffic"><i></i><i></i><i></i></div>
+    <div class="kn-toolbar">
+      <div class="kn-tools kn-left"><span class="kn-tool"><i></i><b>View</b></span><span class="kn-tool"><i></i><b>Zoom</b></span><span class="kn-tool"><i></i><b>Add Slide</b></span></div>
+      <div class="kn-doc"><b>Q4 Roadmap</b><span>Edited</span></div>
+      <div class="kn-tools kn-mid"><span class="kn-tool"><i class="play"></i><b>Play</b></span><span class="kn-tool"><i></i><b>Table</b></span><span class="kn-tool"><i></i><b>Chart</b></span><span class="kn-tool"><i></i><b>Text</b></span><span class="kn-tool"><i></i><b>Shape</b></span><span class="kn-tool"><i></i><b>Media</b></span></div>
+      <div class="kn-tools kn-right"><span class="kn-tool"><i></i><b>Format</b></span><span class="kn-tool"><i></i><b>Animate</b></span><span class="kn-tool"><i></i><b>Document</b></span></div>
+    </div>
+    <div class="kn-body">
+      <div class="kn-rail">
+        <div class="kn-thumb selected"><span>1</span><div class="kn-mini"><i class="t"></i><i class="c"></i><i class="c"></i><i class="c"></i></div></div>
+        <div class="kn-thumb"><span>2</span><div class="kn-mini"><i class="t"></i><i class="l"></i><i class="l"></i></div></div>
+        <div class="kn-thumb"><span>3</span><div class="kn-mini"><i class="t"></i><i class="g"></i></div></div>
+        <div class="kn-thumb"><span>4</span><div class="kn-mini"><i class="t"></i><i class="l"></i><i class="l"></i><i class="l"></i></div></div>
+        <div class="kn-thumb"><span>5</span><div class="kn-mini"><i class="t"></i><i class="g"></i></div></div>
+        <div class="kn-thumb"><span>6</span><div class="kn-mini"><i class="t"></i><i class="l"></i></div></div>
+      </div>
+      <div class="kn-stage">
+        <div class="kn-slide">
+          <div class="kn-eyebrow">Product · Q4 2026</div>
+          <div class="kn-title">Q4 Roadmap</div>
+          <div class="kn-sub">Three priorities for October to December</div>
+          <div class="kn-cols">
+            <div class="kn-col"><i class="kn-num">1</i><b>Offline mode</b><i class="kn-line"></i><i class="kn-line short"></i><i class="kn-line"></i></div>
+            <div class="kn-col"><i class="kn-num">2</i><b>Acme go-live</b><i class="kn-line"></i><i class="kn-line"></i><i class="kn-line short"></i></div>
+            <div class="kn-col"><i class="kn-num">3</i><b>Activation to 45%</b><i class="kn-line short"></i><i class="kn-line"></i><i class="kn-line"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="kn-inspector">
+        <div class="kn-tabs"><i class="on"></i><i></i><i></i></div>
+        <i class="kn-block tall"></i><i class="kn-block"></i><i class="kn-block"></i><i class="kn-block short"></i>
+      </div>
+    </div>
+  </div>
+
+  <div class="desk-file" id="deskFile" draggable="true" data-tip="Drag onto the Island to attach">
+    <div class="df-badge"><span>PDF</span></div>
+    <div class="df-name">Sprint 43 plan.pdf</div>
+  </div>
+
+  <section class="onboard" id="onboard" hidden role="dialog" aria-label="Set up Telu">
+    <div class="ob-steps" id="obSteps"></div>
+    <footer class="ob-foot"><div class="ob-dots" id="obDots"><i></i><i></i><i></i></div><span class="spacer"></span><div class="ob-actions" id="obActions"></div></footer>
+  </section>
+
+  <section class="cmdk" id="cmdk" hidden role="dialog" aria-label="Telu">
+    <div class="cmdk-search">
+      <svg class="i cmdk-glass" aria-hidden="true"><use href="#i-search"/></svg>
+      <input id="cmdkInput" type="text" autocomplete="off" spellcheck="false" placeholder="Search meetings, people, docs — or type a command" aria-label="Search Telu">
+      <span class="kbd cmdk-hint">⌘K</span>
+    </div>
+    <div class="cmdk-body">
+      <div class="cmdk-list" id="cmdkList" role="listbox" aria-label="Results"></div>
+      <div class="cmdk-detail" id="cmdkDetail" tabindex="-1"></div>
+    </div>
+    <footer class="cmdk-foot" id="cmdkFoot"></footer>
+  </section>
+
+  <div class="island" id="island" role="region" aria-label="Telu"></div>
+  <div class="mb-panel" id="mbPanel" hidden role="menu" aria-label="Telu menu"></div>
+  <input type="file" id="filePick" hidden>
+</div>
+<script src="../kit/icons.js"></script>
+<script src="../kit/data.js"></script>
+<script src="../kit/mac-kit.js"></script>
+<script src="c-companion.js"></script>
+<script src="c-companion-views.js"></script>
+<script src="c-companion-palette.js"></script>
+<script src="c-companion-island.js"></script>
+<script src="c-companion-surfaces.js"></script>
+</body>
+</html>

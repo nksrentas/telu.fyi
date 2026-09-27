@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telu · 001 App mental model</title>
+<link rel="icon" href="../kit/telu-icon.png">
+<style>
+  html[data-theme="light"] { --bg: #F1F1EE; --bar: rgba(251, 251, 249, 0.92); --label: #17191F; --label-2: #727783; --fill: rgba(23, 25, 31, 0.07); --thumb: #FFFFFF; --hair: rgba(23, 25, 31, 0.1); --mark: none; }
+  html[data-theme="dark"] { --bg: #0E0E12; --bar: rgba(26, 27, 32, 0.92); --label: #F2F2EF; --label-2: #9DA1AC; --fill: rgba(255, 255, 255, 0.08); --thumb: #3A3B44; --hair: rgba(255, 255, 255, 0.08); --mark: invert(1); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; flex-direction: column; font: 13px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; background: var(--bg); color: var(--label); -webkit-font-smoothing: antialiased; cursor: default; user-select: none; }
+  .bar { position: relative; z-index: 2; height: 56px; flex: none; display: flex; align-items: center; gap: 16px; padding: 0 14px 0 16px; background: var(--bar); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 0 0.5px 0 var(--hair); }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+  .brand img { width: 22px; height: 22px; filter: var(--mark); }
+  .brand-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+  .brand-text b { font-size: 13px; font-weight: 600; }
+  .brand-text span { font-size: 11.5px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg { position: relative; display: inline-flex; padding: 3px; border-radius: 999px; background: var(--fill); flex: none; }
+  .seg button { position: relative; z-index: 1; height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--label-2); font: 500 13px/1 inherit; font-family: inherit; display: inline-flex; align-items: center; gap: 7px; transition: color 160ms ease; cursor: default; }
+  .seg button[aria-selected="true"] { color: var(--label); }
+  .seg button kbd { font: 600 10px/1 inherit; font-family: inherit; opacity: 0.45; }
+  .seg .thumb { position: absolute; top: 3px; left: 0; height: 28px; border-radius: 999px; background: var(--thumb); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.05); transition: transform 240ms cubic-bezier(0.23, 1, 0.32, 1), width 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .seg.small button { height: 24px; padding: 0 10px; font-size: 12px; }
+  .seg.small .thumb { height: 24px; }
+  .right { flex: 1; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+  .open { height: 28px; padding: 0 12px; border-radius: 999px; background: var(--fill); color: var(--label); text-decoration: none; display: inline-flex; align-items: center; font-weight: 500; transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1); }
+  .open:active { transform: scale(0.97); }
+  .star { color: #E8A30C; }
+  .open, .seg button { white-space: nowrap; }
+  @media (max-width: 1080px) { .brand-text { display: none; } .brand { flex: 0 0 auto; } }
+  @media (max-width: 760px) { .seg button kbd, #themes { display: none; } }
+  .stage { position: relative; flex: 1; min-height: 0; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: none; }
+  iframe.active { display: block; }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <div class="brand">
+      <img src="../kit/telu-icon.png" alt="">
+      <div class="brand-text"><b>Sketch 001 · App mental model</b><span id="thesis"></span></div>
+    </div>
+    <div class="seg" id="variants" role="tablist">
+      <span class="thumb"></span>
+      <button role="tab" data-v="a" aria-selected="true" title="Picked: sidebar tabs + agenda">A · Today <span class="star">★</span> <kbd>1</kbd></button>
+      <button role="tab" data-v="b" aria-selected="false" title="Picked: living doc">B · Living Doc <span class="star">★</span> <kbd>2</kbd></button>
+      <button role="tab" data-v="c" aria-selected="false" title="Picked: Island">C · Companion <span class="star">★</span> <kbd>3</kbd></button>
+    </div>
+    <div class="right">
+      <div class="seg small" id="themes">
+        <span class="thumb"></span>
+        <button data-t="default" aria-selected="true">Light</button>
+        <button data-t="dark" aria-selected="false">Dark</button>
+      </div>
+      <a class="open" id="open" target="_blank" rel="noopener">Open ↗</a>
+    </div>
+  </div>
+  <div class="stage" id="stage"></div>
+
+<script>
+  const VARIANTS = {
+    a: { file: 'a-today.html', thesis: 'Your calendar, with memory — time is the spine and every meeting arrives with a brief.' },
+    b: { file: 'b-living-doc.html', thesis: 'One living document per recurring conversation — purpose on top, every meeting a section inside it.' },
+    c: { file: 'c-companion.html', thesis: 'Telu comes to you — a glass island before, during and after each meeting; ⌘K for everything else.' }
+  };
+  const stage = document.getElementById('stage');
+  const frames = {};
+  let theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'default';
+  let current = null;
+
+  const placeThumb = (seg, animate) => {
+    const thumb = seg.querySelector('.thumb');
+    const active = seg.querySelector('[aria-selected="true"]');
+    if (!animate) thumb.style.transition = 'none';
+    thumb.style.width = `${active.offsetWidth}px`;
+    thumb.style.transform = `translateX(${active.offsetLeft - 3}px)`;
+    if (!animate) { thumb.getBoundingClientRect(); thumb.style.transition = ''; }
+  };
+  const select = (seg, attr, value, animate = true) => {
+    seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset[attr] === value)));
+    placeThumb(seg, animate);
+  };
+
+  const show = (id, animate = true) => {
+    if (current === id) return;
+    current = id;
+    if (!frames[id]) {
+      const frame = document.createElement('iframe');
+      frame.src = `${VARIANTS[id].file}?theme=${theme}`;
+      frame.title = VARIANTS[id].thesis;
+      stage.appendChild(frame);
+      frames[id] = frame;
+    }
+    Object.entries(frames).forEach(([key, frame]) => frame.classList.toggle('active', key === id));
+    document.getElementById('thesis').textContent = VARIANTS[id].thesis;
+    document.getElementById('open').href = `${VARIANTS[id].file}?theme=${theme}`;
+    select(document.getElementById('variants'), 'v', id, animate);
+    history.replaceState(null, '', `#${id}`);
+    frames[id].focus();
+  };
+
+  const setTheme = (value, animate = true) => {
+    theme = value;
+    document.documentElement.dataset.theme = value === 'dark' ? 'dark' : 'light';
+    select(document.getElementById('themes'), 't', value, animate);
+    Object.values(frames).forEach((frame) => frame.contentWindow.postMessage({ type: 'theme', value }, '*'));
+    if (current) document.getElementById('open').href = `${VARIANTS[current].file}?theme=${theme}`;
+  };
+
+  document.getElementById('variants').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (btn) show(btn.dataset.v);
+  });
+  document.getElementById('themes').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (btn) setTheme(btn.dataset.t);
+  });
+  document.addEventListener('keydown', (e) => {
+    const map = { Digit1: 'a', Digit2: 'b', Digit3: 'c' };
+    if (map[e.code] && !e.metaKey && !e.altKey && !e.ctrlKey) show(map[e.code], false);
+  });
+
+  setTheme(theme, false);
+  show(VARIANTS[location.hash.slice(1)] ? location.hash.slice(1) : 'a', false);
+</script>
+</body>
+</html>

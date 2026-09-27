@@ -1,0 +1,61 @@
+:root {
+  color-scheme: dark;
+
+  --accent: #7C7FF2;
+  --accent-strong: #9092F6;
+  --accent-soft: rgba(124, 127, 242, 0.22);
+  --accent-softer: rgba(124, 127, 242, 0.1);
+  --on-accent: #FFFFFF;
+  --mint: #67E8C5;
+  --mint-ink: #67E8C5;
+  --mint-soft: rgba(103, 232, 197, 0.16);
+  --coral: #FF6B62;
+  --coral-ink: #FF8A83;
+  --coral-soft: rgba(255, 107, 98, 0.18);
+  --amber: #FFB340;
+  --amber-soft: rgba(255, 179, 64, 0.16);
+
+  --label: #F2F2EF;
+  --label-2: #9DA1AC;
+  --label-3: rgba(242, 242, 239, 0.4);
+  --label-4: rgba(242, 242, 239, 0.22);
+
+  --window-bg: #1B1C21;
+  --content-bg: #1F2026;
+  --surface: #26272E;
+  --surface-sunken: #1A1B20;
+  --fill: rgba(255, 255, 255, 0.05);
+  --fill-2: rgba(255, 255, 255, 0.085);
+  --fill-3: rgba(255, 255, 255, 0.13);
+  --separator: rgba(255, 255, 255, 0.08);
+  --hairline: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.1);
+
+  --glass: rgba(38, 39, 46, 0.62);
+  --glass-strong: rgba(44, 45, 53, 0.82);
+  --glass-rim: rgba(255, 255, 255, 0.1);
+  --glass-edge: rgba(0, 0, 0, 0.5);
+  --sidebar: rgba(34, 35, 42, 0.62);
+  --menubar: rgba(22, 22, 27, 0.55);
+  --scrim: rgba(0, 0, 0, 0.36);
+
+  --wallpaper:
+    radial-gradient(1100px 760px at 12% 16%, #2A2D82 0%, transparent 62%),
+    radial-gradient(900px 700px at 90% 8%, #4B2A55 0%, transparent 58%),
+    radial-gradient(1000px 900px at 72% 100%, #0E4A43 0%, transparent 62%),
+    linear-gradient(160deg, #121329 0%, #0A0B0F 100%);
+
+  --shadow-window: 0 0 0 0.5px rgba(0, 0, 0, 0.7), inset 0 0.5px 0 rgba(255, 255, 255, 0.1), 0 24px 72px rgba(0, 0, 0, 0.55), 0 8px 22px rgba(0, 0, 0, 0.3);
+  --shadow-float: 0 0 0 0.5px rgba(0, 0, 0, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 14px 36px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.25);
+  --shadow-card: 0 0 0 0.5px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 0 0 0.5px rgba(255, 255, 255, 0.1), 0 6px 18px rgba(0, 0, 0, 0.35);
+
+  --series-blue: #0A84FF;
+  --series-orange: #FF9F0A;
+  --series-green: #32D74B;
+  --series-purple: #BF5AF2;
+  --series-teal: #40C8E0;
+  --series-pink: #FF375F;
+  --series-gray: #98989D;
+  --template-filter: invert(1);
+}
