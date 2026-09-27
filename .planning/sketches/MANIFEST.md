@@ -20,5 +20,6 @@ Telu should feel like a first-party macOS app: calm, precise, warm. Native chrom
 |---|------|----------------|--------|------|
 | 001 | app-mental-model | Which mental model makes Telu fastest and most valuable: Today (time), Living Doc (series), or Companion (moment)? | Synthesis: A tabs + agenda, B living doc, C Island → 002 | layout, navigation, calendar, series, purpose-doc, docs, motion |
 | 002 | final-app | Does the synthesis (A calendar + B living doc + C Island) hold together as one app? | Approved — final direction | synthesis, final, calendar, living-doc, island |
+| 003 | component-catalog | What is the complete set of components in the final app, with every variant and state, ready to become reusable React components? | Approved — 183 components, every state and animation | components, design-system, states, variants, inventory |
 
 Earlier exploration (sketches 001–005 from before 2026-09-27) is archived in `_archive/2026-09-27/` and intentionally not used as input.

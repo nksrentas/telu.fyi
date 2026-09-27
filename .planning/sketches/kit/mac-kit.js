@@ -198,7 +198,7 @@ window.Kit = (() => {
       openMenu.close(true);
       if (same) return null;
     }
-    const container = opts.container || (trigger && trigger.closest('.window, .desktop')) || desktopEl();
+    const container = opts.container || (trigger && trigger.closest('.window, .desktop, .panel-host')) || desktopEl();
     const el = html('<div class="menu" role="menu" tabindex="-1"></div>');
     const entries = [];
     items.forEach((item) => {
@@ -303,9 +303,9 @@ window.Kit = (() => {
     return api;
   }
 
-  function alert({ title, message, buttons = [{ label: 'OK', value: 'ok', primary: true }], iconMarkup } = {}) {
+  function alert({ title, message, buttons = [{ label: 'OK', value: 'ok', primary: true }], iconMarkup, container: host } = {}) {
     return new Promise((resolve) => {
-      const container = desktopEl();
+      const container = host || desktopEl();
       const el = html(`<div class="alert" role="alertdialog">
         ${iconMarkup || '<div class="app-icon"><img src="../kit/telu-icon.png" alt=""></div>'}
         <h3>${title}</h3>${message ? `<p>${message}</p>` : ''}
@@ -371,8 +371,8 @@ window.Kit = (() => {
     return { dismiss };
   }
 
-  function notify({ title, body, time = 'now', actions = [], duration = 7000, onClick } = {}) {
-    const desk = desktopEl();
+  function notify({ title, body, time = 'now', actions = [], duration = 7000, onClick, container } = {}) {
+    const desk = container || desktopEl();
     let stack = $(':scope > .notif-stack', desk);
     if (!stack) stack = desk.appendChild(html('<div class="notif-stack"></div>'));
     const el = html(`<div class="notif" role="status">
