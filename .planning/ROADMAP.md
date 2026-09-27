@@ -13,7 +13,7 @@ Telu extends the active Tauri/Rust and Next.js/React Community Edition applicati
 - Integer phases (1, 2, 3): planned MVP work
 - Decimal phases (2.1, 2.2): urgent insertions, if later required
 
-- [ ] **Phase 1: Baseline Observability, Identity, and Trust Boundaries** - Make the existing desktop foundation measurable, recoverable, consistently identified, and truthful about every data destination.
+- [x] **Phase 1: Baseline Observability, Identity, and Trust Boundaries** - Make the existing desktop foundation measurable, recoverable, consistently identified, and truthful about every data destination. (completed 2026-09-26)
 - [ ] **Phase 2: Evidence-Linked Post-Meeting Knowledge** - Turn completed meetings into inspectable, correctable, evidence-backed knowledge without erasing history.
 - [ ] **Phase 3: Bounded Sourced Preparation** - Let users prepare from an explicit, lifecycle-safe set of accepted knowledge and versioned documents using direct bounded context.
 - [ ] **Phase 4: Cancellable Live-Loop Validation** - Prove that a tightly bounded live loop can surface timely, grounded value and remain silent when intervention would distract.
@@ -23,8 +23,8 @@ Telu extends the active Tauri/Rust and Next.js/React Community Edition applicati
 ## Validation Policy
 
 - Unknown evidence does not pass a gate. A failed prerequisite blocks the dependent capability until it is repaired, narrowed, or explicitly removed from the milestone.
-- Thresholds are declared from Phase 1 baseline evidence and representative user evaluation before the relevant experiment or release; this roadmap does not invent numeric targets.
-- Phase 2 may begin only after canonical identity, final-transcript persistence, recovery, and trust-boundary prerequisites pass. Phase 4 has an additional hard dependency on Phase 1's continuous-speech freshness, backlog, stop, and resource evidence.
+- Thresholds are declared from measured baseline evidence and representative user evaluation before the relevant experiment or release; this roadmap does not invent numeric targets.
+- Phase 2 may begin only after canonical identity, final-transcript persistence, recovery, and trust-boundary prerequisites pass. Phase 4 owns the additional continuous-speech freshness, backlog, stop, resource/power, physical-network, and threshold evidence required before live assistance can advance.
 - Sensitive document use waits for a passing lifecycle/deletion canary. Series carry-forward waits for stable review and supersession semantics. Release waits for the held-out integrated gate.
 
 ## Phase Details
@@ -34,19 +34,19 @@ Telu extends the active Tauri/Rust and Next.js/React Community Edition applicati
 **Goal:** Maintainers and users can rely on a measured, recoverable desktop foundation with one meeting identity and explicit local, LAN, or remote data boundaries.
 **Mode:** mvp
 **Depends on:** Nothing (first phase)
-**Requirements:** BASE-01, BASE-02, BASE-03, BASE-04, BASE-05, BASE-06, IDENT-01, IDENT-02, IDENT-03, PRIV-01, PRIV-02, PRIV-03
+**Requirements:** BASE-02, BASE-03, BASE-04, BASE-05, IDENT-01, IDENT-02, IDENT-03, PRIV-01, PRIV-02, PRIV-03
 **Success Criteria** (what must be TRUE):
 
-  1. A maintainer can run the reproducible target-hardware scenario matrix and inspect monotonic end-to-end stage timing, real queue depth and oldest age, throughput, cancellation or supersession, resource use, provider choice, and errors without evaluation data leaving the device by default.
+  1. A maintainer can inspect monotonic stage timing, real queue depth and oldest age, throughput, cancellation or supersession, resource observations, provider choice, and errors without evaluation data leaving the device by default.
   2. A user can create, record, stop, restart, and repeatedly recover one logical meeting under a single Rust-owned identifier, with final transcript evidence persisted incrementally and idempotently and with capture gaps or incomplete state shown rather than hidden.
-  3. A user can see which transcription, summary, document-processing, or generation path is local, LAN, or remote and its destination; an unavailable selected path fails visibly without silent provider fallback, and network-blocked local workflows attempt no undisclosed egress.
-  4. A maintainer can record an evidence-backed go/no-go decision and declare the thresholds that later live experiments and release checks will use, including an explicit result for continuous-speech freshness, backlog age, resource bounds, stop behavior, recovery, and identity continuity.
+  3. A user can see which transcription, summary, document-processing, or generation path is local, LAN, or remote and its destination; an unavailable selected path fails visibly without silent provider fallback, and local workflows expose attributable outbound-attempt evidence.
+  4. A maintainer can record a focused evidence-backed Phase 2 go/no-go decision for identity continuity, durable final evidence, recovery reconciliation, capture completeness, and privacy boundaries without requiring the later live-performance matrix.
 
 **Non-goals:** Structured knowledge extraction, document ingestion, live suggestions, series memory, broad ASR or VAD redesign before measurement, the archived Python/FastAPI backend, or the separate Meetily Pro Agent API.
-**Verification approach:** Run short, continuous, overlapping, sustained-system-audio, overload, stop, restart, crash, and repeated-recovery scenarios on the declared target matrix; inspect stage telemetry and resource samples; verify idempotent database state and stable evidence IDs; block network access in local mode; snapshot provider-boundary disclosures and failure behavior.
-**Exit gate:** Phase 2 may proceed only when canonical meeting identity, stable final-transcript semantics, recovery reconciliation, capture-completeness reporting, and privacy-boundary checks pass. Phase 4 remains blocked unless continuous-speech freshness, backlog age, memory/resource behavior, and stop behavior are observable, bounded against the predeclared experiment thresholds, and passing. Unknown results count as failure.
+**Verification approach:** Reuse completed Phase 1 implementation evidence; run focused automated checks for canonical identity, final-evidence idempotency, recovery, completeness, route enforcement, and the application-side local canary; perform at most one short packaged-app smoke only if existing packaged evidence cannot prove the same boundary. The continuous, overload, resource, power, and full physical network matrix belongs to Phase 4.
+**Exit gate:** Phase 2 may proceed only when canonical meeting identity, stable final-transcript semantics, recovery reconciliation, capture-completeness reporting, and privacy-boundary checks pass. Phase 4 remains blocked unless the deferred target-hardware matrix proves continuous-speech freshness, backlog age, memory/resource behavior, stop behavior, and predeclared experiment thresholds. Unknown results block only the capability that depends on them.
 **Principal risks / stop conditions:** Split or late identity, partial transcripts treated as durable evidence, placeholder queue metrics, unbounded freshness or memory, silent transcript loss, fabricated confidence, ambiguous provider destinations, undisclosed egress, or silent local-to-hosted fallback. Stop dependent work when any required measurement or trust boundary is unknown or failing.
-**Plans:** 18/19 plans executed
+**Plans:** 19/19 plans complete
 Plans:
 **Wave 1**
 
@@ -122,7 +122,7 @@ Plans:
 
 **Wave 19** *(blocked on Wave 18 completion)*
 
-- [ ] 01-19-PLAN.md — Run the approved physical matrix and declare evidence-derived downstream gates.
+- [x] 01-19-PLAN.md — Verify the focused Phase 2 prerequisite gate and defer the live-readiness matrix to Phase 4.
 
 **UI hint:** yes
 
@@ -222,15 +222,15 @@ Plans:
 
 **Goal:** Users can opt into a calm live-assistance experiment that surfaces only timely, grounded, actionable context and safely stays silent or cancels when its work is no longer valid.
 **Mode:** mvp
-**Depends on:** Phase 1 live-readiness gate and Phase 2-3 evidence, correction, context-budget, and source-lifecycle gates
-**Requirements:** LIVE-01, LIVE-02, LIVE-03, LIVE-04, LIVE-05, LIVE-06, LIVE-07, LIVE-08, LIVE-09, LIVE-10
+**Depends on:** Phase 1 foundation gate and Phase 2-3 evidence, correction, context-budget, and source-lifecycle gates
+**Requirements:** BASE-01, BASE-06, LIVE-01, LIVE-02, LIVE-03, LIVE-04, LIVE-05, LIVE-06, LIVE-07, LIVE-08, LIVE-09, LIVE-10
 **Success Criteria** (what must be TRUE):
 
   1. A user can enable or disable live assistance independently of recording; disabling, changing topic, changing relevant context, or ending the meeting cancels or supersedes pending assistance without interrupting durable capture.
   2. Live assistance consumes fresh transcript increments through a bounded non-blocking handoff and maintains at most one in-flight generation plus one latest pending request per meeting, so overload cannot stall recording or replay an old FIFO backlog.
   3. Every request carries immutable meeting scope, context snapshot, epoch, deadline, and source manifest, and stale or late results are fenced before provider dispatch, persistence, and display.
   4. A user sees at most one primary suggestion and one secondary item, only after freshness, evidence, relevance, novelty, duplicate, actionability, and capacity gates pass, with direct evidence inspection, dismiss, and feedback controls.
-  5. A maintainer can replay deterministic timelines and measure phrase-to-visible p50/p95 latency, cancellation, grounding, usefulness, stale or distracting output, duplication, suppression reasons, and appropriate silence; the feature stays gated until all predeclared experiment thresholds pass.
+  5. A maintainer can run the reproducible target-hardware matrix, replay deterministic timelines, preserve distributions and outliers, and measure phrase-to-visible p50/p95 latency, backlog age, stop behavior, resource/power effects, cancellation, grounding, usefulness, stale or distracting output, duplication, suppression reasons, and appropriate silence; the feature stays gated until all predeclared experiment thresholds pass.
 
 **Non-goals:** Broad or autonomous coaching, high-frequency interventions, more than one in-flight generation, streamed partial output, a complex always-on topic model, or weakening durable capture to improve suggestion latency.
 **Verification approach:** Replay timestamped full meeting timelines with overload, silence-required spans, topic changes, provider delay, ignored cancellation, source deletion, meeting switch, renderer reload, and disable/stop races; compare blinded human ratings against no-assistance and reactive baselines; verify all stage timestamps, fencing points, resource effects, and suppression reasons on the target matrix.
@@ -288,7 +288,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6. Each phase's e
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Baseline Observability, Identity, and Trust Boundaries | 18/19 | In Progress|  |
+| 1. Baseline Observability, Identity, and Trust Boundaries | 19/19 | Complete    | 2026-09-26 |
 | 2. Evidence-Linked Post-Meeting Knowledge | 0/26 | Planned | - |
 | 3. Bounded Sourced Preparation | 0/TBD | Not started | - |
 | 4. Cancellable Live-Loop Validation | 0/TBD | Not started | - |

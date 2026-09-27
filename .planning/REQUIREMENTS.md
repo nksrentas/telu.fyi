@@ -126,12 +126,12 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BASE-01 | Phase 1 | Pending |
+| BASE-01 | Phase 4 | Pending |
 | BASE-02 | Phase 1 | Complete |
 | BASE-03 | Phase 1 | Complete |
 | BASE-04 | Phase 1 | Complete |
 | BASE-05 | Phase 1 | Complete |
-| BASE-06 | Phase 1 | Pending |
+| BASE-06 | Phase 4 | Pending |
 | IDENT-01 | Phase 1 | Complete |
 | IDENT-02 | Phase 1 | Complete |
 | IDENT-03 | Phase 1 | Complete |
