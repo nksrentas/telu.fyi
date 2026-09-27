@@ -19,6 +19,6 @@ Telu should feel like a first-party macOS app: calm, precise, warm. Native chrom
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 001 | app-mental-model | Which mental model makes Telu fastest and most valuable: Today (time), Living Doc (series), or Companion (moment)? | Synthesis: A tabs + agenda, B living doc, C Island → 002 | layout, navigation, calendar, series, purpose-doc, docs, motion |
-| 002 | final-app | Does the synthesis (A calendar + B living doc + C Island) hold together as one app? | — | synthesis, final, calendar, living-doc, island |
+| 002 | final-app | Does the synthesis (A calendar + B living doc + C Island) hold together as one app? | Approved — final direction | synthesis, final, calendar, living-doc, island |
 
 Earlier exploration (sketches 001–005 from before 2026-09-27) is archived in `_archive/2026-09-27/` and intentionally not used as input.
