@@ -151,7 +151,7 @@ All values are the LOCKED Telu tokens (light theme shown; dark values are in fou
 | Glass | `--glass-strong` `rgba(251,251,249,0.84)` + blur/saturate recipe per layer | Toolbar groups, popovers, menus, toasts, drawer, alert |
 
 Accent is reserved for exactly these elements:
-1. `primary` buttons (the one main action on a surface: `Find knowledge`, `Save` in Correct, `Try again`).
+1. `primary` buttons (the one main action on a surface: `Find knowledge`, `Save correction` in Correct, `Regenerate` in the regenerate notice, `Try again`).
 2. `tinted` buttons: `Accept` on a candidate, toast `Undo`.
 3. Sidebar row icons (Today `sun`, Review `inbox`) — icons only, never row fills.
 4. Selection: the 2px ring on a selected agenda card; the accent-filled active menu row; cmdk selected result row.
@@ -208,7 +208,7 @@ Section head: eyebrow `KNOWLEDGE` · caption `· {n} to review` (amber text only
 ### Run notice (provider label before the data-bearing call — Phase 1 D-18/D-19)
 
 Shown above any Find/Regenerate action and above a running run; one line, 12px:
-`{route icon} Uses your Summary model · {Local|LAN|Remote} · {sanitizedOrigin}` (Assumption A4). Icons: Local `laptop`, LAN `network`, Remote `cloud`. LAN without encryption adds coral-ink `Not encrypted`. If the route is not `validated`, the action is disabled and the line reads the ProviderBoundary unavailable copy (see Copywriting). No silent fallback.
+`{route icon} Uses your Summary model · {Local|LAN|Remote} · {sanitizedOrigin}` (Assumption A4). Icons: Local `laptop`, LAN `network`, Remote `cloud`. LAN without encryption adds coral-ink `Not encrypted`. If the route is not `validated`, the action is disabled and the line reads the ProviderBoundary unavailable copy (see Copywriting). No silent fallback. Choosing `⋯ › Regenerate…` shows this line inline with `Regenerate` (primary sm) and `Keep current items` (plain sm, dismisses the notice without starting a run).
 
 ### Run states
 
@@ -235,7 +235,7 @@ Grid `112px · 1fr · auto`, gap 12, padding `10px 12px 10px 14px`, radius 12, r
 | State | Visual | Actions |
 |-------|--------|---------|
 | Pending | `--surface-sunken`, 2.5px amber left bar (inset 12px) | `Accept` (tinted sm) · `Correct` (default sm) · Reject (plain sm icon `x`, `aria-label="Reject"`) |
-| Correcting | Text becomes a textbox (`--content-bg`, accent inset ring + 3px ring at 22%), text selected; below it two 28px fields `Owner` and `Due` (12px labels, placeholder `Not stated`) | `Save` (primary sm) · `Cancel` (plain sm). Enter in the text saves, Esc cancels. Unchanged fields = plain accept |
+| Correcting | Text becomes a textbox (`--content-bg`, accent inset ring + 3px ring at 22%), text selected; below it two 28px fields `Owner` and `Due` (12px labels, placeholder `Not stated`) | `Save correction` (primary sm) · `Discard edit` (plain sm). Enter in the text saves, Esc discards the edit. Unchanged fields = plain accept |
 | Accepted | Transparent with 0.5px `--separator` ring; status `✓ Accepted · eligible` (11px, green `--series-green` dot) | `⋯` (plain sm icon): `Correct…`, `Move back to review` (appends `reopen`) |
 | Accepted · corrected | As accepted; status `✓ Corrected · Accepted · eligible` where `Corrected` is a button opening the History popover | Same `⋯` |
 | Accepted · unresolved | Accepted with owner or due `not_stated`: dashed chip stays and turns amber text `Owner not stated` / `Due not stated` | Fill it via `Correct…` |
@@ -298,11 +298,11 @@ Voice: calm, specific, first-party macOS. Sentence case. No exclamation marks. N
 | Primary CTA (review) | `Accept` (per candidate) — tinted button |
 | Primary CTA (explicit extraction start) | `Find knowledge` (gap meetings: `Find knowledge anyway`) |
 | Shell primary action | `Record` with `⌘R`; while recording `Stop` |
-| Correct actions | `Correct` → `Save` / `Cancel`; menu item `Correct…` |
+| Correct actions | `Correct` → `Save correction` / `Discard edit`; menu item `Correct…` |
 | Reject | icon button, accessible name `Reject` |
 | Restore | `Restore` |
 | Accept all | `Accept all` |
-| Regenerate | menu `Regenerate…`; confirm-free, but shows the run notice line inline with button `Regenerate` (primary sm) and `Cancel` (plain sm) |
+| Regenerate | menu `Regenerate…`; confirm-free, but shows the run notice line inline with button `Regenerate` (primary sm) and `Keep current items` (plain sm) |
 | ReviewHead · pending | `Review what Telu found — only items you accept are used later.` |
 | ReviewHead · reviewed | `Reviewed — every item has a decision.` |
 | Abstention line | `1 possible item skipped — not enough evidence` / `{n} possible items skipped — not enough evidence` |
@@ -371,7 +371,7 @@ All timings come from `motion.ts`; components never inline numbers. Only transfo
 | Menus / context menu | instant open, 60ms blink, 120ms fade | ↑/↓ instant |
 | Delete Alert | 0.95 → 1, 220ms in / 140ms out | Esc = Cancel |
 | Toasts | 340ms transform / 220ms opacity in; 180ms out; 4.2s, hover pauses | Undo is a button; ⌘Z also undoes the last review action |
-| Candidate state change | instant swap (no row animation) | Enter saves, Esc cancels |
+| Candidate state change | instant swap (no row animation) | Enter saves the correction, Esc discards the edit |
 | Accept all | 70ms stagger, input stays live | — |
 | Rejected group | grid-rows 260ms + opacity 200ms; chevron 200ms | Space/Enter on header |
 | Recording capsule | in 240ms (scale 0.96, blur 2px) / out 150ms | ⌘R animates like a click |
