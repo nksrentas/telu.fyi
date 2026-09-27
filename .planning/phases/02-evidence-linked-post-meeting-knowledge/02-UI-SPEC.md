@@ -1,7 +1,8 @@
 ---
 phase: "2"
 slug: "evidence-linked-post-meeting-knowledge"
-status: draft
+status: approved
+reviewed_at: "2026-09-27"
 shadcn_initialized: true
 preset: "new-york (components.json, baseColor neutral) — HSL variables replaced by Telu tokens in this phase"
 created: "2026-09-27"
@@ -393,47 +394,118 @@ Reduced motion: opacity and color stay; slides, scales, FLIP, blur and shimmer/w
 
 ## UI Considerations
 
-Applicable state considerations resolved: 31 covered, 4 backstop, 2 unresolved
+Probe: `ui-consideration-probe` over 15 surfaces (94 applicable categories + 5 from the E15 list-collection kind override) plus 3 cross-cutting rows, merged with the researcher's resolutions. Resolved explicit: 37 · resolved backstop: 63 · unresolved: 2. Empty-state and error COPY lives in the Copywriting Contract; rows below reference it.
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| empty | Today timeline (list-collection) | ✅ covered | Zero meetings on a day render the Copywriting "Today empty" / "Past day empty" rows via EmptyState |
-| loading | Today timeline | ✅ covered | First load shows 3 skeleton cards (shimmer lines, `aria-busy`); step-day reuses the previous day until data arrives, no spinner flash under 150ms |
-| error | Today timeline | ✅ covered | Load failure shows the "Error · list load" toast with Try again; the previous content stays |
-| populated | Today timeline | ✅ covered | Cards in start order, 8px apart, with the EventCard state table |
-| zero-one-many | Today / Review counts and chips | ✅ covered | Counts hide at 0; singular `1 to review`, `1 item needs a look`; plural otherwise |
-| long-text | EventCard title, peek title, capsule label | ✅ covered | Titles truncate with ellipsis (single line); chips never shrink; capsule max 300px truncates the title |
-| empty | Review list | ✅ covered | "All caught up" EmptyState from Copywriting |
-| loading | Review list | ✅ covered | Skeleton rows as Today |
-| error | Review list | ✅ covered | Same toast pattern as Today |
-| overflow | Review list, Today timeline | ✅ covered | The content column scrolls under the 52px toolbar, which turns glass after 2px |
-| empty | Knowledge section | ✅ covered | Not run / No evidence / Nothing found / All abstained states with Copywriting rows |
-| loading | Knowledge section | ✅ covered | Running state: spinner + `Reading the transcript…` + Stop; regenerate keeps existing items visible |
-| error | Knowledge section | ✅ covered | Failed run card with code-specific copy and Try again; route unavailable disables actions with the provider copy |
-| partial | Knowledge section | ✅ covered | Abstention line shows skipped count; gap meetings require explicit start and show gap copy; incomplete-capture evidence is flagged in popover and transcript |
-| partial | CandidateRow owner/due | ✅ covered | `not_stated` fields render dashed `Owner not stated` / `Due not stated`; accepted items keep them as amber unresolved |
-| zero-one-many | Candidate list | ✅ covered | ReviewHead: `Accept all` only with ≥ 2 pending; Rejected group hidden at 0; singular/plural copy |
-| long-text | Candidate text | ✅ covered | Wraps (no truncation) within the 1fr column; correction capped at 400 chars, owner/due 80 chars, counter-free inline error on empty |
-| overflow | Candidate list with many items | 🧪 backstop | 40+ candidates on one meeting remain scrollable in the page column and the peek without layout break — verify with a fixture meeting in the screenshot gallery |
-| error | Review actions (accept/correct/reject/restore) | ✅ covered | On command failure the row returns to its prior state and the "Error · review action" toast shows |
-| populated | Evidence popover | ✅ covered | Eyebrow, verbatim quote, derivation run line, Open transcript |
-| partial | Evidence with changed/missing segment | ✅ covered | Row status `Evidence changed/missing — not eligible`; popover shows the stored quote with note `This line has changed since Telu quoted it.` and no highlight |
-| long-text | Evidence quote | ✅ covered | Quote wraps inside the 320px popover; popover max-height 60vh then scrolls |
-| loading | Transcript drawer | ✅ covered | Skeleton lines until `list_evidence_by_meeting` resolves; highlight applied after load |
-| empty | Transcript drawer | ✅ covered | `No transcript lines yet.` (13px `--label-2`) for meetings with no evidence |
-| overflow | Transcript drawer (long meetings) | 🧪 backstop | A 2-hour meeting (≈ 1,500 segments) opens and centres the cited line without jank — virtualize the list (existing virtualized transcript pattern); verify with a large fixture |
-| populated | History popover | ✅ covered | Original proposal, each revision with timestamp, unchanged evidence, item id and run |
-| loading | Delete Alert counts | ✅ covered | Delete disabled + tiny spinner until impact counts load |
-| error | Delete Alert | ✅ covered | Delete failure keeps the Alert open with 11px coral-ink `Couldn't delete this meeting. Nothing was removed.` (transaction rolled back) |
-| zero-one-many | Delete Alert counts | ✅ covered | Singular/plural and the both-zero variant in Copywriting |
-| loading | Recording start from shell | ✅ covered | Record button shows 10px spinner and is disabled until the Rust canonical id returns; failure toast `Couldn't start recording. {reason}` |
-| populated | Live transcript during recording | ✅ covered | Meeting page / peek show `LIVE TRANSCRIPT` section; new lines enter (280ms, translateY 6px); auto-scroll pinned to bottom unless the user scrolls up, then a `Jump to latest` plain sm button appears |
-| empty | Search popover | ✅ covered | Hint `Type to search meetings and transcripts`; no matches row from Copywriting |
-| long-text | Toolbar title / subtitle | ✅ covered | Both ellipsize on one line |
-| overflow | Sidebar | 🧪 backstop | Only two nav rows plus Settings and footer; at minimum window height (verify 600px) the footer stays visible — check in the gallery |
-| populated | Settings and re-skinned screens | 🧪 backstop | Every existing screen matches its "after" screenshot with zero hard-coded palette classes (grep gate) — human review at the Wave 1 checkpoint |
-| partial | Dark appearance | ⚠ unresolved | Whether dark ships switched on in Phase 2 is a checkpoint decision (Assumption A1); planner treats light-only as the default acceptance bar |
-| loading | Window vibrancy / Overlay chrome in DMG builds | ⚠ unresolved | tauri#13415 transparency risk; planner treats "verified on a `tauri build` artifact" as a human-verify checkpoint |
+### Resolved — explicit (lift as `must_haves.truths` strings)
+
+- [E1 Today timeline · empty] Zero meetings on a day render the Copywriting "Today empty" / "Past day empty" rows via EmptyState
+- [E1 Today timeline · loading] First load shows 3 skeleton cards (shimmer lines, `aria-busy`); step-day reuses the previous day until data arrives, no spinner flash under 150ms
+- [E1 Today timeline · error] Load failure shows the "Error · list load" toast with Try again; the previous content stays
+- [E1 Today timeline · populated] Cards in start order, 8px apart, with the EventCard state table
+- [E1 Today timeline · overflow] The content column scrolls under the 52px toolbar, which turns glass after 2px
+- [E1 Today timeline · zero-one-many] Counts hide at 0; singular `1 to review`, `1 item needs a look`; plural otherwise
+- [E2 Review list · empty] "All caught up" EmptyState from Copywriting
+- [E2 Review list · loading] Skeleton rows as Today
+- [E2 Review list · error] Same toast pattern as Today
+- [E2 Review list · overflow] The content column scrolls under the 52px toolbar, which turns glass after 2px
+- [E2 Review list · zero-one-many] Counts hide at 0; singular `1 to review`, `1 item needs a look`; plural otherwise
+- [E3 Knowledge section · empty] Not run / No evidence / Nothing found / All abstained states with Copywriting rows
+- [E3 Knowledge section · loading] Running state: spinner + `Reading the transcript…` + Stop; regenerate keeps existing items visible
+- [E3 Knowledge section · error] Failed run card with code-specific copy and Try again; route unavailable disables actions with the provider copy
+- [E3 Knowledge section · partial] Abstention line shows skipped count; gap meetings require explicit start and show gap copy; incomplete-capture evidence is flagged in popover and transcript
+- [E3 Knowledge section · zero-one-many] ReviewHead: `Accept all` only with ≥ 2 pending; Rejected group hidden at 0; singular/plural copy
+- [E4 CandidateRow · error] On command failure the row returns to its prior state and the "Error · review action" toast shows
+- [E4 CandidateRow · partial] `not_stated` fields render dashed `Owner not stated` / `Due not stated`; accepted items keep them as amber unresolved
+- [E4 CandidateRow · long-text] Wraps (no truncation) within the 1fr column; correction capped at 400 chars, owner/due 80 chars, counter-free inline error on empty
+- [E6 Evidence popover · long-text] Quote wraps inside the 320px popover; popover max-height 60vh then scrolls
+- [E7 Transcript drawer · empty] `No transcript lines yet.` (13px `--label-2`) for meetings with no evidence
+- [E7 Transcript drawer · loading] Skeleton lines until `list_evidence_by_meeting` resolves; highlight applied after load
+- [E8 History popover · populated] Original proposal, each revision with timestamp, unchanged evidence, item id and run
+- [E9 Delete meeting alert · loading] Delete disabled + tiny spinner until impact counts load
+- [E9 Delete meeting alert · error] Delete failure keeps the Alert open with 11px coral-ink `Couldn't delete this meeting. Nothing was removed.` (transaction rolled back)
+- [E9 Delete meeting alert · zero-one-many] Singular/plural and the both-zero variant in Copywriting
+- [E10 Record button / recording capsule · loading] Record button shows 10px spinner and is disabled until the Rust canonical id returns; failure toast `Couldn't start recording. {reason}`
+- [E10 Record button / recording capsule · long-text] Titles truncate with ellipsis (single line); chips never shrink; capsule max 300px truncates the title
+- [E11 Live transcript · populated] Meeting page / peek show `LIVE TRANSCRIPT` section; new lines enter (280ms, translateY 6px); auto-scroll pinned to bottom unless the user scrolls up, then a `Jump to latest` plain sm button appears
+- [E12 Search popover · empty] Hint `Type to search meetings and transcripts`; no matches row from Copywriting
+- [E13 Toolbar title · long-text] Both ellipsize on one line
+- [E15 Side peek · long-text] Titles truncate with ellipsis (single line); chips never shrink; capsule max 300px truncates the title
+- [E15 Side peek · empty] (kind override: list-collection — the peek body renders the Knowledge section) The peek body is the meeting page blocks with `surface="peek"`, so its empty Knowledge state is E3's empty state and copy, unchanged
+- [E15 Side peek · populated] The populated peek shows header (22px/700 title, meta line, completeness chip when not Complete) then the same Knowledge blocks as the page, in compact container rules at ≤ 600px
+- [E15 Side peek · partial] Partial knowledge (skipped claims, "not stated" owner/due, legacy "No evidence") renders exactly as E3/E4 do on the page — no peek-specific variant
+- [E15 Side peek · overflow] The 46px bar (Open as page ↗ · ✕) stays sticky; the peek body scrolls independently with 48px bottom padding; the agenda pads right by `--peek-w + 24px` so nothing hides under the peek
+- [E15 Side peek · zero-one-many] Singular/plural counts in the peek reuse E3's copy (`1 item` / `{n} items`); layout does not change between one and many
+
+### Resolved — backstop (lift as `{ statement, verification: backstop }`)
+
+- { statement: "[E1 Today timeline · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E2 Review list · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E2 Review list · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E3 Knowledge section · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E3 Knowledge section · overflow] 40+ candidates on one meeting remain scrollable in the page column and the peek without layout break — verify with a fixture meeting in the screenshot gallery", verification: backstop }
+- { statement: "[E4 CandidateRow · empty] What is shown when there is no data — zero items, an unfilled form, or absent media? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E4 CandidateRow · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E4 CandidateRow · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E4 CandidateRow · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E4 CandidateRow · zero-one-many] How does the layout read at zero, one, and many items (singular vs plural copy, spacing)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · empty] What is shown when there is no data — zero items, an unfilled form, or absent media? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · zero-one-many] How does the layout read at zero, one, and many items (singular vs plural copy, spacing)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E5 Rejected group · long-text] What happens with unusually long text — truncation, wrapping, ellipsis, or reflow? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E6 Evidence popover · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E6 Evidence popover · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E6 Evidence popover · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E7 Transcript drawer · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E7 Transcript drawer · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E7 Transcript drawer · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E7 Transcript drawer · overflow] A 2-hour meeting (≈ 1,500 segments) opens and centres the cited line without jank — virtualize the list (existing virtualized transcript pattern); verify with a large fixture", verification: backstop }
+- { statement: "[E7 Transcript drawer · zero-one-many] How does the layout read at zero, one, and many items (singular vs plural copy, spacing)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E8 History popover · empty] What is shown when there is no data — zero items, an unfilled form, or absent media? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E8 History popover · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E8 History popover · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E8 History popover · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E8 History popover · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E8 History popover · zero-one-many] How does the layout read at zero, one, and many items (singular vs plural copy, spacing)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E9 Delete meeting alert · empty] What is shown when there is no data — zero items, an unfilled form, or absent media? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E9 Delete meeting alert · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E9 Delete meeting alert · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E9 Delete meeting alert · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E9 Delete meeting alert · long-text] What happens with unusually long text — truncation, wrapping, ellipsis, or reflow? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E10 Record button / recording capsule · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E11 Live transcript · empty] What is shown when there is no data — zero items, an unfilled form, or absent media? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E11 Live transcript · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E11 Live transcript · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E11 Live transcript · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E11 Live transcript · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E11 Live transcript · zero-one-many] How does the layout read at zero, one, and many items (singular vs plural copy, spacing)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E12 Search popover · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E12 Search popover · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E12 Search popover · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E12 Search popover · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E12 Search popover · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E12 Search popover · zero-one-many] How does the layout read at zero, one, and many items (singular vs plural copy, spacing)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E12 Search popover · long-text] What happens with unusually long text — truncation, wrapping, ellipsis, or reflow? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E13 Toolbar title · overflow] What happens when content exceeds its container — scroll, clip, wrap, or truncate? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E14 Sidebar · empty] What is shown when there is no data — zero items, an unfilled form, or absent media? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E14 Sidebar · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E14 Sidebar · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E14 Sidebar · populated] What does the normal populated (happy-path) state look like at a typical volume of content? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E14 Sidebar · partial] What is shown for partial or incomplete data — some fields or rows present, others missing? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E14 Sidebar · overflow] Only two nav rows plus Settings and footer; at minimum window height (verify 600px) the footer stays visible — check in the gallery", verification: backstop }
+- { statement: "[E14 Sidebar · zero-one-many] How does the layout read at zero, one, and many items (singular vs plural copy, spacing)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E14 Sidebar · long-text] What happens with unusually long text — truncation, wrapping, ellipsis, or reflow? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E15 Side peek · loading] What is shown while data or content is still loading (skeleton, spinner, progressive reveal)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[E15 Side peek · error] What is shown when the load or submit fails (message, retry affordance, partial fallback)? (auto floor — confirm in the screenshot gallery / component tests)", verification: backstop }
+- { statement: "[Settings and re-skinned screens · populated] Every existing screen matches its \"after\" screenshot with zero hard-coded palette classes (grep gate) — human review at the Wave 1 checkpoint", verification: backstop }
+
+### Unresolved — planner must treat as assumption
+
+- ⚠ unresolved — planner must treat as assumption: [Dark appearance · partial] Whether dark ships switched on in Phase 2 is a checkpoint decision (Assumption A1); planner treats light-only as the default acceptance bar
+- ⚠ unresolved — planner must treat as assumption: [Window vibrancy / Overlay chrome in DMG builds · loading] tauri#13415 transparency risk; planner treats "verified on a `tauri build` artifact" as a human-verify checkpoint
 
 ---
 
