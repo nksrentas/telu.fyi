@@ -407,3 +407,7 @@ $env:RUST_LOG="debug"; ./clean_run_windows.bat
 
 **Whisper Integration**:
 - [frontend/src-tauri/src/whisper_engine/whisper_engine.rs](frontend/src-tauri/src/whisper_engine/whisper_engine.rs) - Whisper model management and transcription
+
+## Design Skill Routing
+
+- **Sketch findings for telu-fyi** (design decisions, CSS patterns, visual direction) → `Skill("sketch-findings-telu-fyi")` — load before building or changing any UI in `frontend/`.
