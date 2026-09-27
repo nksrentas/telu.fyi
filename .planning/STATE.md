@@ -1,19 +1,19 @@
 ---
-gsd_state_version: "1.0"
-current_phase: 01
-current_phase_name: Baseline Observability, Identity, and Trust Boundaries
-status: executing
-stopped_at: Completed 01-18-PLAN.md
-last_updated: "2026-09-23T19:17:32+03:00"
-last_activity: 2026-09-23
-last_activity_desc: "Completed quick task 260923-q8n: Rename the app from Meetly or Meetily to Telu"
-state_head: b8624c42041936afb80186a9add48709209d1564
+gsd_state_version: 1.0
+current_phase: 2
+current_phase_name: Evidence-Linked Post-Meeting Knowledge
+status: planning
+stopped_at: Phase 2 context gathered
+last_updated: "2026-09-27T18:27:14.800Z"
+last_activity: 2026-09-26
+last_activity_desc: Phase 1 complete, transitioned to Phase 2
+state_head: 313251142d4abe0674595abff9cbab13cc61c4a0
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 19
-  completed_plans: 18
-  percent: 0
+  completed_plans: 19
+  percent: 17
 ---
 
 # Project State
@@ -23,22 +23,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-20)
 
 **Core value:** Telu surfaces the right evidence-backed context at the moment it is useful—and stays silent when an intervention would not add more value than distraction.
-**Current focus:** Phase 01 — Baseline Observability, Identity, and Trust Boundaries
+**Current focus:** Phase 02 — Evidence-Linked Post-Meeting Knowledge
 
 ## Current Position
 
-Phase: 01 (Baseline Observability, Identity, and Trust Boundaries) — EXECUTING
-Plan: 19 of 19
-Status: Ready to execute
+Phase: 2 — Evidence-Linked Post-Meeting Knowledge
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-09-26 - Completed quick task 260926-w68: Use the supplied Telu macOS icon kit for the app's existing desktop and bundle icon assets
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 17%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 19
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -46,7 +46,7 @@ Progress: [░░░░░░░░░░] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 1 | 19 | - | - |
 
 **Recent Trend:**
 
@@ -158,7 +158,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1]: The Meetily foundation is not benchmark-validated on the target hardware, OS, model, and language matrix.
+- [Phase 1 → Phase 4]: The Meetily foundation is not yet benchmark-validated on the target hardware, OS, model, and language matrix; this blocks live-loop validation, not evidence-linked post-meeting knowledge.
 - [Phase 1 → Phase 4]: Continuous-speech transcript freshness, real backlog age, resource ceilings, and stop behavior are unknown until measured.
 - [Phase 1]: Canonical meeting identity, idempotent incremental final-transcript persistence, and privacy/provider boundaries must pass before downstream features depend on them.
 - [Phase 3]: Sensitive document ingestion waits for a passing replace/delete propagation canary.
@@ -171,6 +171,11 @@ None yet.
 | 260923-q8n | Rename the app from Meetly or Meetily to Telu | 2026-09-23 | d6fd543 | [260923-q8n-rename-the-app-from-meetly-or-meetily-to](./quick/260923-q8n-rename-the-app-from-meetly-or-meetily-to/) |
 | 260926-w68 | Use the supplied Telu macOS icon kit for the app's existing desktop and bundle icon assets | 2026-09-26 | 5a217cd | [260926-w68-use-the-supplied-telu-macos-icon-kit-for](./quick/260926-w68-use-the-supplied-telu-macos-icon-kit-for/) |
 
+### Roadmap Evolution
+
+- Phase 1 edited: moved the full physical/performance matrix to Phase 4 and narrowed Plan 01-19 to the Phase 2 foundation gate
+- Phase 4 edited: assigned BASE-01 and BASE-06 physical/live-readiness validation to Phase 4
+
 ## Deferred Items
 
 | Category | Item | Status | Deferred At | Milestone |
@@ -178,9 +183,10 @@ None yet.
 | Retrieval | FTS5, embeddings, and external vector infrastructure until bounded direct context demonstrably fails | Deferred | Roadmap creation | MVP |
 | Automation | Automatic series grouping, calendar integration, bots, and meeting auto-join | Deferred | Roadmap creation | MVP |
 | Collaboration | Shared team memory, roles, and cloud collaboration | Deferred | Roadmap creation | MVP |
+| Validation | Full physical target-hardware matrix, repeated performance/power runs, independent packet capture, and BASE-06 live-readiness thresholds | Deferred to Phase 4 | Phase 1 scope revision (2026-09-26) | MVP |
 
 ## Session Continuity
 
-Last session: 2026-09-21T11:20:14.944Z
-Stopped at: Completed 01-18-PLAN.md
-Resume file: None
+Last session: 2026-09-27T18:27:14.699Z
+Stopped at: Phase 2 context gathered
+Resume file: .planning/phases/02-evidence-linked-post-meeting-knowledge/02-CONTEXT.md
