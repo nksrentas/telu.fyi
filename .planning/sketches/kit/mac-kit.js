@@ -567,9 +567,10 @@ window.Kit = (() => {
     const day = dayMatch ? DAY_LABEL[dayMatch[1].slice(0, 3)] : null;
     if (day && !cadence) cadence = 'Weekly';
     let time = null;
-    const timeMatch = scrubbed.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?![\d:])/);
-    const dayThenNumber = new RegExp(DAY_RE.source + '\\s+\\d').test(scrubbed);
-    if (timeMatch && (timeMatch[2] || timeMatch[3] || /\bat\s+\d/.test(scrubbed) || dayThenNumber)) {
+    const timeText = scrubbed.replace(/every (2|two) weeks/g, blank);
+    const timeMatch = timeText.match(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?(?![\d:])/);
+    const dayThenNumber = new RegExp(DAY_RE.source + '\\s+\\d').test(timeText);
+    if (timeMatch && (timeMatch[2] || timeMatch[3] || /\bat\s+\d/.test(timeText) || dayThenNumber)) {
       let hours = Number(timeMatch[1]);
       if (timeMatch[3] === 'pm' && hours < 12) hours += 12;
       if (timeMatch[3] === 'am' && hours === 12) hours = 0;
