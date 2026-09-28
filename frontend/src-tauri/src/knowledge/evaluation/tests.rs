@@ -1,4 +1,5 @@
 use super::*;
+use crate::database::repositories::meeting::MeetingsRepository;
 
 fn segment(id: &str, text: &str) -> GoldSegment {
     GoldSegment {
@@ -96,6 +97,7 @@ fn predictions(items: Vec<PredictedItem>) -> PredictionSet {
             },
         ],
         resurrection_count: Some(0),
+        deletion_residue_count: Some(0),
     }
 }
 
@@ -276,4 +278,180 @@ async fn run_replay_reports_zero_resurrection_when_rejected_items_return_under_o
 
     assert_eq!(predictions.fixtures[0].items.len(), 3);
     assert_eq!(predictions.resurrection_count, Some(0));
+}
+
+fn empty_reply_fixture() -> GoldFixture {
+    GoldFixture {
+        fixture_id: "quiet".to_string(),
+        ..release_fixture()
+    }
+}
+
+#[tokio::test]
+async fn count_deletion_residue_reports_rows_left_behind() {
+    let pool = replay::replay_pool().await.expect("pool");
+    let meeting_id = uuid::Uuid::new_v4().to_string();
+    replay::seed_meeting(&pool, &meeting_id, &release_fixture().segments[..2]).await.expect("seed");
+
+    assert_eq!(replay::count_deletion_residue(&pool, &meeting_id).await.expect("count"), 3);
+    MeetingsRepository::delete_meeting(&pool, &meeting_id).await.expect("delete");
+    assert_eq!(replay::count_deletion_residue(&pool, &meeting_id).await.expect("count"), 0);
+}
+
+#[tokio::test]
+async fn run_replay_measures_zero_deletion_residue_through_the_production_delete() {
+    let fixtures = [release_fixture()];
+    let completions = HashMap::from([("release".to_string(), vec![release_reply()])]);
+
+    let predictions = replay::run_replay(&fixtures, &completions).await.expect("replay");
+
+    assert_eq!(predictions.deletion_residue_count, Some(0));
+    assert_eq!(predictions.resurrection_count, Some(0));
+}
+
+#[tokio::test]
+async fn run_replay_leaves_resurrection_unmeasured_without_rejected_items() {
+    let fixtures = [empty_reply_fixture()];
+    let completions = HashMap::from([("quiet".to_string(), vec!["{\"items\": []}".to_string()])]);
+
+    let predictions = replay::run_replay(&fixtures, &completions).await.expect("replay");
+
+    assert_eq!(predictions.resurrection_count, None);
+    assert_eq!(predictions.deletion_residue_count, Some(0));
+}
+
+async fn seed_exported_meeting(path: &std::path::Path, meeting_id: &str) {
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(path).create_if_missing(true))
+        .await
+        .expect("database");
+    sqlx::migrate!("./migrations").run(&pool).await.expect("migrations");
+    let segments = [segment("018f5e27-2f68-7e27-9c90-7c7212316401", "We decided to ship the beta on Friday.")];
+    replay::seed_meeting(&pool, meeting_id, &segments).await.expect("meeting");
+    let run_id = uuid::Uuid::new_v4().to_string();
+    crate::knowledge::repository::KnowledgeRepository::insert_running_run(&pool, &export_run(meeting_id, &run_id))
+        .await
+        .expect("run");
+    let mut transaction = pool.begin().await.expect("transaction");
+    crate::knowledge::repository::KnowledgeRepository::insert_items_with_links(
+        &mut transaction,
+        meeting_id,
+        &run_id,
+        &[export_item(&segments[0])],
+    )
+    .await
+    .expect("items");
+    crate::knowledge::repository::KnowledgeRepository::finalize_run(
+        &mut transaction,
+        &run_id,
+        crate::knowledge::models::RunStatus::Succeeded,
+        crate::knowledge::repository::RunCounts { proposed: 1, ..Default::default() },
+        None,
+    )
+    .await
+    .expect("finalize");
+    transaction.commit().await.expect("commit");
+    pool.close().await;
+}
+
+fn export_run(meeting_id: &str, run_id: &str) -> crate::knowledge::repository::NewRun {
+    crate::knowledge::repository::NewRun {
+        run_id: run_id.to_string(),
+        meeting_id: meeting_id.to_string(),
+        trigger_kind: crate::knowledge::models::TriggerKind::User,
+        provider_id: "ollama".to_string(),
+        model_id: "llama3".to_string(),
+        location_class: "local".to_string(),
+        sanitized_origin: "This device".to_string(),
+        prompt_version: "knowledge-extract-v2".to_string(),
+        meeting_completeness_at_start: "complete".to_string(),
+        input_evidence_count: 1,
+        input_fingerprint: "fingerprint".to_string(),
+    }
+}
+
+fn export_item(segment: &GoldSegment) -> crate::knowledge::repository::NewItem {
+    use crate::knowledge::span_verifier::{sha256_hex, AttributeSupport, VerifiedSpan};
+    crate::knowledge::repository::NewItem {
+        item_id: uuid::Uuid::new_v4().to_string(),
+        item_type: KnowledgeType::Decision,
+        text: "Ship the beta on Friday".to_string(),
+        normalized_key: "ship the beta on friday".to_string(),
+        claims: vec![VerifiedSpan {
+            evidence_id: segment.id.clone(),
+            raw_start: 14,
+            raw_end: 37,
+            quote_text: "ship the beta on Friday".to_string(),
+            normalized_quote: "ship the beta on friday".to_string(),
+            evidence_text_sha256: sha256_hex(&segment.text),
+            segment_capture_incomplete: false,
+        }],
+        owner: AttributeSupport::NotStated,
+        due: AttributeSupport::NotStated,
+    }
+}
+
+#[tokio::test]
+async fn export_from_db_measures_invariants_for_an_exported_meeting() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let database = temp.path().join("telu.sqlite");
+    let meeting_id = "018f5e27-2f68-7e27-9c90-7c7212316402".to_string();
+    seed_exported_meeting(&database, &meeting_id).await;
+
+    let (_, predictions) = replay::export_from_db(&database, std::slice::from_ref(&meeting_id)).await.expect("export");
+
+    assert_eq!(predictions.fixtures[0].items.len(), 1);
+    assert_eq!(predictions.resurrection_count, Some(0));
+    assert_eq!(predictions.deletion_residue_count, Some(0));
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(sqlx::sqlite::SqliteConnectOptions::new().filename(&database).read_only(true))
+        .await
+        .expect("app database");
+    let kept: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM meetings WHERE id = ?")
+        .bind(&meeting_id)
+        .fetch_one(&pool)
+        .await
+        .expect("count");
+    assert_eq!(kept, 1);
+}
+
+fn unmeasured_failures(set: &PredictionSet) -> (GateStatus, Vec<String>) {
+    let fixtures = fixtures();
+    let labels = labels();
+    let limits = thresholds(Some(ScopeThresholds::default()));
+    let report = score(&ScoreInput { fixtures: &fixtures, predictions: set, labels: &labels, thresholds: &limits }, envelope());
+    (report.gate, report.failures)
+}
+
+#[test]
+fn score_fails_when_an_invariant_is_unmeasured() {
+    let no_resurrection = PredictionSet { resurrection_count: None, ..predictions(standard_items()) };
+    let no_residue = PredictionSet { deletion_residue_count: None, ..predictions(standard_items()) };
+    let nothing_shown = predictions(Vec::new());
+
+    for (set, failure) in [
+        (no_resurrection, "invariants.resurrection.unmeasured"),
+        (no_residue, "invariants.deletionResidue.unmeasured"),
+        (nothing_shown, "invariants.exactSpanSupport.unmeasured"),
+    ] {
+        let (gate, failures) = unmeasured_failures(&set);
+        assert_eq!(gate, GateStatus::Fail, "{failure}");
+        assert!(failures.contains(&failure.to_string()), "{failure}: {failures:?}");
+    }
+}
+
+#[test]
+fn score_fails_when_deletion_residue_is_above_zero() {
+    let fixtures = fixtures();
+    let set = PredictionSet { deletion_residue_count: Some(2), ..predictions(standard_items()) };
+    let labels = labels();
+    let limits = thresholds(Some(ScopeThresholds::default()));
+
+    let report = score(&ScoreInput { fixtures: &fixtures, predictions: &set, labels: &labels, thresholds: &limits }, envelope());
+
+    assert_eq!(report.invariants.deletion_residue, Some(2));
+    assert_eq!(report.gate, GateStatus::Fail);
+    assert!(report.failures.contains(&"invariants.deletionResidue".to_string()));
 }
