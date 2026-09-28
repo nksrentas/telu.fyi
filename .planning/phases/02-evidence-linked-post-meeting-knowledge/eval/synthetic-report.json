@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "generatedAtUtc": "2026-09-28T11:49:21.891302+00:00",
+  "generatedAtUtc": "2026-09-28T15:09:54.672742+00:00",
   "promptVersion": "knowledge-extract-v2",
-  "thresholdsSha256": "6af4ebe924cb0e57c3b2fe987fd0ad7d1acff152b1c0ad18f7b92f9b0c515f50",
-  "gitCommit": "61f30f7c0f149aa0965637202d31213753e4fe94",
+  "thresholdsSha256": "aa1261fae592fb70282e68cdd02192191c1f8ef0c9d3d9541c47764c0693ae79",
+  "gitCommit": "61222ff693b3ccaa94c511bec4ec1f02ffca6e86",
   "fixtures": [
     "degraded-capture",
     "insufficient-evidence",
@@ -296,8 +296,10 @@
       "denominator": 6
     },
     "resurrection": 0,
-    "deletionResidue": null
+    "deletionResidue": 0
   },
-  "gate": "undeclared",
-  "failures": []
+  "gate": "fail",
+  "failures": [
+    "inputs.representativeFixtures"
+  ]
 }
