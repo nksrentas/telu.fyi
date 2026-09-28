@@ -1,0 +1,53 @@
+{
+  "version": 2,
+  "invariants": {
+    "exactSpanSupport": 1.0,
+    "resurrection": 0,
+    "deletionResidue": 0
+  },
+  "quality": {
+    "abstention": {
+      "insufficientEvidence": null
+    },
+    "decision": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null,
+      "maxDuplication": null,
+      "minReviewAccepted": null
+    },
+    "commitment": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null,
+      "maxDuplication": null,
+      "minReviewAccepted": null
+    },
+    "question": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null,
+      "maxDuplication": null,
+      "minReviewAccepted": null
+    },
+    "fact": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null,
+      "maxDuplication": null,
+      "minReviewAccepted": null
+    },
+    "overall": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null,
+      "maxDuplication": null,
+      "minReviewAccepted": null
+    }
+  }
+}
