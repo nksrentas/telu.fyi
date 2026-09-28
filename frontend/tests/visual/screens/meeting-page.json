@@ -1,0 +1,196 @@
+[
+  {
+    "name": "meeting-page-complete",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000003",
+          "sequence": 2,
+          "text": "Maria will update the release notes by Thursday.",
+          "audioStartTime": 20.0,
+          "audioEndTime": 24.2,
+          "captureCompleteness": "incomplete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000004",
+          "sequence": 3,
+          "text": "Is the pricing page ready for review?",
+          "audioStartTime": 30.0,
+          "audioEndTime": 33.4,
+          "captureCompleteness": "complete"
+        }
+      ]
+    }
+  },
+  {
+    "name": "meeting-page-drawer-open",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d&evidence=0197a1b2-0001-7000-8000-000000000002",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000003",
+          "sequence": 2,
+          "text": "Maria will update the release notes by Thursday.",
+          "audioStartTime": 20.0,
+          "audioEndTime": 24.2,
+          "captureCompleteness": "incomplete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000004",
+          "sequence": 3,
+          "text": "Is the pricing page ready for review?",
+          "audioStartTime": 30.0,
+          "audioEndTime": 33.4,
+          "captureCompleteness": "complete"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "waitFor": "[data-line=\"0197a1b2-0001-7000-8000-000000000002\"]"
+      }
+    ]
+  },
+  {
+    "name": "meeting-page-legacy",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": []
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"Transcript\"]"
+      },
+      {
+        "waitFor": "text=Transcript only · no evidence"
+      }
+    ]
+  },
+  {
+    "name": "meeting-page-empty-transcript",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [],
+      "api_get_meeting_transcripts": {
+        "transcripts": [],
+        "total_count": 0,
+        "has_more": false
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"Transcript\"]"
+      },
+      {
+        "waitFor": "text=No transcript lines yet."
+      }
+    ]
+  },
+  {
+    "name": "meeting-page-incomplete",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000003",
+          "sequence": 2,
+          "text": "Maria will update the release notes by Thursday.",
+          "audioStartTime": 20.0,
+          "audioEndTime": 24.2,
+          "captureCompleteness": "incomplete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000004",
+          "sequence": 3,
+          "text": "Is the pricing page ready for review?",
+          "audioStartTime": 30.0,
+          "audioEndTime": 33.4,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "api_get_meeting_metadata": {
+        "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "title": "Weekly product sync",
+        "created_at": "2026-09-27T09:00:00Z",
+        "updated_at": "2026-09-27T09:44:00Z",
+        "folder_path": "/Users/demo/Movies/Telu/Weekly product sync",
+        "lifecycle": "complete",
+        "completeness": "incomplete",
+        "completeness_reason": "capture_gap",
+        "gap_count": 2,
+        "gaps": []
+      }
+    }
+  },
+  {
+    "name": "meeting-page-2h",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d&evidence=seg-1200",
+    "ipc": {
+      "knowledge_list_evidence": {
+        "$repeat": 1500,
+        "template": {
+          "evidenceId": "seg-$i",
+          "sequence": "$i",
+          "text": "Line $i of the quarterly planning review, covering scope, owners and the next milestone.",
+          "audioStartTime": "$i*4.8",
+          "audioEndTime": "$i*4.8+4.2",
+          "captureCompleteness": "complete"
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "[data-line=\"seg-1200\"]"
+      }
+    ]
+  }
+]

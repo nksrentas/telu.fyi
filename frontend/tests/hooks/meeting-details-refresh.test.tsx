@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import type { SummaryProcessResponse } from '../../src/types';
 
@@ -9,6 +9,7 @@ const originalPreferences = { ...await import('../../src/lib/summary-language-pr
 const originalToast = { ...await import('sonner') };
 const originalNavigation = { ...await import('next/navigation') };
 const originalConfig = { ...await import('../../src/contexts/ConfigContext') };
+const originalMeetingPage = { ...await import('../../src/components/living-doc/meeting-page') };
 afterAll(() => {
   mock.module('@tauri-apps/api/core', () => originalCore);
   mock.module('../../src/lib/analytics', () => originalAnalytics);
@@ -16,6 +17,7 @@ afterAll(() => {
   mock.module('sonner', () => originalToast);
   mock.module('next/navigation', () => originalNavigation);
   mock.module('../../src/contexts/ConfigContext', () => originalConfig);
+  mock.module('../../src/components/living-doc/meeting-page', () => originalMeetingPage);
 });
 
 let selectedMeeting = 'meeting-a';
@@ -69,11 +71,15 @@ function SummaryView(props: any) {
     modelConfig: { provider: 'ollama', model: 'test', whisperModel: 'base' }, isModelConfigLoading: false,
     selectedTemplate: 'daily_standup', setAiSummary: data.setAiSummary, updateMeetingTitle: data.updateMeetingTitle,
   });
-  refresh = props.onRefetchTranscripts;
   useEffect(() => { mounts += 1; }, []);
   return <output>{props.meeting.id}:{summaryState.summaryStatus}:{JSON.stringify(data.aiSummary)}</output>;
 }
 mock.module('../../src/app/meeting-details/page-content', () => ({ default: SummaryView }));
+function PassthroughMeetingPage({ onRefetchTranscripts, children }: { onRefetchTranscripts: () => Promise<void>; children: ReactNode }) {
+  refresh = onRefetchTranscripts;
+  return <>{children}</>;
+}
+mock.module('../../src/components/living-doc/meeting-page', () => ({ MeetingPage: PassthroughMeetingPage }));
 const { default: MeetingDetails } = await import('../../src/app/meeting-details/page');
 
 let renderer: ReactTestRenderer | undefined;

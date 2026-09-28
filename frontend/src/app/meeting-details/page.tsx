@@ -10,6 +10,9 @@ import {
   Transcript,
 } from "@/types";
 import PageContent from "./page-content";
+import { MeetingPage } from "@/components/living-doc/meeting-page";
+import { Button } from "@/components/ui/button";
+import { listMeetingEvidence } from "@/lib/knowledge-service";
 import { useRouter, useSearchParams } from "next/navigation";
 import Analytics from "@/lib/analytics";
 import { invoke } from "@tauri-apps/api/core";
@@ -36,6 +39,8 @@ function MeetingDetailsContent() {
   const searchParams = useSearchParams();
   const meetingId = searchParams.get('id');
   const source = searchParams.get('source'); // Check if navigated from recording
+  const originLabel = searchParams.get('from') ?? 'Today';
+  const evidenceParam = searchParams.get('evidence');
   const { setCurrentMeeting, refetchMeetings } = useSidebar();
   const { isAutoSummary } = useConfig(); // Get auto-summary toggle state
   const router = useRouter();
@@ -46,18 +51,16 @@ function MeetingDetailsContent() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [shouldAutoGenerate, setShouldAutoGenerate] = useState<boolean>(false);
   const [hasCheckedAutoGen, setHasCheckedAutoGen] = useState<boolean>(false);
+  const [evidenceInfo, setEvidenceInfo] = useState<{ count: number | null; durationSeconds: number | null }>({
+    count: null,
+    durationSeconds: null,
+  });
 
   // Use pagination hook for efficient transcript loading
   const {
     metadata,
-    segments,
     transcripts,
     isLoading: isLoadingTranscripts,
-    isLoadingMore,
-    hasMore,
-    totalCount,
-    loadedCount,
-    loadMore,
     refetch,
     error: transcriptError,
   } = usePaginatedTranscripts({ meetingId: meetingId || '' });
@@ -190,6 +193,7 @@ function MeetingDetailsContent() {
     setMeetingDetails(null);
     setMeetingSummary(null);
     setSummaryResponse(null);
+    setEvidenceInfo({ count: null, durationSeconds: null });
     setError(null);
     setIsLoading(true);
     // Reset auto-generation state to allow new meeting to be checked
@@ -233,9 +237,24 @@ function MeetingDetailsContent() {
       }
     };
 
+    const fetchEvidenceInfo = async () => {
+      try {
+        const evidence = await listMeetingEvidence(meetingId);
+        if (cancelled) return;
+        const durationSeconds = evidence.length > 0
+          ? evidence.reduce((longest, segment) => Math.max(longest, segment.audioEndTime), 0)
+          : null;
+        setEvidenceInfo({ count: evidence.length, durationSeconds });
+      } catch (error) {
+        if (cancelled) return;
+        console.error('Failed to read transcript evidence for meeting:', error);
+        setEvidenceInfo({ count: null, durationSeconds: null });
+      }
+    };
+
     const loadData = async () => {
       try {
-        await fetchMeetingSummary();
+        await Promise.all([fetchMeetingSummary(), fetchEvidenceInfo()]);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -258,8 +277,7 @@ function MeetingDetailsContent() {
         !isLoading &&
         summaryResponse?.status === 'idle' &&
         meetingSummary === null &&
-        meetingDetails.transcripts &&
-        meetingDetails.transcripts.length > 0 &&
+        ((evidenceInfo.count ?? 0) > 0 || meetingDetails.transcripts.length > 0) &&
         !hasCheckedAutoGen
       ) {
         console.log('No summary found, checking for auto-generation...');
@@ -268,19 +286,16 @@ function MeetingDetailsContent() {
     };
 
     checkAutoGen();
-  }, [meetingDetails, meetingSummary, summaryResponse, isLoading, hasCheckedAutoGen, setupAutoGeneration]);
+  }, [meetingDetails, meetingSummary, summaryResponse, isLoading, hasCheckedAutoGen, setupAutoGeneration, evidenceInfo.count]);
 
   if (error) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
-          <p className="text-red-500 mb-4">{error}</p>
-          <button
-            onClick={() => router.push('/')}
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
+          <p className="text-coral-ink mb-4">{error}</p>
+          <Button onClick={() => router.push('/')}>
             Go Back
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -293,28 +308,37 @@ function MeetingDetailsContent() {
     </div>;
   }
 
-  return <PageContent
-    key={meetingId}
-    initialSummary={summaryResponse}
-    meeting={meetingDetails}
-    summaryData={meetingSummary}
-    shouldAutoGenerate={shouldAutoGenerate}
-    onAutoGenerateComplete={() => setShouldAutoGenerate(false)}
-    onMeetingUpdated={async () => {
-      // Refetch meeting details to get updated title from backend
-      await fetchMeetingDetails();
-      // Refetch meetings list to update sidebar
-      await refetchMeetings();
-    }}
-    onRefetchTranscripts={refetch}
-    // Pagination props for efficient transcript loading
-    segments={segments}
-    hasMore={hasMore}
-    isLoadingMore={isLoadingMore}
-    totalCount={totalCount}
-    loadedCount={loadedCount}
-    onLoadMore={loadMore}
-  />;
+  const legacyDuration = meetingDetails.transcripts.reduce(
+    (longest, transcript) => Math.max(longest, transcript.audio_end_time ?? transcript.audio_start_time ?? 0),
+    0,
+  );
+  const durationSeconds = evidenceInfo.durationSeconds ?? (legacyDuration > 0 ? legacyDuration : null);
+
+  return (
+    <MeetingPage
+      key={meetingId}
+      meeting={meetingDetails}
+      originLabel={originLabel}
+      hasEvidence={evidenceInfo.count !== 0}
+      initialEvidenceId={evidenceParam}
+      onRefetchTranscripts={refetch}
+    >
+      <PageContent
+        initialSummary={summaryResponse}
+        meeting={meetingDetails}
+        summaryData={meetingSummary}
+        shouldAutoGenerate={shouldAutoGenerate}
+        onAutoGenerateComplete={() => setShouldAutoGenerate(false)}
+        onMeetingUpdated={async () => {
+          await fetchMeetingDetails();
+          await refetchMeetings();
+        }}
+        surface="page"
+        hasEvidence={(evidenceInfo.count ?? 0) > 0}
+        durationSeconds={durationSeconds}
+      />
+    </MeetingPage>
+  );
 }
 
 export default function MeetingDetails() {

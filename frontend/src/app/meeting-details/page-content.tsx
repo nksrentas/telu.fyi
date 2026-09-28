@@ -1,14 +1,17 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
+import { Chip } from '@/components/telu-ui/chip';
+import { Textarea } from '@/components/ui/textarea';
+import { MeetingHeader } from '@/components/living-doc/meeting-header';
+import { DURATION, EASE } from '@/lib/motion';
+import { cn } from '@/lib/utils';
 import { MeetingSummary, SummaryProcessResponse } from '@/types';
 import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import Analytics from '@/lib/analytics';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import { TranscriptPanel } from '@/components/MeetingDetails/TranscriptPanel';
 import { SummaryPanel } from '@/components/MeetingDetails/SummaryPanel';
-import { MeetingDetailsSplitView, type MeetingDetailsTab } from '@/components/MeetingDetails/MeetingDetailsSplitView';
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { MeetingCompleteness } from '@/components/MeetingCompleteness';
 import { KnowledgeSection } from '@/components/living-doc/knowledge-section';
@@ -18,7 +21,6 @@ import { useMeetingData } from '@/hooks/meeting-details/useMeetingData';
 import { useSummaryGeneration } from '@/hooks/meeting-details/useSummaryGeneration';
 import { useTemplates } from '@/hooks/meeting-details/useTemplates';
 import { useCopyOperations } from '@/hooks/meeting-details/useCopyOperations';
-import { useMeetingOperations } from '@/hooks/meeting-details/useMeetingOperations';
 import { useConfig } from '@/contexts/ConfigContext';
 import {
   ProviderBoundary,
@@ -39,14 +41,9 @@ export default function PageContent({
   shouldAutoGenerate = false,
   onAutoGenerateComplete,
   onMeetingUpdated,
-  onRefetchTranscripts,
-  // Pagination props for efficient transcript loading
-  segments,
-  hasMore,
-  isLoadingMore,
-  totalCount,
-  loadedCount,
-  onLoadMore,
+  surface = 'page',
+  hasEvidence = false,
+  durationSeconds = null,
 }: {
   meeting: any;
   summaryData: MeetingSummary | null;
@@ -54,25 +51,12 @@ export default function PageContent({
   shouldAutoGenerate?: boolean;
   onAutoGenerateComplete?: () => void;
   onMeetingUpdated?: () => Promise<void>;
-  onRefetchTranscripts?: () => Promise<void>;
-  // Pagination props
-  segments?: any[];
-  hasMore?: boolean;
-  isLoadingMore?: boolean;
-  totalCount?: number;
-  loadedCount?: number;
-  onLoadMore?: () => void;
+  surface?: 'page' | 'peek';
+  hasEvidence?: boolean;
+  durationSeconds?: number | null;
 }) {
-  console.log('📄 PAGE CONTENT: Initializing with data:', {
-    meetingId: meeting.id,
-    summaryDataKeys: summaryData ? Object.keys(summaryData) : null,
-    transcriptsCount: meeting.transcripts?.length
-  });
-
   // State
   const [customPrompt, setCustomPrompt] = useState<string>('');
-  const isRecording = false;
-  const [activeTab, setActiveTab] = useState<MeetingDetailsTab>('transcript');
   const [summaryRouteState, setSummaryRouteState] = useState<ProviderRouteViewState>({
     status: 'loading',
     route: null,
@@ -84,8 +68,6 @@ export default function PageContent({
 
   // Ref to store the modal open function from SummaryGeneratorButtonGroup
   const openModelSettingsRef = useRef<(() => void) | null>(null);
-  const autoSwitchedSummaryMeetingIdsRef = useRef(new Set<string>());
-  const manuallySelectedTabMeetingIdsRef = useRef(new Set<string>());
   const autoGenerationStartedMeetingIdRef = useRef<string | null>(null);
   const pendingSummaryActionRef = useRef<{ kind: 'generate' | 'regenerate'; prompt: string }>({
     kind: 'generate',
@@ -239,25 +221,12 @@ export default function PageContent({
     blockNoteSummaryRef: meetingData.blockNoteSummaryRef,
   });
 
-  const meetingOperations = useMeetingOperations({
-    meeting,
-  });
-
   // Track page view
   useEffect(() => {
     Analytics.trackPageView('meeting_details');
   }, []);
 
-  useEffect(() => {
-    if (
-      (meetingData.aiSummary || summaryGeneration.summaryStatus === 'completed')
-      && !autoSwitchedSummaryMeetingIdsRef.current.has(meeting.id)
-      && !manuallySelectedTabMeetingIdsRef.current.has(meeting.id)
-    ) {
-      autoSwitchedSummaryMeetingIdsRef.current.add(meeting.id);
-      setActiveTab('summary');
-    }
-  }, [meeting.id, meetingData.aiSummary, summaryGeneration.summaryStatus]);
+  const hasTranscript = hasEvidence || meetingData.transcripts.length > 0;
 
   // Auto-generate only after the model configuration has settled.
   useEffect(() => {
@@ -265,7 +234,7 @@ export default function PageContent({
       !shouldAutoGenerate
       || summaryGeneration.summaryStatus !== 'idle'
       || isModelConfigLoading
-      || meetingData.transcripts.length === 0
+      || !hasTranscript
       || autoGenerationStartedMeetingIdRef.current === meeting.id
     ) {
       return;
@@ -285,7 +254,7 @@ export default function PageContent({
   }, [
     shouldAutoGenerate,
     meeting.id,
-    meetingData.transcripts.length,
+    hasTranscript,
     isModelConfigLoading,
     modelConfig.provider,
     modelConfig.model,
@@ -297,122 +266,109 @@ export default function PageContent({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="flex h-screen min-w-0 flex-col bg-background"
+      initial={{ opacity: 0, filter: 'blur(2px)' }}
+      animate={{ opacity: 1, filter: 'blur(0px)' }}
+      transition={{ duration: DURATION.viewFade, ease: EASE.out }}
+      data-surface={surface}
+      className="@container min-w-0"
     >
-      <header className="shrink-0 border-b bg-card px-6 py-4">
-        <div className="flex flex-wrap items-start gap-3">
-          <h1 className="line-clamp-2 min-w-0 flex-1 text-lg font-semibold text-foreground">
-            {meetingData.meetingTitle}
-          </h1>
+      <div className={cn('flex flex-col', surface === 'peek' ? 'gap-8' : 'gap-8 @[600px]:gap-11')}>
+        <div className="space-y-3">
+          <MeetingHeader
+            surface={surface}
+            meeting={{
+              title: meetingData.meetingTitle,
+              createdAt: meeting.created_at,
+              durationSeconds,
+              lifecycle: meeting.lifecycle,
+              completeness: meeting.completeness,
+              gapCount: meeting.gap_count,
+            }}
+          />
           <MeetingCompleteness
             lifecycle={meeting.lifecycle}
             completeness={meeting.completeness}
             gapCount={meeting.gap_count}
-            variant="compact"
+            gaps={meeting.gaps}
+            variant="detail"
+            showStatus={false}
           />
         </div>
-        <MeetingCompleteness
-          className="mt-3"
-          lifecycle={meeting.lifecycle}
-          completeness={meeting.completeness}
-          gapCount={meeting.gap_count}
-          gaps={meeting.gaps}
-          variant="detail"
-          showStatus={false}
-        />
-      </header>
-      <div className="flex flex-1 min-w-0 overflow-hidden">
-        <MeetingDetailsSplitView
-          activeTab={activeTab}
-          onTabChange={(tab) => {
-            manuallySelectedTabMeetingIdsRef.current.add(meeting.id);
-            setActiveTab(tab);
-          }}
-          transcript={
-            <TranscriptPanel
-              transcripts={meetingData.transcripts}
-              customPrompt={customPrompt}
-              onPromptChange={setCustomPrompt}
-              onCopyTranscript={copyOperations.handleCopyTranscript}
-              onOpenMeetingFolder={meetingOperations.handleOpenMeetingFolder}
-              isRecording={isRecording}
-              disableAutoScroll={true}
-              usePagination={true}
-              segments={segments}
-              hasMore={hasMore}
-              isLoadingMore={isLoadingMore}
-              totalCount={totalCount}
-              loadedCount={loadedCount}
-              onLoadMore={onLoadMore}
-              meetingId={meeting.id}
-              meetingFolderPath={meeting.folder_path}
-              onRefetchTranscripts={onRefetchTranscripts}
+
+        <section aria-labelledby="summary-heading" className="scroll-mt-[72px] space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="summary-heading" className="sec-eyebrow m-0">Summary</h2>
+            <Chip>Unreviewed</Chip>
+            <span className="text-[11px] text-label-3">· Generated by your Summary model</span>
+          </div>
+          <div className="space-y-2">
+            <ProviderBoundary
+              capability="summary"
+              refreshKey={`${modelConfig.provider}:${modelConfig.model}:${summaryRouteRefreshKey}`}
+              showUnavailableAlert={false}
+              onRouteStateChange={handleSummaryRouteStateChange}
             />
-          }
-          summary={
-            <div className="flex h-full min-w-0 flex-1 flex-col">
-              <div className="space-y-2 border-b bg-background p-3">
-                <ProviderBoundary
-                  capability="summary"
-                  refreshKey={`${modelConfig.provider}:${modelConfig.model}:${summaryRouteRefreshKey}`}
-                  showUnavailableAlert={false}
-                  onRouteStateChange={handleSummaryRouteStateChange}
-                />
-                {summaryRouteFailure && (
-                  <ProviderRouteFailureAlert
-                    capability="summary"
-                    failure={summaryRouteFailure}
-                    isRetrying={isSummaryRouteRetrying}
-                    onRetry={handleRetrySummary}
-                    onChangeProvider={() => {
-                      handleOpenModelSettings();
-                      window.setTimeout(() => {
-                        document.getElementById('summary-provider-control')?.focus();
-                      }, 0);
-                    }}
-                    onCancel={() => {
-                      retrySummaryAfterRefreshRef.current = false;
-                      setSummaryRouteFailure(null);
-                    }}
-                  />
-                )}
-              </div>
-              <SummaryPanel
-                meeting={meeting}
-                meetingTitle={meetingData.meetingTitle}
-                summaryRef={meetingData.blockNoteSummaryRef}
-                isSaving={meetingData.isSaving}
-                isSummaryDirty={meetingData.isSummaryDirty}
-                onSaveAll={meetingData.saveAllChanges}
-                onCopySummary={copyOperations.handleCopySummary}
-                aiSummary={meetingData.aiSummary}
-                summaryStatus={summaryGeneration.summaryStatus}
-                transcripts={meetingData.transcripts}
-                modelConfig={modelConfig}
-                setModelConfig={setModelConfig}
-                onSaveModelConfig={handleSaveModelConfig}
-                onGenerateSummary={handleGenerateSummaryWithRoute}
-                onStopGeneration={summaryGeneration.handleStopGeneration}
-                customPrompt={customPrompt}
-                onSaveSummary={meetingData.handleSaveSummary}
-                onSummaryChange={meetingData.handleSummaryChange}
-                onDirtyChange={meetingData.setIsSummaryDirty}
-                summaryError={summaryGeneration.summaryError}
-                onRegenerateSummary={handleRegenerateSummaryWithRoute}
-                getSummaryStatusMessage={summaryGeneration.getSummaryStatusMessage}
-                availableTemplates={templates.availableTemplates}
-                selectedTemplate={templates.selectedTemplate}
-                onTemplateSelect={templates.handleTemplateSelection}
-                isModelConfigLoading={isModelConfigLoading || isSummaryRouteRetrying || summaryRouteState.status !== 'validated'}
-                onOpenModelSettings={handleRegisterModalOpen}
+            {summaryRouteFailure && (
+              <ProviderRouteFailureAlert
+                capability="summary"
+                failure={summaryRouteFailure}
+                isRetrying={isSummaryRouteRetrying}
+                onRetry={handleRetrySummary}
+                onChangeProvider={() => {
+                  handleOpenModelSettings();
+                  window.setTimeout(() => {
+                    document.getElementById('summary-provider-control')?.focus();
+                  }, 0);
+                }}
+                onCancel={() => {
+                  retrySummaryAfterRefreshRef.current = false;
+                  setSummaryRouteFailure(null);
+                }}
               />
-              <KnowledgeSection meetingId={meeting.id} />
-            </div>
-          }
-        />
+            )}
+          </div>
+          {hasTranscript && (
+            <Textarea
+              aria-label="Context for the summary"
+              placeholder="Add context for AI summary. For example people involved, meeting overview, objective etc..."
+              value={customPrompt}
+              onChange={(event) => setCustomPrompt(event.target.value)}
+            />
+          )}
+          <div className="overflow-hidden rounded-card bg-surface shadow-card">
+            <SummaryPanel
+              meeting={meeting}
+              meetingTitle={meetingData.meetingTitle}
+              summaryRef={meetingData.blockNoteSummaryRef}
+              isSaving={meetingData.isSaving}
+              isSummaryDirty={meetingData.isSummaryDirty}
+              onSaveAll={meetingData.saveAllChanges}
+              onCopySummary={copyOperations.handleCopySummary}
+              aiSummary={meetingData.aiSummary}
+              summaryStatus={summaryGeneration.summaryStatus}
+              transcripts={meetingData.transcripts}
+              modelConfig={modelConfig}
+              setModelConfig={setModelConfig}
+              onSaveModelConfig={handleSaveModelConfig}
+              onGenerateSummary={handleGenerateSummaryWithRoute}
+              onStopGeneration={summaryGeneration.handleStopGeneration}
+              customPrompt={customPrompt}
+              onSaveSummary={meetingData.handleSaveSummary}
+              onSummaryChange={meetingData.handleSummaryChange}
+              onDirtyChange={meetingData.setIsSummaryDirty}
+              summaryError={summaryGeneration.summaryError}
+              onRegenerateSummary={handleRegenerateSummaryWithRoute}
+              getSummaryStatusMessage={summaryGeneration.getSummaryStatusMessage}
+              availableTemplates={templates.availableTemplates}
+              selectedTemplate={templates.selectedTemplate}
+              onTemplateSelect={templates.handleTemplateSelection}
+              isModelConfigLoading={isModelConfigLoading || isSummaryRouteRetrying || summaryRouteState.status !== 'validated'}
+              onOpenModelSettings={handleRegisterModalOpen}
+            />
+          </div>
+        </section>
+
+        <KnowledgeSection meetingId={meeting.id} />
       </div>
     </motion.div>
   );

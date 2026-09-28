@@ -23,19 +23,24 @@
   },
   {
     "name": "meeting-summary",
-    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d"
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": []
+    }
   },
   {
     "name": "meeting-transcript",
     "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
     "steps": [
       {
-        "click": "[role=tab]:has-text(\"Transcript\")"
+        "click": "button[aria-label=\"Transcript\"]"
+      },
+      {
+        "waitFor": "text=Transcript only · no evidence"
       }
     ],
-    "viewport": {
-      "width": 720,
-      "height": 700
+    "ipc": {
+      "knowledge_list_evidence": []
     }
   },
   {
@@ -359,7 +364,10 @@
       {
         "click": "button[title=\"Summary Settings\"]"
       }
-    ]
+    ],
+    "ipc": {
+      "knowledge_list_evidence": []
+    }
   },
   {
     "name": "notes",

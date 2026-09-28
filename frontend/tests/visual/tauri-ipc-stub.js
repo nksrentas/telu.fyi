@@ -20,12 +20,27 @@
   let nextId = 1;
   window.__TELU_UNMOCKED__ = [];
 
+  const fillTemplate = (template, index) =>
+    JSON.parse(JSON.stringify(template), (_key, value) => {
+      if (typeof value !== 'string') return value;
+      const numeric = /^\$i(?:\*(\d+(?:\.\d+)?))?(?:\+(\d+(?:\.\d+)?))?$/.exec(value);
+      if (numeric) return index * Number(numeric[1] ?? 1) + Number(numeric[2] ?? 0);
+      return value.split('$i').join(String(index));
+    });
+
+  const expand = (value) => {
+    if (value && typeof value === 'object' && !Array.isArray(value) && '$repeat' in value) {
+      return Array.from({ length: value.$repeat }, (_unused, index) => fillTemplate(value.template, index));
+    }
+    return value;
+  };
+
   const resolveEntry = (entry, args) => {
     if (entry && typeof entry === 'object' && !Array.isArray(entry) && '$byArg' in entry) {
       const key = String((args || {})[entry.$byArg]);
-      return key in entry.cases ? entry.cases[key] : entry.default;
+      return expand(key in entry.cases ? entry.cases[key] : entry.default);
     }
-    return entry;
+    return expand(entry);
   };
 
   const invoke = async (cmd, args) => {
