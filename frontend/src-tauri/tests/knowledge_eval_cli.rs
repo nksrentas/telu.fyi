@@ -341,7 +341,53 @@ async fn export_reads_one_meeting_from_the_app_database_and_rejects_bad_ids() {
     assert_eq!(fixtures.len(), 1);
     assert_eq!(fixtures[0]["fixtureId"], exported);
     assert_eq!(fixtures[0]["items"][0]["links"][0]["quote"], "ship the beta on Friday");
+    assert_eq!(predictions["resurrectionCount"], 0);
+    assert_eq!(predictions["deletionResidueCount"], 0);
     assert!(out.join("fixtures").join(format!("{exported}.json")).exists());
     assert!(!refused.status.success());
     assert!(String::from_utf8_lossy(&refused.stderr).contains("INVALID_MEETING_ID"));
+}
+
+fn score_against_db(gold: &Path, predictions: &Path, database: &Path, out: &Path) -> Output {
+    let labels = out.with_extension("labels.json");
+    fs::write(&labels, "{}").expect("empty labels");
+    run(&[
+        "score",
+        "--gold-dir",
+        gold.to_str().unwrap(),
+        "--predictions",
+        predictions.to_str().unwrap(),
+        "--labels",
+        labels.to_str().unwrap(),
+        "--thresholds",
+        fixtures().join("thresholds-test.json").to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+        "--db",
+        database.to_str().unwrap(),
+        "--commit",
+        "test-commit",
+    ])
+}
+
+#[tokio::test]
+async fn score_with_db_counts_review_outcomes_only_for_the_scored_meetings() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let database = temp.path().join("telu.sqlite");
+    let scored = "018f5e27-2f68-7e27-9c90-7c7212316401";
+    let unrelated = "018f5e27-2f68-7e27-9c90-7c7212316402";
+    seed_database(&database, &[scored, unrelated]).await;
+    let export = temp.path().join("export");
+    let exported = run(&["export", "--db", database.to_str().unwrap(), "--meeting", scored, "--out", export.to_str().unwrap()]);
+    assert!(exported.status.success(), "export failed: {}", stderr_of(&exported));
+    let predictions = export.join("predictions.json");
+
+    let output = score_against_db(&export.join("fixtures"), &predictions, &database, &temp.path().join("score"));
+    let refused = score_against_db(&gold_dir(), &predictions, &database, &temp.path().join("refused"));
+
+    assert!(output.status.success(), "score failed: {}", stderr_of(&output));
+    let report: Value = serde_json::from_str(&text(&temp.path().join("score").join("report.json"))).expect("report");
+    assert_eq!(report["reviewOutcomes"]["decision"]["pending"]["denominator"], 1);
+    assert!(!refused.status.success());
+    assert!(stderr_of(&refused).contains("INVALID_MEETING_ID"));
 }
