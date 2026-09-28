@@ -1,14 +1,24 @@
 "use client"
 
-import { Fragment, forwardRef } from "react"
+import { Fragment, forwardRef, useState, type ReactNode } from "react"
 import { CircleCheck } from "lucide-react"
 
 import { WAITING_FOR_STATUS, finalizationDetail } from "@/app/_components/StatusOverlays"
+import { useRecordingControlsContext } from "@/components/app-shell/recording-host"
+import { DeleteMeetingAlert, isDeleteDisabled } from "@/components/living-doc/delete-meeting-alert"
 import { MeetingCompleteness } from "@/components/MeetingCompleteness"
 import { clock, formatMeetingDuration } from "@/components/living-doc/meeting-header"
 import { Chip } from "@/components/telu-ui/chip"
 import { RecDot, Shimmer, Waveform } from "@/components/telu-ui/indicators"
 import { Button } from "@/components/ui/button"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import type { AgendaCardState, AgendaMeeting } from "@/lib/agenda-service"
 import { formatElapsed } from "@/lib/format-elapsed"
 import { cn } from "@/lib/utils"
@@ -142,22 +152,64 @@ function CardActionButton({ meeting, onOpen }: { meeting: AgendaMeeting; onOpen:
   )
 }
 
+interface CardMenuProps {
+  meeting: AgendaMeeting
+  onPeek: () => void
+  onOpenPage: () => void
+  children: ReactNode
+}
+
+export function isCardDeleteDisabled(meeting: AgendaMeeting): boolean {
+  return meeting.cardState === "recording" || meeting.cardState === "finalizing" || isDeleteDisabled(meeting.lifecycle)
+}
+
+function CardMenu({ meeting, onPeek, onOpenPage, children }: CardMenuProps) {
+  const recording = useRecordingControlsContext()
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  return (
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={onPeek}>
+            Open in side peek
+            <ContextMenuShortcut>↩</ContextMenuShortcut>
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={onOpenPage}>Open as page</ContextMenuItem>
+          {meeting.cardState === "recording" && (
+            <ContextMenuItem disabled={!recording?.isRecording} onSelect={() => void recording?.stop()}>
+              Stop recording
+              <ContextMenuShortcut>⌘R</ContextMenuShortcut>
+            </ContextMenuItem>
+          )}
+          <ContextMenuSeparator />
+          <ContextMenuItem variant="danger" disabled={isCardDeleteDisabled(meeting)} onSelect={() => setDeleteOpen(true)}>
+            Delete meeting…
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+      <DeleteMeetingAlert meetingId={meeting.id} title={meeting.title} open={deleteOpen} onOpenChange={setDeleteOpen} navigateHome={false} />
+    </>
+  )
+}
+
 interface EventCardProps {
   meeting: AgendaMeeting
   selected: boolean
   onOpen: (section?: CardSection) => void
+  onOpenPage?: () => void
   finalization?: FinalizationProgressSnapshot | null
   recordingSeconds?: number | null
   tabIndex?: number
 }
 
 export const EventCard = forwardRef<HTMLDivElement, EventCardProps>(function EventCard(
-  { meeting, selected, onOpen, finalization = null, recordingSeconds = null, tabIndex = -1 },
+  { meeting, selected, onOpen, onOpenPage, finalization = null, recordingSeconds = null, tabIndex = -1 },
   ref
 ) {
   const live = meeting.cardState === "recording"
   const dim = DIMMED_STATES.includes(meeting.cardState)
-  return (
+  const card = (
     <div
       ref={ref}
       role="option"
@@ -181,5 +233,11 @@ export const EventCard = forwardRef<HTMLDivElement, EventCardProps>(function Eve
         <CardActionButton meeting={meeting} onOpen={onOpen} />
       </div>
     </div>
+  )
+  if (!onOpenPage) return card
+  return (
+    <CardMenu meeting={meeting} onPeek={() => onOpen()} onOpenPage={onOpenPage}>
+      {card}
+    </CardMenu>
   )
 })

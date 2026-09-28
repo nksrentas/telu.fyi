@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
-type Step = { click?: string; waitFor?: string; press?: string; hover?: string; dispatch?: string };
+type Step = { click?: string; rightClick?: string; waitFor?: string; press?: string; hover?: string; dispatch?: string; type?: string };
 type StoreSeed = { keyPath: string; autoIncrement?: boolean; indexes?: [string, string | string[], boolean][]; records?: unknown[] };
 type IndexedDbSeed = { name: string; version: number; stores: Record<string, StoreSeed> };
 type Screen = {
@@ -33,6 +33,8 @@ const outputRoot = label
 
 async function runStep(page: import('@playwright/test').Page, step: Step) {
   if (step.click) await page.locator(step.click).first().click();
+  if (step.rightClick) await page.locator(step.rightClick).first().click({ button: 'right' });
+  if (step.type) await page.keyboard.type(step.type);
   if (step.hover) await page.locator(step.hover).first().hover();
   if (step.waitFor) await page.locator(step.waitFor).first().waitFor();
   if (step.press) await page.keyboard.press(step.press);

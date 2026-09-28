@@ -1,12 +1,19 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
-import type { ReactElement } from 'react';
+import { cloneElement, createContext, useContext, type ReactElement, type ReactNode } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import type { AgendaMeeting } from '../../src/lib/agenda-service';
 import type { FinalizationProgressSnapshot } from '../../src/services/transcriptService';
 
 type EventHandler = (event: { event: string; id: number; payload: unknown }) => void;
 type Responder = (args: Record<string, unknown>) => unknown;
-type TestGlobals = typeof globalThis & { window?: Record<string, unknown>; document?: Record<string, unknown> };
+type TestGlobals = typeof globalThis & {
+  window?: Record<string, unknown>;
+  document?: Record<string, unknown>;
+  requestAnimationFrame?: (callback: (time: number) => void) => unknown;
+  cancelAnimationFrame?: (handle: unknown) => void;
+  getComputedStyle?: (node: unknown) => unknown;
+  ResizeObserver?: unknown;
+};
 
 const globals = globalThis as TestGlobals;
 const originalWindow = globals.window;
@@ -18,6 +25,8 @@ let nextId = 1;
 let responses: Record<string, Responder> = {};
 let recording = { status: 'idle', activeDuration: null as number | null, recordingDuration: null as number | null };
 const push = mock((_href: string) => {});
+const search = { searchTranscripts: mock(async (_query: string) => {}), searchResults: [] as Array<{ id: string; title: string; matchContext: string }>, isSearching: false };
+const PopoverState = createContext<{ open: boolean; setOpen: (open: boolean) => void }>({ open: false, setOpen: () => {} });
 const animate = mock((_frames: unknown, _options: unknown) => ({ cancel: () => {} }));
 
 const ipc = mock(async (command: string, args: Record<string, unknown> = {}): Promise<unknown> => {
@@ -31,7 +40,59 @@ const ipc = mock(async (command: string, args: Record<string, unknown> = {}): Pr
 const originalCore = { ...await import('@tauri-apps/api/core') };
 const originalNavigation = { ...await import('next/navigation') };
 const originalRecordingState = { ...await import('../../src/contexts/RecordingStateContext') };
+const originalSidebar = { ...await import('../../src/components/Sidebar/SidebarProvider') };
+const originalPopover = { ...await import('../../src/components/ui/popover') };
+const originalContextMenu = { ...await import('../../src/components/ui/context-menu') };
+const originalRadix = { ...await import('radix-ui') };
+const originalPageContent = { ...await import('../../src/app/meeting-details/page-content') };
+const { useEvidenceNavigation } = await import('../../src/components/living-doc/meeting-page');
 mock.module('@tauri-apps/api/core', () => ({ ...originalCore, invoke: ipc }));
+mock.module('../../src/components/Sidebar/SidebarProvider', () => ({ ...originalSidebar, useSidebar: () => search }));
+mock.module('../../src/components/ui/popover', () => ({
+  Popover: ({ children, open, onOpenChange }: { children: ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) => (
+    <PopoverState.Provider value={{ open: Boolean(open), setOpen: (next) => onOpenChange?.(next) }}>{children}</PopoverState.Provider>
+  ),
+  PopoverTrigger: ({ children }: { children: ReactElement<{ onClick?: (event: unknown) => void }> }) => {
+    const state = useContext(PopoverState);
+    return cloneElement(children, { onClick: (event: unknown) => { children.props.onClick?.(event); state.setOpen(!state.open); } });
+  },
+  PopoverAnchor: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverArrow: () => null,
+  PopoverContent: ({ children }: { children: ReactNode }) => (useContext(PopoverState).open ? <div data-popover="">{children}</div> : null),
+}));
+mock.module('../../src/components/ui/context-menu', () => ({
+  ContextMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+  ContextMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  ContextMenuContent: ({ children }: { children: ReactNode }) => <div data-context-menu="">{children}</div>,
+  ContextMenuSeparator: () => <hr />,
+  ContextMenuShortcut: ({ children }: { children: ReactNode }) => <span>{children}</span>,
+  ContextMenuItem: ({ children, onSelect, disabled, variant }: { children: ReactNode; onSelect?: () => void; disabled?: boolean; variant?: string }) => (
+    <button type="button" data-menu-item="" data-variant={variant} disabled={disabled} onClick={() => onSelect?.()}>{children}</button>
+  ),
+}));
+mock.module('radix-ui', () => ({
+  ...originalRadix,
+  AlertDialog: {
+    Root: ({ open, children }: { open: boolean; children?: ReactNode }) => (open ? <>{children}</> : null),
+    Portal: ({ children }: { children?: ReactNode }) => <>{children}</>,
+    Overlay: () => null,
+    Content: ({ children }: { children?: ReactNode }) => <div role="alertdialog">{children}</div>,
+    Title: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
+    Description: ({ children }: { children?: ReactNode }) => <>{children}</>,
+    Cancel: ({ children }: { children?: ReactNode }) => <>{children}</>,
+  },
+}));
+function PageContentStub({ meeting, surface }: { meeting: { id: string; title: string }; surface: string }) {
+  const navigation = useEvidenceNavigation();
+  const link = { linkId: 'link-1', evidenceId: 'evidence-2', role: 'claim', quoteText: 'ship the beta', rawStart: 3, rawEnd: 16, sequence: 1, audioStartTime: 5, audioEndTime: 9, segmentCaptureIncomplete: false };
+  return (
+    <div data-page-content={surface} data-meeting={meeting.id}>
+      {meeting.title}
+      <button type="button" onClick={() => navigation.openEvidence([link as never])}>Open transcript</button>
+    </div>
+  );
+}
+mock.module('../../src/app/meeting-details/page-content', () => ({ ...originalPageContent, default: PageContentStub }));
 mock.module('next/navigation', () => ({ ...originalNavigation, useRouter: () => ({ push }) }));
 mock.module('../../src/contexts/RecordingStateContext', () => ({
   ...originalRecordingState,
@@ -43,9 +104,14 @@ const { localDayBounds } = await import('../../src/lib/agenda-service');
 const { EventCard } = await import('../../src/components/agenda/event-card');
 const { TodayView } = await import('../../src/components/agenda/today-view');
 const { DayStepper, dayHeading } = await import('../../src/components/app-shell/agenda-toolbar');
+const { TooltipProvider } = await import('../../src/components/ui/tooltip');
 
 beforeAll(() => {
   process.env.TZ = 'UTC';
+  globals.requestAnimationFrame = (callback) => setTimeout(() => callback(Date.now()), 0);
+  globals.cancelAnimationFrame = (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>);
+  globals.getComputedStyle = () => ({ animationName: 'none', display: 'block' });
+  globals.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
   globals.window = {
     __TAURI_INTERNALS__: {
       invoke: ipc,
@@ -61,8 +127,18 @@ beforeAll(() => {
     removeEventListener: windowEvents.removeEventListener.bind(windowEvents),
     dispatchEvent: windowEvents.dispatchEvent.bind(windowEvents),
     matchMedia: () => ({ matches: false }),
+    setTimeout: globalThis.setTimeout.bind(globalThis),
+    clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    location: { href: 'http://localhost/', origin: 'http://localhost', hash: '' },
   };
-  globals.document = { activeElement: null, body: {}, documentElement: {} };
+  globals.document = {
+    activeElement: { hasAttribute: () => false, getAttribute: () => null },
+    body: {},
+    documentElement: {},
+    querySelector: () => null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
 });
 
 afterAll(async () => {
@@ -73,6 +149,11 @@ afterAll(async () => {
   globals.document = originalDocument;
   mock.module('@tauri-apps/api/core', () => originalCore);
   mock.module('next/navigation', () => originalNavigation);
+  mock.module('../../src/components/Sidebar/SidebarProvider', () => originalSidebar);
+  mock.module('../../src/components/ui/popover', () => originalPopover);
+  mock.module('../../src/components/ui/context-menu', () => originalContextMenu);
+  mock.module('radix-ui', () => originalRadix);
+  mock.module('../../src/app/meeting-details/page-content', () => originalPageContent);
   mock.module('../../src/contexts/RecordingStateContext', () => originalRecordingState);
 });
 
@@ -102,7 +183,7 @@ const unmount = () => {
 const root = () => renderer!.root;
 const textOf = (node: ReactTestInstance): string =>
   node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('');
-const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+const settle = (ms = 0) => act(async () => { await new Promise((resolve) => setTimeout(resolve, ms)); });
 const options = () => root().findAll((node) => node.type === 'div' && node.props.role === 'option');
 const dayCalls = () => ipc.mock.calls.filter(([command]) => command === 'agenda_list_day');
 const hasClass = (node: ReactTestInstance, name: string) => String(node.props.className ?? '').split(/\s+/).includes(name);
@@ -110,8 +191,8 @@ const hasClass = (node: ReactTestInstance, name: string) => String(node.props.cl
 async function renderElement(element: ReactElement) {
   unmount();
   await act(async () => {
-    renderer = create(element, {
-      createNodeMock: (node) => (node.type === 'div' ? { animate, contains: () => false, focus: () => {} } : null),
+    renderer = create(<TooltipProvider>{element}</TooltipProvider>, {
+      createNodeMock: (node) => (node.type === 'div' ? { animate, contains: () => false, focus: () => {}, querySelector: () => null, querySelectorAll: () => [], setAttribute: () => {}, getAttribute: () => null, addEventListener: () => {}, removeEventListener: () => {} } : null),
     });
   });
   await settle();
@@ -126,11 +207,18 @@ async function press(key: string) {
   await settle();
 }
 
+const PEEK_RESPONSES: Record<string, Responder> = {
+  api_get_meeting_metadata: (args) => ({ id: args.meetingId, title: 'Meeting', created_at: '2026-09-27T09:00:00Z', updated_at: '2026-09-27T09:15:00Z', lifecycle: 'complete', completeness: 'complete', gap_count: 0, gaps: [] }),
+  api_get_meeting_transcripts: () => ({ transcripts: [], total_count: 0, has_more: false }),
+  api_get_summary: (args) => ({ status: 'idle', meeting_id: args.meetingId, data: null }),
+  knowledge_list_evidence: () => [],
+};
+
 beforeEach(() => {
   ipc.mockClear();
   push.mockClear();
   animate.mockClear();
-  responses = {};
+  responses = { ...PEEK_RESPONSES };
   recording = { status: 'idle', activeDuration: null, recordingDuration: null };
 });
 
@@ -261,7 +349,10 @@ describe('TodayView', () => {
     expect(options().map((node) => node.props['aria-selected'])).toEqual([true, false]);
 
     await press('Enter');
-    expect(push).toHaveBeenCalledWith('/meeting-details?id=meeting-a&from=Today');
+    expect(push).not.toHaveBeenCalled();
+    expect(root().findAll((node) => node.props['aria-label'] === 'Side peek' && typeof node.type === 'string')).toHaveLength(1);
+    await press('Escape');
+    await settle(20);
 
     const calls = dayCalls().length;
     await act(async () => { windowEvents.dispatchEvent(new Event('telu:meetings-changed')); });
@@ -281,5 +372,122 @@ describe('TodayView', () => {
     const find = root().find((node) => node.type === 'button' && textOf(node) === 'Find knowledge');
     await act(async () => find.props.onClick({ stopPropagation: () => {} }));
     expect(push).toHaveBeenCalledWith('/meeting-details?id=meeting-a&from=Today#knowledge');
+  });
+});
+
+describe('Side peek, search and card menu', () => {
+  const first = meeting({ id: 'meeting-a', title: 'Standup', startedAtUtc: '2026-09-27T09:00:00Z', endedAtUtc: '2026-09-27T09:15:00Z' });
+  const second = meeting({ id: 'meeting-b', title: 'Design review', startedAtUtc: '2026-09-27T14:00:00Z', endedAtUtc: '2026-09-27T14:30:00Z' });
+  const peek = () => root().findAll((node) => node.type === 'aside' && node.props['aria-label'] === 'Side peek');
+  const peekMeeting = () => root().findAll((node) => node.props['data-page-content'] === 'peek').map((node) => node.props['data-meeting']);
+  const menuItem = (label: string) => root().findAll((node) => node.props['data-menu-item'] === '' && textOf(node).startsWith(label));
+
+  async function pressMeta(key: string) {
+    const event = Object.assign(new Event('keydown', { cancelable: true }), { key, metaKey: true, ctrlKey: false, altKey: false, shiftKey: false });
+    await act(async () => { windowEvents.dispatchEvent(event); });
+    await settle();
+  }
+
+  beforeEach(() => {
+    search.searchTranscripts.mockClear();
+    search.searchResults = [];
+    search.isSearching = false;
+    responses.agenda_list_day = () => [first, second];
+    responses.api_get_meeting_metadata = (args) => ({
+      id: args.meetingId,
+      title: args.meetingId === 'meeting-a' ? 'Standup' : 'Design review',
+      created_at: '2026-09-27T09:00:00Z',
+      updated_at: '2026-09-27T09:15:00Z',
+      lifecycle: 'complete',
+      completeness: 'complete',
+      gap_count: 0,
+      gaps: [],
+    });
+    responses.api_get_meeting_transcripts = () => ({ transcripts: [], total_count: 0, has_more: false });
+    responses.api_get_summary = (args) => ({ status: 'idle', meeting_id: args.meetingId, data: null });
+    responses.knowledge_list_evidence = () => [
+      { evidenceId: 'evidence-1', sequence: 0, text: 'Morning everyone', audioStartTime: 1, audioEndTime: 4, captureCompleteness: 'complete' },
+      { evidenceId: 'evidence-2', sequence: 1, text: 'We ship the beta on Friday', audioStartTime: 5, audioEndTime: 9, captureCompleteness: 'complete' },
+    ];
+  });
+
+  test('a card click opens the peek on that meeting; ↑ swaps it and Esc closes it', async () => {
+    await renderElement(<TodayView />);
+    await act(async () => options()[1].props.onClick());
+    await settle(30);
+    expect(peek()).toHaveLength(1);
+    expect(peekMeeting()).toEqual(['meeting-b']);
+    expect(push).not.toHaveBeenCalled();
+
+    await press('ArrowUp');
+    await settle(30);
+    expect(peekMeeting()).toEqual(['meeting-a']);
+
+    await press('Escape');
+    await settle(20);
+    expect(peek()).toHaveLength(0);
+  });
+
+  test('Open as page keeps the Today origin', async () => {
+    await renderElement(<TodayView />);
+    await act(async () => options()[1].props.onClick());
+    await settle(10);
+    const openPage = peek()[0].find((node) => node.type === 'button' && textOf(node) === 'Open as page');
+    await act(async () => openPage.props.onClick());
+    expect(push).toHaveBeenCalledWith('/meeting-details?id=meeting-b&from=Today');
+  });
+
+  test('Open transcript in the peek expands the inline transcript on the cited line, not the page drawer', async () => {
+    await renderElement(<TodayView />);
+    await act(async () => options()[0].props.onClick());
+    await settle(10);
+    const openTranscript = root().find((node) => node.type === 'button' && textOf(node) === 'Open transcript');
+    await act(async () => openTranscript.props.onClick());
+    await settle(10);
+    const cited = root().findAll((node) => node.type === 'li' && node.props['data-cited'] === true);
+    expect(cited.map((node) => node.props['data-line'])).toEqual(['evidence-2']);
+    expect(root().findAllByType('mark').map(textOf)).toEqual(['ship the beta']);
+    expect(root().findAll((node) => node.props.role === 'complementary')).toHaveLength(0);
+  });
+
+  test('⌘F opens search with the hint, debounces the query and renders results as text', async () => {
+    await renderElement(<TodayView />);
+    await pressMeta('f');
+    const input = () => root().find((node) => node.type === 'input' && node.props.placeholder === 'Search meetings and transcripts');
+    expect(input()).toBeDefined();
+    expect(textOf(root())).toContain('Type to search meetings and transcripts');
+
+    await act(async () => input().props.onChange({ target: { value: 'beta' } }));
+    expect(search.searchTranscripts).not.toHaveBeenCalled();
+    await settle(230);
+    expect(search.searchTranscripts.mock.calls).toEqual([['beta']]);
+    expect(textOf(root())).toContain('No matches for "beta"');
+
+    search.searchResults = [{ id: 'meeting-b', title: 'Design review', matchContext: '…<b>ship</b> the beta…' }];
+    await renderElement(<TodayView />);
+    await pressMeta('f');
+    await act(async () => input().props.onChange({ target: { value: 'beta' } }));
+    expect(textOf(root())).toContain('…<b>ship</b> the beta…');
+    expect(root().findAll((node) => node.type === 'b')).toHaveLength(0);
+  });
+
+  test('the card menu offers peek, page and a guarded delete; stop only while recording', async () => {
+    responses.agenda_list_day = () => [
+      first,
+      meeting({ id: 'meeting-live', title: 'Live sync', cardState: 'recording', lifecycle: 'recording', endedAtUtc: null, startedAtUtc: '2026-09-27T15:00:00Z' }),
+    ];
+    responses.knowledge_deletion_impact = () => ({ accepted: 1, suggestions: 2, rejected: 0, runs: 1 });
+    await renderElement(<TodayView />);
+    expect(menuItem('Open in side peek')).toHaveLength(2);
+    expect(menuItem('Open as page')).toHaveLength(2);
+    expect(menuItem('Stop recording')).toHaveLength(1);
+    const deletes = menuItem('Delete meeting…');
+    expect(deletes.map((node) => node.props.disabled)).toEqual([false, true]);
+    expect(deletes[0].props['data-variant']).toBe('danger');
+
+    await act(async () => deletes[0].props.onClick());
+    await settle();
+    expect(root().findAll((node) => node.props.role === 'alertdialog')).toHaveLength(1);
+    expect(ipc.mock.calls.some(([command]) => command === 'knowledge_deletion_impact')).toBe(true);
   });
 });

@@ -13,7 +13,7 @@ import { EventCard, type CardSection } from "./event-card"
 
 export type AgendaOrigin = "Today" | "Review"
 
-export function meetingHref(meeting: AgendaMeeting, from: AgendaOrigin, section?: CardSection): string {
+export function meetingHref(meeting: Pick<AgendaMeeting, "id">, from: AgendaOrigin, section?: CardSection): string {
   const query = `/meeting-details?id=${encodeURIComponent(meeting.id)}&from=${from}`
   return section ? `${query}#${section}` : query
 }
@@ -143,11 +143,12 @@ interface TimelineProps {
   recordingSeconds: number | null
   optionRefs: RefObject<Map<string, HTMLDivElement>>
   onOpen: (meeting: AgendaMeeting, section?: CardSection) => void
+  onOpenPage?: (meeting: AgendaMeeting) => void
   dayLabel?: (meeting: AgendaMeeting) => string
   leaving?: ReadonlySet<string>
 }
 
-export function Timeline({ label, meetings, selectedId, finalization, recordingSeconds, optionRefs, onOpen, dayLabel, leaving }: TimelineProps) {
+export function Timeline({ label, meetings, selectedId, finalization, recordingSeconds, optionRefs, onOpen, onOpenPage, dayLabel, leaving }: TimelineProps) {
   const focusId = selectedId ?? meetings[0]?.id
   return (
     <div role="listbox" aria-label={label} className="flex flex-col gap-2">
@@ -170,6 +171,7 @@ export function Timeline({ label, meetings, selectedId, finalization, recordingS
               finalization={finalization?.meeting_id === meeting.id ? finalization : null}
               recordingSeconds={meeting.cardState === "recording" ? recordingSeconds : null}
               onOpen={(section) => onOpen(meeting, section)}
+              onOpenPage={onOpenPage && (() => onOpenPage(meeting))}
             />
           </div>
         </div>

@@ -15,11 +15,13 @@ import {
   weekdayName,
 } from "@/components/app-shell/agenda-toolbar"
 import { useRecordingControlsContext } from "@/components/app-shell/recording-host"
+import { PEEK_PADDING_CLASS, PeekLayer, usePeek } from "@/components/side-peek/side-peek"
 import { EmptyState } from "@/components/telu-ui/empty-state"
 import { Button } from "@/components/ui/button"
 import { useRecordingState } from "@/contexts/RecordingStateContext"
 import { listAgendaDay, localDayBounds, type AgendaMeeting } from "@/lib/agenda-service"
 import { DURATION, EASE, cssEase } from "@/lib/motion"
+import { cn } from "@/lib/utils"
 import {
   Timeline,
   TimelineSkeleton,
@@ -149,6 +151,7 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
   const optionRefs = useRef(new Map<string, HTMLDivElement>())
   const meetings = useMemo(() => shown?.meetings ?? [], [shown])
   const { selectedId, setSelectedId, move } = useSelection(meetings, optionRefs, listRef)
+  const { peek, closeInstant, openPeek, closePeek } = usePeek(selectedId)
   const { slideOut, cancelSlide } = useDaySlide(listRef, shown)
   const { scrolled, onScroll } = useScrolled(scrollRef)
   const isToday = requestedDay === null || isSameDay(requestedDay, new Date())
@@ -177,15 +180,18 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
   const open = useCallback(
     (meeting: AgendaMeeting, section?: CardSection) => {
       setSelectedId(meeting.id)
-      router.push(meetingHref(meeting, "Today", section))
+      if (section === "knowledge" && meeting.cardState === "no_knowledge") {
+        router.push(meetingHref(meeting, "Today", section))
+        return
+      }
+      openPeek(meeting.id, { instant: false, focusKnowledge: section === "knowledge" })
     },
-    [router, setSelectedId]
+    [openPeek, router, setSelectedId]
   )
 
   const openSelected = useCallback(() => {
-    const meeting = meetings.find((candidate) => candidate.id === selectedId)
-    if (meeting) open(meeting)
-  }, [meetings, selectedId, open])
+    if (selectedId && meetings.some((candidate) => candidate.id === selectedId)) openPeek(selectedId, { instant: true })
+  }, [meetings, selectedId, openPeek])
 
   useTimelineKeys({
     listRef,
@@ -198,7 +204,7 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <AgendaToolbar title={heading.title} subtitle={heading.subtitle} scrolled={scrolled}>
+      <AgendaToolbar origin="Today" title={heading.title} subtitle={heading.subtitle} scrolled={scrolled}>
         <DayStepper
           isToday={isToday}
           onStep={(direction) => requestedDay && goToDay(addDays(requestedDay, direction), true)}
@@ -207,7 +213,7 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
       </AgendaToolbar>
       <div ref={scrollRef} onScroll={onScroll} className="@container min-h-0 flex-1 overflow-y-auto pt-[52px]">
         {notice && <div className="px-5 pt-1.5 @[901px]:px-7">{notice}</div>}
-        <div ref={listRef} className="px-5 pb-[72px] pt-1.5 @[901px]:px-7">
+        <div ref={listRef} className={cn("px-5 pb-[72px] pt-1.5 @[901px]:px-7", peek && PEEK_PADDING_CLASS)}>
           {shown === null && !failed && <TimelineSkeleton />}
           {shown === null && failed && (
             <div className="flex flex-col items-center gap-2 py-10 text-label-2">
@@ -227,10 +233,12 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
               recordingSeconds={recordingSeconds}
               optionRefs={optionRefs}
               onOpen={open}
+              onOpenPage={(meeting) => router.push(meetingHref(meeting, "Today"))}
             />
           )}
         </div>
       </div>
+      <PeekLayer peek={peek} closeInstant={closeInstant} origin="Today" onClose={closePeek} />
     </div>
   )
 }

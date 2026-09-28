@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ProviderBoundary } from '@/components/ProviderBoundary';
 import { GlassGroup } from '@/components/telu-ui/glass-group';
@@ -66,19 +67,25 @@ export function RecordingCapsule({ controls }: { controls: RecordingControlsValu
   );
 }
 
-export function RecordSlot() {
+export function RecordSlot({ children }: { children?: ReactNode }) {
   const controls = useRecordingControlsContext();
-  if (!controls || controls.isStopping) return null;
+  const extra = children ? <GlassGroup aria-label="Search">{children}</GlassGroup> : null;
+  if (!controls || controls.isStopping) return extra;
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {controls.isRecording ? (
-        <RecordingCapsule key="capsule" controls={controls} />
-      ) : (
-        <GlassGroup key="record" aria-label="Recording">
-          <ProviderBoundary capability="transcription" compact refreshKey={controls.routeRefreshKey} showUnavailableAlert={false} />
-          <RecordButton controls={controls} />
-        </GlassGroup>
-      )}
-    </AnimatePresence>
+    <>
+      <AnimatePresence mode="wait" initial={false}>
+        {controls.isRecording ? (
+          <RecordingCapsule key="capsule" controls={controls} />
+        ) : (
+          <GlassGroup key="record" aria-label="Recording">
+            <ProviderBoundary capability="transcription" compact refreshKey={controls.routeRefreshKey} showUnavailableAlert={false} />
+            <RecordButton controls={controls} />
+            {children && <span aria-hidden className="mx-0.5 h-4 w-[0.5px] bg-hairline" />}
+            {children}
+          </GlassGroup>
+        )}
+      </AnimatePresence>
+      {controls.isRecording && extra}
+    </>
   );
 }

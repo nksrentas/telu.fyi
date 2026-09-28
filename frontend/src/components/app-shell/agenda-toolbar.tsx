@@ -5,7 +5,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { GlassGroup } from "@/components/telu-ui/glass-group"
+import type { AgendaOrigin } from "@/components/agenda/agenda-timeline"
 import { RecordSlot } from "./recording-capsule"
+import { SearchPopover } from "./search-popover"
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 const MONTHS = [
@@ -77,10 +79,11 @@ interface AgendaToolbarProps {
   title: string
   subtitle?: string
   scrolled: boolean
+  origin: AgendaOrigin
   children?: ReactNode
 }
 
-export function AgendaToolbar({ title, subtitle, scrolled, children }: AgendaToolbarProps) {
+export function AgendaToolbar({ title, subtitle, scrolled, origin, children }: AgendaToolbarProps) {
   return (
     <header
       data-tauri-drag-region
@@ -99,7 +102,9 @@ export function AgendaToolbar({ title, subtitle, scrolled, children }: AgendaToo
       </div>
       <div data-tauri-drag-region className="flex-1 self-stretch" />
       {children}
-      <RecordSlot />
+      <RecordSlot>
+        <SearchPopover origin={origin} />
+      </RecordSlot>
     </header>
   )
 }

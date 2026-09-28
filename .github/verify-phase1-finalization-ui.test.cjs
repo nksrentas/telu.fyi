@@ -11,7 +11,8 @@ const meetingPage = readFileSync(join(root, 'frontend/src/app/meeting-details/pa
 const overlays = readFileSync(join(root, 'frontend/src/app/_components/StatusOverlays.tsx'), 'utf8');
 
 test('stop swaps controls for in-place finalization while the transcript remains mounted', () => {
-  assert.match(recordSlot, /controls\.isStopping\) return null/);
+  assert.match(recordSlot, /if \(!controls \|\| controls\.isStopping\) return extra;/);
+  assert.match(recordSlot, /const extra = children \? <GlassGroup aria-label="Search">/);
   assert.match(recordSlot, /disabled=\{[^}]*isStopping/);
   assert.match(host, /<StatusOverlays/);
   assert.match(liveTranscript, /isRecording \|\| isStopping \|\| isProcessing \|\| isSaving/);

@@ -6,16 +6,16 @@ import { Check, ChevronRight, Circle } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const MENU_SURFACE =
+export const MENU_SURFACE =
   "z-50 min-w-[210px] overflow-y-auto overflow-x-hidden rounded-[12px] bg-glass-strong p-[5px] text-[13px] text-label shadow-float outline-none backdrop-blur-[26px] backdrop-saturate-[1.8] data-[state=closed]:animate-menu-out [&:has([data-chosen])]:[animation-delay:130ms]"
 
-const MENU_ROW =
+export const MENU_ROW =
   "group relative flex h-6 cursor-default select-none items-center gap-2 whitespace-nowrap rounded-[6px] px-[9px] outline-none data-[disabled]:pointer-events-none data-[disabled]:text-label-3 data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[chosen]:animate-menu-blink [&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-label-2 data-[highlighted]:[&>svg]:text-white/85"
 
-const DANGER_ROW =
+export const DANGER_ROW =
   "text-coral-ink [--blink-bg:var(--coral)] [--blink-fg:var(--coral-ink)] data-[highlighted]:bg-coral data-[highlighted]:text-white [&>svg]:text-coral-ink"
 
-function useChosen(onSelect?: (event: Event) => void) {
+export function useChosen(onSelect?: (event: Event) => void) {
   const [chosen, setChosen] = React.useState(false)
   const handleSelect = (event: Event) => {
     onSelect?.(event)

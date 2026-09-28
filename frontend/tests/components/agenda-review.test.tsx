@@ -1,11 +1,17 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import type { AgendaMeeting } from '../../src/lib/agenda-service';
 
 type EventHandler = (event: { event: string; id: number; payload: unknown }) => void;
 type Responder = (args: Record<string, unknown>) => unknown;
-type TestGlobals = typeof globalThis & { window?: Record<string, unknown>; document?: Record<string, unknown> };
+type TestGlobals = typeof globalThis & {
+  window?: Record<string, unknown>;
+  document?: Record<string, unknown>;
+  requestAnimationFrame?: (callback: (time: number) => void) => unknown;
+  cancelAnimationFrame?: (handle: unknown) => void;
+  getComputedStyle?: (node: unknown) => unknown;
+};
 
 const globals = globalThis as TestGlobals;
 const original = { window: globals.window, document: globals.document, tz: process.env.TZ };
@@ -34,7 +40,34 @@ const originals = {
   recordingState: { ...await import('../../src/contexts/RecordingStateContext') },
   config: { ...await import('../../src/contexts/ConfigContext') },
   importDialog: { ...await import('../../src/contexts/ImportDialogContext') },
+  sidebarProvider: { ...await import('../../src/components/Sidebar/SidebarProvider') },
+  popover: { ...await import('../../src/components/ui/popover') },
+  contextMenu: { ...await import('../../src/components/ui/context-menu') },
+  pageContent: { ...await import('../../src/app/meeting-details/page-content') },
 };
+mock.module('../../src/components/Sidebar/SidebarProvider', () => ({
+  ...originals.sidebarProvider,
+  useSidebar: () => ({ searchTranscripts: async () => {}, searchResults: [], isSearching: false }),
+}));
+mock.module('../../src/components/ui/popover', () => ({
+  Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverAnchor: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverArrow: () => null,
+  PopoverContent: () => null,
+}));
+mock.module('../../src/components/ui/context-menu', () => ({
+  ContextMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+  ContextMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  ContextMenuContent: () => null,
+  ContextMenuSeparator: () => null,
+  ContextMenuShortcut: () => null,
+  ContextMenuItem: () => null,
+}));
+mock.module('../../src/app/meeting-details/page-content', () => ({
+  ...originals.pageContent,
+  default: ({ meeting, surface }: { meeting: { id: string }; surface: string }) => <div data-page-content={surface} data-meeting={meeting.id} />,
+}));
 mock.module('@tauri-apps/api/core', () => ({ ...originals.core, invoke: ipc }));
 mock.module('next/navigation', () => ({ ...originals.navigation, useRouter: () => ({ push }), usePathname: () => pathname }));
 mock.module('../../src/contexts/RecordingStateContext', () => ({
@@ -46,10 +79,14 @@ mock.module('../../src/contexts/ImportDialogContext', () => ({ ...originals.impo
 
 const { toast } = await import('sonner');
 const { ReviewView } = await import('../../src/components/agenda/review-view');
+const { TooltipProvider } = await import('../../src/components/ui/tooltip');
 const { Sidebar } = await import('../../src/components/app-shell/sidebar');
 
 beforeAll(() => {
   process.env.TZ = 'UTC';
+  globals.requestAnimationFrame = (callback) => setTimeout(() => callback(Date.now()), 0);
+  globals.cancelAnimationFrame = (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>);
+  globals.getComputedStyle = () => ({ animationName: 'none', display: 'block' });
   globals.window = {
     __TAURI_INTERNALS__: {
       invoke: ipc,
@@ -68,7 +105,7 @@ beforeAll(() => {
     setTimeout: globalThis.setTimeout.bind(globalThis),
     clearTimeout: globalThis.clearTimeout.bind(globalThis),
   };
-  globals.document = { activeElement: null, body: {}, documentElement: {} };
+  globals.document = { activeElement: null, body: {}, documentElement: {}, querySelector: () => null, addEventListener: () => {}, removeEventListener: () => {} };
 });
 
 afterAll(async () => {
@@ -82,6 +119,10 @@ afterAll(async () => {
   mock.module('../../src/contexts/RecordingStateContext', () => originals.recordingState);
   mock.module('../../src/contexts/ConfigContext', () => originals.config);
   mock.module('../../src/contexts/ImportDialogContext', () => originals.importDialog);
+  mock.module('../../src/components/Sidebar/SidebarProvider', () => originals.sidebarProvider);
+  mock.module('../../src/components/ui/popover', () => originals.popover);
+  mock.module('../../src/components/ui/context-menu', () => originals.contextMenu);
+  mock.module('../../src/app/meeting-details/page-content', () => originals.pageContent);
 });
 
 const meeting = (id: string, pendingCount: number, startedAtUtc: string, overrides: Partial<AgendaMeeting> = {}): AgendaMeeting => ({
@@ -115,7 +156,7 @@ const options = () => root().findAll((node) => node.type === 'div' && node.props
 
 async function render(element: ReactElement) {
   unmount();
-  await act(async () => { renderer = create(element); });
+  await act(async () => { renderer = create(<TooltipProvider>{element}</TooltipProvider>); });
   await settle();
 }
 
@@ -144,7 +185,12 @@ beforeEach(() => {
   push.mockClear();
   listeners.clear();
   pathname = '/review';
-  responses = {};
+  responses = {
+    api_get_meeting_metadata: (args) => ({ id: args.meetingId, title: 'Meeting', created_at: '2026-09-27T09:00:00Z', updated_at: '2026-09-27T09:15:00Z', lifecycle: 'complete', completeness: 'complete', gap_count: 0, gaps: [] }),
+    api_get_meeting_transcripts: () => ({ transcripts: [], total_count: 0, has_more: false }),
+    api_get_summary: (args) => ({ status: 'idle', meeting_id: args.meetingId, data: null }),
+    knowledge_list_evidence: () => [],
+  };
 });
 
 describe('ReviewView', () => {
@@ -189,7 +235,7 @@ describe('ReviewView', () => {
     error.mockRestore();
   });
 
-  test('a decided meeting leaves after the beat; Enter opens the review from Review', async () => {
+  test('a decided meeting leaves after the beat; Enter opens its review in the peek and Open as page keeps Review', async () => {
     responses.agenda_list_review = () => reviewList();
     await render(<ReviewView />);
     responses.agenda_list_review = () => reviewList().filter((entry) => entry.id !== 'b');
@@ -201,6 +247,11 @@ describe('ReviewView', () => {
 
     await press('ArrowDown');
     await press('Enter');
+    await settle(30);
+    expect(push).not.toHaveBeenCalled();
+    expect(root().findAll((node) => node.props['data-page-content'] === 'peek').map((node) => node.props['data-meeting'])).toEqual(['a']);
+    const openPage = root().find((node) => node.type === 'button' && textOf(node) === 'Open as page');
+    await act(async () => openPage.props.onClick());
     expect(push).toHaveBeenCalledWith('/meeting-details?id=a&from=Review');
   });
 });

@@ -7,10 +7,12 @@ import { toast } from "sonner"
 
 import { AgendaToolbar, isSameDay } from "@/components/app-shell/agenda-toolbar"
 import { useRecordingControlsContext } from "@/components/app-shell/recording-host"
+import { PEEK_PADDING_CLASS, PeekLayer, usePeek } from "@/components/side-peek/side-peek"
 import { EmptyState } from "@/components/telu-ui/empty-state"
 import { Button } from "@/components/ui/button"
 import { useRecordingState } from "@/contexts/RecordingStateContext"
 import { listReviewMeetings, type AgendaMeeting } from "@/lib/agenda-service"
+import { cn } from "@/lib/utils"
 import {
   Timeline,
   TimelineSkeleton,
@@ -127,27 +129,31 @@ export function ReviewView() {
   const rows = useMemo(() => meetings ?? [], [meetings])
   const active = useMemo(() => rows.filter((meeting) => !leaving.has(meeting.id)), [rows, leaving])
   const { selectedId, setSelectedId, move } = useSelection(active, optionRefs, listRef)
+  const { peek, closeInstant, openPeek, closePeek } = usePeek(selectedId)
   const { scrolled, onScroll } = useScrolled(scrollRef)
   const pending = pendingItems(active)
 
   const open = useCallback(
     (meeting: AgendaMeeting, section?: CardSection) => {
       setSelectedId(meeting.id)
-      router.push(meetingHref(meeting, "Review", section))
+      if (section === "knowledge" && meeting.cardState === "no_knowledge") {
+        router.push(meetingHref(meeting, "Review", section))
+        return
+      }
+      openPeek(meeting.id, { instant: false, focusKnowledge: true })
     },
-    [router, setSelectedId]
+    [openPeek, router, setSelectedId]
   )
   const openSelected = useCallback(() => {
-    const meeting = active.find((candidate) => candidate.id === selectedId)
-    if (meeting) open(meeting)
-  }, [active, selectedId, open])
+    if (selectedId && active.some((candidate) => candidate.id === selectedId)) openPeek(selectedId, { instant: true, focusKnowledge: true })
+  }, [active, selectedId, openPeek])
   useTimelineKeys({ listRef, onMove: move, onEnter: openSelected })
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <AgendaToolbar title="Review" subtitle={meetings === null ? "" : reviewSubtitle(pending)} scrolled={scrolled} />
+      <AgendaToolbar origin="Review" title="Review" subtitle={meetings === null ? "" : reviewSubtitle(pending)} scrolled={scrolled} />
       <div ref={scrollRef} onScroll={onScroll} className="@container min-h-0 flex-1 overflow-y-auto pt-[52px]">
-        <div ref={listRef} className="px-5 pb-[72px] pt-1.5 @[901px]:px-7">
+        <div ref={listRef} className={cn("px-5 pb-[72px] pt-1.5 @[901px]:px-7", peek && PEEK_PADDING_CLASS)}>
           {meetings === null && !failed && <TimelineSkeleton />}
           {meetings === null && failed && (
             <div className="flex flex-col items-center gap-2 py-10 text-label-2">
@@ -176,11 +182,13 @@ export function ReviewView() {
                 recordingSeconds={recording.activeDuration ?? recording.recordingDuration ?? null}
                 optionRefs={optionRefs}
                 onOpen={open}
+              onOpenPage={(meeting) => router.push(meetingHref(meeting, "Review"))}
               />
             </ReviewSection>
           )}
         </div>
       </div>
+      <PeekLayer peek={peek} closeInstant={closeInstant} origin="Review" onClose={closePeek} />
     </div>
   )
 }

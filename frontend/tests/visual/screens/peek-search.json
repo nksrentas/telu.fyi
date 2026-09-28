@@ -1,0 +1,891 @@
+[
+  {
+    "name": "today-peek-open",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "m-standup",
+          "title": "Daily standup",
+          "startedAtUtc": "2026-09-27T06:00:00Z",
+          "endedAtUtc": "2026-09-27T06:15:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "reviewed"
+        },
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Weekly product sync",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        }
+      ],
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 4,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Maria sends the launch checklist to design",
+            "ownerText": "Maria",
+            "ownerSupport": "stated",
+            "dueText": "by Wednesday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000003",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "question",
+            "text": "Do we need a second QA pass before the beta?",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000003",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000004",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "fact",
+            "text": "The beta group has 240 people",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000004",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 4,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "click": "[role=option]:has-text(\"Weekly product sync\")"
+      },
+      {
+        "waitFor": "aside[aria-label=\"Side peek\"]"
+      },
+      {
+        "waitFor": "aside >> text=Summary"
+      },
+      {
+        "waitFor": "aside >> text=Accept all"
+      }
+    ]
+  },
+  {
+    "name": "today-peek-legacy",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Imported interview",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 0,
+          "legacyTranscriptCount": 12,
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": null,
+          "cardState": "transcript_only"
+        }
+      ],
+      "knowledge_list_evidence": []
+    },
+    "steps": [
+      {
+        "click": "[role=option]:has-text(\"Imported interview\")"
+      },
+      {
+        "waitFor": "aside[aria-label=\"Side peek\"]"
+      },
+      {
+        "waitFor": "aside >> text=Knowledge needs an evidence transcript"
+      }
+    ]
+  },
+  {
+    "name": "review-peek-open",
+    "path": "/review",
+    "ipc": {
+      "agenda_list_review": [
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Weekly product sync",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        }
+      ],
+      "agenda_counts": {
+        "dayCount": 2,
+        "pendingTotal": 4
+      },
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 4,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Maria sends the launch checklist to design",
+            "ownerText": "Maria",
+            "ownerSupport": "stated",
+            "dueText": "by Wednesday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000003",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "question",
+            "text": "Do we need a second QA pass before the beta?",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000003",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000004",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "fact",
+            "text": "The beta group has 240 people",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000004",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 4,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "click": "[role=option]:has-text(\"Weekly product sync\")"
+      },
+      {
+        "waitFor": "aside[aria-label=\"Side peek\"]"
+      },
+      {
+        "waitFor": "aside >> text=Summary"
+      },
+      {
+        "waitFor": "aside >> text=Accept all"
+      }
+    ]
+  },
+  {
+    "name": "peek-inline-transcript",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "m-standup",
+          "title": "Daily standup",
+          "startedAtUtc": "2026-09-27T06:00:00Z",
+          "endedAtUtc": "2026-09-27T06:15:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "reviewed"
+        },
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Weekly product sync",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        }
+      ],
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 4,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Maria sends the launch checklist to design",
+            "ownerText": "Maria",
+            "ownerSupport": "stated",
+            "dueText": "by Wednesday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000003",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "question",
+            "text": "Do we need a second QA pass before the beta?",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000003",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000004",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "fact",
+            "text": "The beta group has 240 people",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000004",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 4,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "click": "[role=option]:has-text(\"Weekly product sync\")"
+      },
+      {
+        "waitFor": "aside[aria-label=\"Side peek\"]"
+      },
+      {
+        "waitFor": "aside >> text=Summary"
+      },
+      {
+        "click": "aside button[aria-label^=\"Source:\"]"
+      },
+      {
+        "click": "button:has-text(\"Open transcript\")"
+      },
+      {
+        "waitFor": "aside li[data-cited]"
+      },
+      {
+        "hover": "aside li[data-cited]"
+      }
+    ]
+  },
+  {
+    "name": "search-open-results",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "m-standup",
+          "title": "Daily standup",
+          "startedAtUtc": "2026-09-27T06:00:00Z",
+          "endedAtUtc": "2026-09-27T06:15:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "reviewed"
+        },
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Weekly product sync",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        }
+      ],
+      "api_search_transcripts": [
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Weekly product sync",
+          "matchContext": "…we decided to ship the beta on Friday…"
+        },
+        {
+          "id": "m-standup",
+          "title": "Daily standup",
+          "matchContext": "…the beta group grows to 240 people…"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "waitFor": "[role=option]"
+      },
+      {
+        "press": "Meta+f"
+      },
+      {
+        "type": "beta"
+      },
+      {
+        "waitFor": "text=Daily standup >> nth=1"
+      }
+    ]
+  },
+  {
+    "name": "search-no-matches",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "m-standup",
+          "title": "Daily standup",
+          "startedAtUtc": "2026-09-27T06:00:00Z",
+          "endedAtUtc": "2026-09-27T06:15:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "reviewed"
+        },
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Weekly product sync",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        }
+      ],
+      "api_search_transcripts": []
+    },
+    "steps": [
+      {
+        "waitFor": "[role=option]"
+      },
+      {
+        "press": "Meta+f"
+      },
+      {
+        "type": "quarterly"
+      },
+      {
+        "waitFor": "text=No matches for \"quarterly\""
+      }
+    ]
+  },
+  {
+    "name": "event-card-context-menu",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "m-standup",
+          "title": "Daily standup",
+          "startedAtUtc": "2026-09-27T06:00:00Z",
+          "endedAtUtc": "2026-09-27T06:15:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "reviewed"
+        },
+        {
+          "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "title": "Weekly product sync",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 20,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "rightClick": "[role=option]:has-text(\"Weekly product sync\")"
+      },
+      {
+        "waitFor": "[role=menuitem]:has-text(\"Delete meeting…\")"
+      }
+    ]
+  }
+]

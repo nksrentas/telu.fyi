@@ -59,18 +59,19 @@ function MetaChip({ children }: { children: ReactNode }) {
 export function MeetingHeader({ meeting, surface }: MeetingHeaderProps) {
   const when = formatMeetingWhen(meeting.createdAt, meeting.durationSeconds)
   const duration = formatMeetingDuration(meeting.durationSeconds)
+  const Title = surface === "page" ? "h1" : "h2"
 
   return (
     <header data-slot="meeting-header" className="space-y-3">
-      <h1
+      <Title
         data-doc-title
         className={cn(
-          "selectable min-w-0 break-words font-display text-label",
+          "selectable m-0 min-w-0 break-words font-display text-label",
           surface === "page" ? "text-large" : "text-title1"
         )}
       >
         {meeting.title}
-      </h1>
+      </Title>
       <div className="flex flex-wrap items-center gap-1.5">
         {when && <MetaChip><span className="tabular-nums">{when}</span></MetaChip>}
         {duration && <MetaChip><span className="tabular-nums">{duration}</span></MetaChip>}

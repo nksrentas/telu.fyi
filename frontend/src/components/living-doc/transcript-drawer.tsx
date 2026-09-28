@@ -37,7 +37,7 @@ interface TranscriptDrawerProps {
   onOpenRecordingFolder?: () => void
 }
 
-interface DrawerLine {
+export interface DrawerLine {
   id: string
   text: string
   start: number
@@ -50,7 +50,7 @@ type EvidenceState = { status: "loading" } | { status: "error" } | { status: "re
 const LINE_ESTIMATE = 52
 const INITIAL_RECT = { width: 340, height: 600 }
 
-function formatTime(seconds: number): string {
+export function formatTime(seconds: number): string {
   const total = Math.max(0, Math.floor(seconds))
   return `${Math.floor(total / 60).toString().padStart(2, "0")}:${(total % 60).toString().padStart(2, "0")}`
 }
@@ -82,7 +82,7 @@ function fromLegacy(transcripts: Transcript[]): DrawerLine[] {
   }))
 }
 
-function useEvidenceLines(meetingId: string) {
+export function useEvidenceLines(meetingId: string) {
   const [state, setState] = useState<EvidenceState>({ status: "loading" })
   const [attempt, setAttempt] = useState(0)
 
@@ -106,7 +106,22 @@ function useEvidenceLines(meetingId: string) {
   return { state, retry }
 }
 
-function QuotedText({ text, span }: { text: string; span?: EvidenceSpan }) {
+export function useTranscriptLines(meetingId: string) {
+  const { state, retry } = useEvidenceLines(meetingId)
+  const evidenceEmpty = state.status === "ready" && state.lines.length === 0
+  const legacy = usePaginatedTranscripts({ meetingId: evidenceEmpty ? meetingId : null })
+  const legacyMode = evidenceEmpty && legacy.transcripts.length > 0
+  const lines = useMemo(
+    () => (state.status !== "ready" ? [] : legacyMode ? fromLegacy(legacy.transcripts) : state.lines),
+    [state, legacyMode, legacy.transcripts]
+  )
+  const loading = state.status === "loading" || (evidenceEmpty && legacy.isLoading && !legacyMode)
+  const failed = state.status === "error" || (evidenceEmpty && Boolean(legacy.error))
+  const retryLines = state.status === "error" ? retry : () => void legacy.refetch()
+  return { lines, legacyMode, loading, failed, retry: retryLines }
+}
+
+export function QuotedText({ text, span }: { text: string; span?: EvidenceSpan }) {
   const points = Array.from(text)
   if (!span || span.start < 0 || span.end > points.length || span.start >= span.end) {
     return <>{text}</>
@@ -152,14 +167,7 @@ export const TranscriptDrawer = forwardRef<TranscriptDrawerHandle, TranscriptDra
   { meetingId, title, dateLabel, open, onClose, highlight, onCopyTranscript, onOpenRecordingFolder },
   ref
 ) {
-  const { state, retry } = useEvidenceLines(meetingId)
-  const evidenceEmpty = state.status === "ready" && state.lines.length === 0
-  const legacy = usePaginatedTranscripts({ meetingId: evidenceEmpty ? meetingId : null })
-  const legacyMode = evidenceEmpty && legacy.transcripts.length > 0
-  const lines = useMemo(
-    () => (state.status !== "ready" ? [] : legacyMode ? fromLegacy(legacy.transcripts) : state.lines),
-    [state, legacyMode, legacy.transcripts]
-  )
+  const { lines, legacyMode, loading, failed, retry } = useTranscriptLines(meetingId)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [instantClose, setInstantClose] = useState(false)
 
@@ -234,12 +242,12 @@ export const TranscriptDrawer = forwardRef<TranscriptDrawerHandle, TranscriptDra
       </header>
 
       <div ref={scrollRef} data-slot="transcript-scroll" className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {state.status === "loading" || (evidenceEmpty && legacy.isLoading && !legacyMode) ? (
+        {loading ? (
           <LoadingLines />
-        ) : state.status === "error" || (evidenceEmpty && legacy.error) ? (
+        ) : failed ? (
           <div role="alert" className="flex flex-col items-center gap-3 px-3 py-6 text-center">
             <p className="text-[13px] text-label-2">Couldn&apos;t load the transcript.</p>
-            <Button size="sm" onClick={state.status === "error" ? retry : () => void legacy.refetch()}>
+            <Button size="sm" onClick={retry}>
               Try again
             </Button>
           </div>

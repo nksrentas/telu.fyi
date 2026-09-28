@@ -60,9 +60,10 @@ interface DeleteMeetingAlertProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleted?: () => void;
+  navigateHome?: boolean;
 }
 
-export function DeleteMeetingAlert({ meetingId, title, open, onOpenChange, onDeleted }: DeleteMeetingAlertProps) {
+export function DeleteMeetingAlert({ meetingId, title, open, onOpenChange, onDeleted, navigateHome = true }: DeleteMeetingAlertProps) {
   const router = useRouter();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const impactState = useDeletionImpact(meetingId, open);
@@ -82,7 +83,7 @@ export function DeleteMeetingAlert({ meetingId, title, open, onOpenChange, onDel
       window.dispatchEvent(new CustomEvent(MEETINGS_CHANGED_EVENT, { detail: { meetingId } }));
       onDeleted?.();
       toast.success(`Deleted ${title} from this Mac`);
-      router.push('/');
+      if (navigateHome) router.push('/');
     } catch (error) {
       console.error('Failed to delete meeting:', error);
       setFailed(true);
