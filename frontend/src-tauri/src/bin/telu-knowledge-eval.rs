@@ -64,6 +64,7 @@ enum EvalError {
     InputTooLarge,
     JsonMalformed,
     OutputFailed,
+    ThresholdsInvalid,
     Replay(ReplayError),
 }
 
@@ -75,6 +76,7 @@ impl EvalError {
             Self::InputTooLarge => "INPUT_TOO_LARGE",
             Self::JsonMalformed => "JSON_MALFORMED",
             Self::OutputFailed => "OUTPUT_FAILED",
+            Self::ThresholdsInvalid => "THRESHOLDS_INVALID",
             Self::Replay(error) => error.code(),
         }
     }
@@ -114,7 +116,7 @@ async fn score_command(
     let predictions: PredictionSet = read_json(predictions)?;
     let labels: LabelSet = read_json(labels)?;
     let threshold_bytes = read_bounded(thresholds)?;
-    let limits: Thresholds = serde_json::from_slice(&threshold_bytes).map_err(|_| EvalError::JsonMalformed)?;
+    let limits = parse_thresholds(&threshold_bytes)?;
     let review = match db {
         Some(path) => Some(review_outcomes(&safe_input(path)?).await.map_err(EvalError::Replay)?),
         None => None,
@@ -157,6 +159,12 @@ async fn export_command(db: &Path, meetings: &[String], out: &Path) -> Result<()
     write_json(out, "predictions.json", &predictions)?;
     print_summary(json!({ "meetings": fixtures.len() }));
     Ok(())
+}
+
+fn parse_thresholds(bytes: &[u8]) -> Result<Thresholds, EvalError> {
+    let thresholds: Thresholds = serde_json::from_slice(bytes).map_err(|_| EvalError::ThresholdsInvalid)?;
+    thresholds.validate().map_err(|_| EvalError::ThresholdsInvalid)?;
+    Ok(thresholds)
 }
 
 fn load_fixtures(gold_dir: &Path) -> Result<Vec<GoldFixture>, EvalError> {

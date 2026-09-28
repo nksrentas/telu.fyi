@@ -114,7 +114,7 @@ pub struct Label {
 pub type LabelSet = HashMap<String, Label>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InvariantThresholds {
     pub exact_span_support: f64,
     pub resurrection: u64,
@@ -122,7 +122,7 @@ pub struct InvariantThresholds {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ScopeThresholds {
     pub claim_correctness: Option<f64>,
     pub semantic_support: Option<f64>,
@@ -158,7 +158,7 @@ fn minimum_in_range(value: f64) -> bool {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AbstentionThreshold {
     pub insufficient_evidence: Option<f64>,
 }
@@ -172,7 +172,7 @@ pub struct QualityThresholds {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Thresholds {
     pub version: u16,
     pub invariants: InvariantThresholds,
