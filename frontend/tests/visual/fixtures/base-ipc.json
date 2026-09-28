@@ -1,0 +1,338 @@
+{
+  "get_audio_devices": [
+    {
+      "name": "MacBook Pro Microphone",
+      "device_type": "Input"
+    },
+    {
+      "name": "BlackHole 2ch",
+      "device_type": "Output"
+    }
+  ],
+  "get_onboarding_status": {
+    "version": "1.0",
+    "completed": true,
+    "current_step": 4,
+    "model_status": {
+      "parakeet": "downloaded",
+      "summary": "downloaded",
+      "selected_summary_model": "qwen3.5:4b"
+    },
+    "last_updated": "2026-09-27T09:00:00Z"
+  },
+  "check_first_launch": false,
+  "get_ollama_models": [],
+  "api_get_transcript_config": {
+    "provider": "parakeet",
+    "model": "parakeet-tdt-0.6b-v3-int8",
+    "apiKey": null
+  },
+  "set_language_preference": null,
+  "api_get_model_config": {
+    "provider": "builtin-ai",
+    "model": "qwen3.5:4b",
+    "whisperModel": "large-v3",
+    "apiKey": null,
+    "ollamaEndpoint": null
+  },
+  "api_get_api_key": "",
+  "get_recording_preferences": {
+    "save_folder": "/Users/demo/Movies/Telu",
+    "auto_save": true,
+    "file_format": "mp4",
+    "preferred_mic_device": null,
+    "preferred_system_device": null
+  },
+  "get_recording_state": {
+    "is_recording": false,
+    "is_paused": false,
+    "is_active": false,
+    "recording_duration": null,
+    "active_duration": null,
+    "meeting_id": null,
+    "meeting_lifecycle": null,
+    "meeting_title": null,
+    "meeting_started_at_utc": null
+  },
+  "get_canary_mode": null,
+  "api_get_meetings": [
+    {
+      "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+      "title": "Weekly product sync",
+      "lifecycle": "complete",
+      "completeness": "complete",
+      "gap_count": 0,
+      "created_at": "2026-09-27T09:00:00Z",
+      "updated_at": "2026-09-27T09:44:00Z"
+    },
+    {
+      "id": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+      "title": "Design review",
+      "lifecycle": "complete",
+      "completeness": "recovered_with_gaps",
+      "gap_count": 1,
+      "created_at": "2026-09-26T14:00:00Z",
+      "updated_at": "2026-09-26T14:30:00Z"
+    },
+    {
+      "id": "9d3e4f50-6172-4c8d-8e9f-1a2b3c4d5e6f",
+      "title": "Customer call \u2014 Acme",
+      "lifecycle": "legacy",
+      "completeness": "completion_not_verified",
+      "gap_count": 0,
+      "created_at": "2026-09-25T11:00:00Z",
+      "updated_at": "2026-09-25T11:40:00Z"
+    }
+  ],
+  "plugin:store|load": 1,
+  "plugin:store|get_store": 1,
+  "plugin:store|get": {
+    "$byArg": "key",
+    "cases": {},
+    "default": [
+      null,
+      false
+    ]
+  },
+  "plugin:store|set": null,
+  "plugin:store|save": null,
+  "plugin:store|has": false,
+  "plugin:store|keys": [],
+  "plugin:store|values": [],
+  "plugin:store|entries": [],
+  "plugin:store|length": 0,
+  "plugin:store|delete": false,
+  "plugin:store|reload": null,
+  "get_current_provider_route": {
+    "$byArg": "capability",
+    "cases": {
+      "transcription": {
+        "capability": "transcription",
+        "providerId": "parakeet",
+        "modelId": "parakeet-tdt-0.6b-v3-int8",
+        "locationClass": "local",
+        "sanitizedOrigin": "This device",
+        "encrypted": false,
+        "validationState": "validated",
+        "resolvedAddresses": []
+      },
+      "summary": {
+        "capability": "summary",
+        "providerId": "builtin-ai",
+        "modelId": "qwen3.5:4b",
+        "locationClass": "local",
+        "sanitizedOrigin": "This device",
+        "encrypted": false,
+        "validationState": "validated",
+        "resolvedAddresses": []
+      }
+    },
+    "default": {
+      "capability": "summary",
+      "providerId": "builtin-ai",
+      "modelId": "qwen3.5:4b",
+      "locationClass": "local",
+      "sanitizedOrigin": "This device",
+      "encrypted": false,
+      "validationState": "validated",
+      "resolvedAddresses": []
+    }
+  },
+  "validate_provider_route": {
+    "$byArg": "expectedRoute",
+    "cases": {},
+    "default": {
+      "capability": "summary",
+      "providerId": "builtin-ai",
+      "modelId": "qwen3.5:4b",
+      "locationClass": "local",
+      "sanitizedOrigin": "This device",
+      "encrypted": false,
+      "validationState": "validated",
+      "resolvedAddresses": []
+    }
+  },
+  "is_recording": false,
+  "whisper_get_models_directory": "/Users/demo/Library/Application Support/Telu/models",
+  "get_database_directory": "/Users/demo/Library/Application Support/Telu",
+  "get_default_recordings_folder_path": "/Users/demo/Movies/Telu",
+  "get_meeting_folder_path": "/Users/demo/Movies/Telu/Weekly product sync",
+  "get_recording_meeting_name": null,
+  "get_notification_settings": {
+    "recording_notifications": true,
+    "time_based_reminders": false,
+    "meeting_reminders": false,
+    "respect_do_not_disturb": true,
+    "notification_sound": false,
+    "system_permission_granted": true,
+    "consent_given": true,
+    "manual_dnd_mode": false,
+    "notification_preferences": {
+      "show_recording_started": true,
+      "show_recording_stopped": true,
+      "show_recording_paused": true,
+      "show_recording_resumed": true,
+      "show_transcription_complete": true,
+      "show_meeting_reminders": false,
+      "show_system_errors": true
+    }
+  },
+  "parakeet_init": null,
+  "parakeet_get_available_models": [
+    {
+      "name": "parakeet-tdt-0.6b-v3-int8",
+      "path": "/Users/demo/models/parakeet",
+      "size_mb": 670,
+      "accuracy": "High",
+      "speed": "Fast",
+      "status": "Available",
+      "description": "Parakeet v3 (int8)",
+      "quantization": "Int8"
+    }
+  ],
+  "parakeet_download_model": null,
+  "builtin_ai_get_recommended_model": "qwen3.5:4b",
+  "builtin_ai_list_models": [
+    {
+      "name": "qwen3.5:4b",
+      "display_name": "Qwen 3.5 4B",
+      "status": {
+        "type": "available"
+      },
+      "path": "/Users/demo/models/summary/qwen3.5-4b.gguf",
+      "size_mb": 2613,
+      "context_size": 32768,
+      "description": "Balanced local summary model",
+      "gguf_file": "qwen3.5-4b.gguf"
+    }
+  ],
+  "get_audio_backend_info": [
+    {
+      "id": "coreaudio",
+      "name": "Core Audio",
+      "description": "macOS native audio"
+    }
+  ],
+  "list_diagnostic_runs": [],
+  "api_get_auto_generate_setting": true,
+  "evaluate_canary_background_attempt": {
+    "runId": null,
+    "canaryEnabled": false,
+    "service": "analytics",
+    "trigger": "automatic",
+    "allowDispatch": false,
+    "sequence": null,
+    "disposition": null,
+    "redactedCode": "CANARY_INACTIVE",
+    "packetBlockerAuthority": "The selected OS or proxy method is authoritative for packets; Telu only records application decisions."
+  },
+  "api_get_meeting_metadata": {
+    "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "title": "Weekly product sync",
+    "created_at": "2026-09-27T09:00:00Z",
+    "updated_at": "2026-09-27T09:44:00Z",
+    "folder_path": "/Users/demo/Movies/Telu/Weekly product sync",
+    "lifecycle": "complete",
+    "completeness": "complete",
+    "gap_count": 0,
+    "gaps": []
+  },
+  "api_get_summary": {
+    "status": "completed",
+    "meetingName": "Weekly product sync",
+    "meeting_id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "start": "2026-09-27T09:45:00Z",
+    "end": "2026-09-27T09:45:40Z",
+    "data": {
+      "markdown": "# Weekly product sync\n\n## Decisions\n- Ship the beta on Friday.\n\n## Action items\n- Maria updates the release notes by Thursday.\n\n## Open questions\n- Is the pricing page ready for review?\n"
+    },
+    "error": null
+  },
+  "api_get_meeting_transcripts": {
+    "transcripts": [
+      {
+        "id": "t-1",
+        "text": "Good morning, let's start the weekly product sync.",
+        "timestamp": "09:00:04",
+        "sequence_id": 1,
+        "confidence": 0.94,
+        "audio_start_time": 4.0,
+        "audio_end_time": 8.5,
+        "duration": 4.5
+      },
+      {
+        "id": "t-2",
+        "text": "We decided to ship the beta on Friday.",
+        "timestamp": "09:00:12",
+        "sequence_id": 2,
+        "confidence": 0.93,
+        "audio_start_time": 12.0,
+        "audio_end_time": 15.8,
+        "duration": 3.8
+      },
+      {
+        "id": "t-3",
+        "text": "Maria will update the release notes by Thursday.",
+        "timestamp": "09:00:20",
+        "sequence_id": 3,
+        "confidence": 0.92,
+        "audio_start_time": 20.0,
+        "audio_end_time": 24.1,
+        "duration": 4.1
+      },
+      {
+        "id": "t-4",
+        "text": "Is the pricing page ready for review?",
+        "timestamp": "09:00:30",
+        "sequence_id": 4,
+        "confidence": 0.91,
+        "audio_start_time": 30.0,
+        "audio_end_time": 32.9,
+        "duration": 2.9
+      }
+    ],
+    "total_count": 4,
+    "has_more": false
+  },
+  "knowledge_get_meeting": {
+    "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "latestRun": null,
+    "items": [],
+    "rejected": [],
+    "pendingCount": 0,
+    "acceptedCount": 0,
+    "skippedCount": 0
+  },
+  "parakeet_has_available_models": true,
+  "builtin_ai_is_model_ready": true,
+  "api_list_templates": [
+    {
+      "id": "daily_standup",
+      "name": "Daily standup",
+      "description": "Yesterday, today and blockers"
+    },
+    {
+      "id": "standard_meeting",
+      "name": "Standard meeting",
+      "description": "Decisions, action items and open questions"
+    }
+  ],
+  "api_get_meeting_summary_language": null,
+  "set_notification_settings": null,
+  "plugin:app|version": "0.4.1",
+  "get_current_audio_backend": "coreaudio",
+  "save_onboarding_status_cmd": null,
+  "whisper_get_available_models": [
+    {
+      "name": "large-v3",
+      "size_mb": 2900,
+      "status": "Available"
+    },
+    {
+      "name": "base",
+      "size_mb": 142,
+      "status": "Missing"
+    }
+  ],
+  "track_analytics_transparency_viewed": null
+}

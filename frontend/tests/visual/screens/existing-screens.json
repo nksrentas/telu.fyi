@@ -1,0 +1,368 @@
+[
+  {
+    "name": "home-idle",
+    "path": "/"
+  },
+  {
+    "name": "home-recording",
+    "path": "/",
+    "ipc": {
+      "get_recording_state": {
+        "is_recording": true,
+        "is_paused": false,
+        "is_active": true,
+        "recording_duration": 754.0,
+        "active_duration": 754.0,
+        "meeting_id": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "meeting_lifecycle": "recording",
+        "meeting_title": "Weekly product sync",
+        "meeting_started_at_utc": "2026-09-27T10:33:26Z"
+      },
+      "is_recording": true
+    }
+  },
+  {
+    "name": "meeting-summary",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d"
+  },
+  {
+    "name": "meeting-transcript",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "steps": [
+      {
+        "click": "[role=tab]:has-text(\"Transcript\")"
+      }
+    ],
+    "viewport": {
+      "width": 720,
+      "height": 700
+    }
+  },
+  {
+    "name": "settings-general",
+    "path": "/settings"
+  },
+  {
+    "name": "settings-recordings",
+    "path": "/settings",
+    "steps": [
+      {
+        "click": "[role=tab]:has-text(\"Recordings\")"
+      }
+    ]
+  },
+  {
+    "name": "settings-transcription",
+    "path": "/settings",
+    "steps": [
+      {
+        "click": "[role=tab]:has-text(\"Transcription\")"
+      }
+    ]
+  },
+  {
+    "name": "settings-summary",
+    "path": "/settings",
+    "steps": [
+      {
+        "click": "[role=tab]:has-text(\"Summary\")"
+      }
+    ]
+  },
+  {
+    "name": "settings-beta",
+    "path": "/settings",
+    "steps": [
+      {
+        "click": "[role=tab]:has-text(\"Beta\")"
+      }
+    ]
+  },
+  {
+    "name": "settings-diagnostics",
+    "path": "/settings",
+    "steps": [
+      {
+        "click": "[role=tab]:has-text(\"Diagnostics\")"
+      }
+    ]
+  },
+  {
+    "name": "onboarding-welcome",
+    "path": "/",
+    "ipc": {
+      "get_onboarding_status": {
+        "version": "1.0",
+        "completed": false,
+        "current_step": 1,
+        "model_status": {
+          "parakeet": "not_downloaded",
+          "summary": "not_downloaded"
+        },
+        "last_updated": "2026-09-27T09:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "onboarding-setup-overview",
+    "path": "/",
+    "ipc": {
+      "get_onboarding_status": {
+        "version": "1.0",
+        "completed": false,
+        "current_step": 2,
+        "model_status": {
+          "parakeet": "not_downloaded",
+          "summary": "not_downloaded"
+        },
+        "last_updated": "2026-09-27T09:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "onboarding-download-progress",
+    "path": "/",
+    "ipc": {
+      "get_onboarding_status": {
+        "version": "1.0",
+        "completed": false,
+        "current_step": 3,
+        "model_status": {
+          "parakeet": "not_downloaded",
+          "summary": "not_downloaded"
+        },
+        "last_updated": "2026-09-27T09:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "onboarding-permissions",
+    "path": "/",
+    "ipc": {
+      "get_onboarding_status": {
+        "version": "1.0",
+        "completed": false,
+        "current_step": 4,
+        "model_status": {
+          "parakeet": "not_downloaded",
+          "summary": "not_downloaded"
+        },
+        "last_updated": "2026-09-27T09:00:00Z"
+      }
+    }
+  },
+  {
+    "name": "dialog-transcript-recovery",
+    "path": "/",
+    "indexedDb": {
+      "name": "MeetilyRecoveryDB",
+      "version": 3,
+      "stores": {
+        "meetings": {
+          "keyPath": "meetingId",
+          "indexes": [
+            [
+              "lastUpdated",
+              "lastUpdated",
+              false
+            ],
+            [
+              "savedToSQLite",
+              "savedToSQLite",
+              false
+            ]
+          ],
+          "records": [
+            {
+              "meetingId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+              "title": "Interrupted planning call",
+              "startTime": 1790491560000,
+              "lastUpdated": 1790492160000,
+              "transcriptCount": 2,
+              "savedToSQLite": false,
+              "lifecycle": "recording",
+              "completeness": "pending"
+            }
+          ]
+        },
+        "transcripts": {
+          "keyPath": "id",
+          "autoIncrement": true,
+          "indexes": [
+            [
+              "meetingId",
+              "meetingId",
+              false
+            ],
+            [
+              "storedAt",
+              "storedAt",
+              false
+            ]
+          ],
+          "records": []
+        },
+        "transcriptEvidence": {
+          "keyPath": "evidenceId",
+          "indexes": [
+            [
+              "meetingId",
+              "meetingId",
+              false
+            ],
+            [
+              "meetingSourceSegment",
+              [
+                "meetingId",
+                "source",
+                "sourceSegmentKey"
+              ],
+              true
+            ],
+            [
+              "storedAt",
+              "storedAt",
+              false
+            ]
+          ],
+          "records": [
+            {
+              "evidenceId": "d4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70",
+              "meetingId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+              "source": "mixed",
+              "sourceSegmentKey": "s-1",
+              "text": "Let's review the roadmap for next quarter.",
+              "timestamp": "2026-09-27T09:46:10Z",
+              "confidence": 0.92,
+              "sequenceId": 1,
+              "storedAt": 1790491660000,
+              "audio_start_time": 10.0,
+              "audio_end_time": 14.0,
+              "duration": 4.0,
+              "captureCompleteness": "complete",
+              "isFinal": true,
+              "isCanonical": true
+            },
+            {
+              "evidenceId": "e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7081",
+              "meetingId": "c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f",
+              "source": "mixed",
+              "sourceSegmentKey": "s-2",
+              "text": "We should ship the beta before the offsite.",
+              "timestamp": "2026-09-27T09:46:20Z",
+              "confidence": 0.9,
+              "sequenceId": 2,
+              "storedAt": 1790491760000,
+              "audio_start_time": 20.0,
+              "audio_end_time": 25.0,
+              "duration": 5.0,
+              "captureCompleteness": "complete",
+              "isFinal": true,
+              "isCanonical": true
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "dialog-import-audio",
+    "path": "/",
+    "localStorage": {
+      "betaFeatures": "{\"importAndRetranscribe\": true}"
+    },
+    "steps": [
+      {
+        "click": "button:has(.lucide-upload)"
+      },
+      {
+        "waitFor": "[role=dialog]"
+      }
+    ]
+  },
+  {
+    "name": "dialog-update",
+    "path": "/",
+    "steps": [
+      {
+        "dispatch": "check-updates-from-tray"
+      },
+      {
+        "waitFor": "[role=dialog]"
+      }
+    ],
+    "ipc": {
+      "evaluate_canary_background_attempt": {
+        "runId": null,
+        "canaryEnabled": false,
+        "service": "updater",
+        "trigger": "manual",
+        "allowDispatch": true,
+        "sequence": null,
+        "disposition": "permitted",
+        "redactedCode": null,
+        "packetBlockerAuthority": "The selected OS or proxy method is authoritative for packets; Telu only records application decisions."
+      },
+      "plugin:updater|check": {
+        "rid": 7,
+        "currentVersion": "0.4.1",
+        "version": "0.5.0",
+        "date": "2026-09-20T00:00:00Z",
+        "body": "Faster summaries and a calmer recording view.",
+        "rawJson": {}
+      }
+    }
+  },
+  {
+    "name": "dialog-analytics-data",
+    "path": "/settings",
+    "ipc": {
+      "plugin:store|has": {
+        "$byArg": "key",
+        "cases": {
+          "analyticsOptedIn": true,
+          "analyticsDefaultOffMigrationV1": true
+        },
+        "default": false
+      },
+      "plugin:store|get": {
+        "$byArg": "key",
+        "cases": {
+          "analyticsOptedIn": [
+            true,
+            true
+          ],
+          "analyticsDefaultOffMigrationV1": [
+            true,
+            true
+          ]
+        },
+        "default": [
+          null,
+          false
+        ]
+      }
+    },
+    "steps": [
+      {
+        "click": "div.justify-between:has(h4:text-is(\"Enable Analytics\")) [role=switch]"
+      },
+      {
+        "waitFor": "h2:text-is(\"What Analytics Collects\")"
+      }
+    ]
+  },
+  {
+    "name": "dialog-model-settings",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "steps": [
+      {
+        "click": "button[title=\"Summary Settings\"]"
+      }
+    ]
+  },
+  {
+    "name": "notes",
+    "path": "/notes/team-sync-dec-26"
+  }
+]
