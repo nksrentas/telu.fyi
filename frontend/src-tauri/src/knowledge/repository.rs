@@ -1,15 +1,14 @@
 use crate::knowledge::models::{
-    AbstentionReason, EvidenceLinkView, EvidenceRole, KnowledgeError, KnowledgeItemView,
-    KnowledgeRunView, KnowledgeType, ReviewState, RunStatus, Support, TriggerKind,
+    AbstentionReason, EvidenceRole, KnowledgeError, KnowledgeRunView, KnowledgeType, RunStatus,
+    Support, TriggerKind,
 };
 use crate::knowledge::span_verifier::{AttributeSupport, VerifiedSpan};
 use chrono::Utc;
-use sqlx::{Error as SqlxError, FromRow, SqliteConnection, SqlitePool};
-use std::collections::HashMap;
+use sqlx::{Error as SqlxError, SqliteConnection, SqlitePool};
 use tracing::error;
 use uuid::Uuid;
 
-const RUN_COLUMNS: &str = "run_id, meeting_id, trigger_kind, status, provider_id, model_id,
+pub(crate) const RUN_COLUMNS: &str = "run_id, meeting_id, trigger_kind, status, provider_id, model_id,
     location_class, sanitized_origin, prompt_version, input_evidence_count, proposed_count,
     skipped_count, suppressed_count, reconfirmed_count, failure_code, started_at_utc,
     finished_at_utc";
@@ -50,35 +49,6 @@ pub struct NewItem {
 pub struct NewAbstention {
     pub reason: AbstentionReason,
     pub candidate_type: Option<KnowledgeType>,
-}
-
-#[derive(FromRow)]
-struct ItemRow {
-    item_id: String,
-    meeting_id: String,
-    origin_run_id: String,
-    item_type: KnowledgeType,
-    text: String,
-    owner_text: Option<String>,
-    owner_support: Support,
-    due_text: Option<String>,
-    due_support: Support,
-    created_at_utc: String,
-}
-
-#[derive(FromRow)]
-struct LinkRow {
-    link_id: String,
-    item_id: String,
-    evidence_id: String,
-    role: EvidenceRole,
-    quote_text: String,
-    raw_start: i64,
-    raw_end: i64,
-    segment_capture_incomplete: bool,
-    sequence: i64,
-    audio_start_time: f64,
-    audio_end_time: f64,
 }
 
 pub struct KnowledgeRepository;
@@ -227,37 +197,6 @@ impl KnowledgeRepository {
         .map_err(|error| storage_error("latest_run", meeting_id, error))
     }
 
-    pub async fn list_meeting_items(
-        pool: &SqlitePool,
-        meeting_id: &str,
-    ) -> Result<Vec<KnowledgeItemView>, KnowledgeError> {
-        validate_meeting_id(meeting_id)?;
-        let items = sqlx::query_as::<_, ItemRow>(
-            "SELECT item_id, meeting_id, origin_run_id, item_type, text, owner_text,
-                    owner_support, due_text, due_support, created_at_utc
-             FROM knowledge_items WHERE meeting_id = ?",
-        )
-        .bind(meeting_id)
-        .fetch_all(pool)
-        .await
-        .map_err(|error| storage_error("list_meeting_items", meeting_id, error))?;
-        let links = sqlx::query_as::<_, LinkRow>(
-            "SELECT l.link_id, l.item_id, l.evidence_id, l.role, l.quote_text, l.raw_start,
-                    l.raw_end, l.segment_capture_incomplete, e.sequence, e.audio_start_time,
-                    e.audio_end_time
-             FROM knowledge_evidence_links l
-             JOIN transcript_evidence e ON e.evidence_id = l.evidence_id
-             WHERE l.meeting_id = ?
-             ORDER BY e.sequence, l.raw_start, l.link_id",
-        )
-        .bind(meeting_id)
-        .fetch_all(pool)
-        .await
-        .map_err(|error| storage_error("list_meeting_items", meeting_id, error))?;
-
-        Ok(assemble_items(items, links))
-    }
-
     async fn run_by_id(pool: &SqlitePool, run_id: &str) -> Result<KnowledgeRunView, KnowledgeError> {
         sqlx::query_as::<_, KnowledgeRunView>(&format!(
             "SELECT {RUN_COLUMNS} FROM knowledge_runs WHERE run_id = ?"
@@ -359,71 +298,13 @@ async fn insert_link(
     .map_err(|error| storage_error("insert_link", meeting_id, error))
 }
 
-fn assemble_items(items: Vec<ItemRow>, links: Vec<LinkRow>) -> Vec<KnowledgeItemView> {
-    let mut links_by_item: HashMap<String, Vec<EvidenceLinkView>> = HashMap::new();
-    for link in links {
-        links_by_item
-            .entry(link.item_id.clone())
-            .or_default()
-            .push(link_view(link));
-    }
-    let mut views: Vec<KnowledgeItemView> = items
-        .into_iter()
-        .map(|item| {
-            let evidence = links_by_item.remove(&item.item_id).unwrap_or_default();
-            item_view(item, evidence)
-        })
-        .collect();
-    views.sort_by(|left, right| item_order_key(left).cmp(&item_order_key(right)));
-    views
-}
-
-fn item_order_key(item: &KnowledgeItemView) -> (i64, i64, String) {
-    item.evidence
-        .first()
-        .map(|link| (link.sequence, link.raw_start, item.item_id.clone()))
-        .unwrap_or((i64::MAX, i64::MAX, item.item_id.clone()))
-}
-
-fn link_view(link: LinkRow) -> EvidenceLinkView {
-    EvidenceLinkView {
-        link_id: link.link_id,
-        evidence_id: link.evidence_id,
-        role: link.role,
-        quote_text: link.quote_text,
-        raw_start: link.raw_start,
-        raw_end: link.raw_end,
-        sequence: link.sequence,
-        audio_start_time: link.audio_start_time,
-        audio_end_time: link.audio_end_time,
-        segment_capture_incomplete: link.segment_capture_incomplete,
-    }
-}
-
-fn item_view(item: ItemRow, evidence: Vec<EvidenceLinkView>) -> KnowledgeItemView {
-    KnowledgeItemView {
-        item_id: item.item_id,
-        meeting_id: item.meeting_id,
-        origin_run_id: item.origin_run_id,
-        item_type: item.item_type,
-        text: item.text,
-        owner_text: item.owner_text,
-        owner_support: item.owner_support,
-        due_text: item.due_text,
-        due_support: item.due_support,
-        review_state: ReviewState::Proposed,
-        created_at_utc: item.created_at_utc,
-        evidence,
-    }
-}
-
-fn validate_meeting_id(meeting_id: &str) -> Result<(), KnowledgeError> {
+pub(crate) fn validate_meeting_id(meeting_id: &str) -> Result<(), KnowledgeError> {
     Uuid::parse_str(meeting_id)
         .map(|_| ())
         .map_err(|_| KnowledgeError::InvalidRequest)
 }
 
-fn storage_error(operation: &'static str, subject_id: &str, error: SqlxError) -> KnowledgeError {
+pub(crate) fn storage_error(operation: &'static str, subject_id: &str, error: SqlxError) -> KnowledgeError {
     error!(operation, subject_id, error = %error, "knowledge storage operation failed");
     KnowledgeError::Storage
 }
@@ -597,15 +478,16 @@ mod tests {
         )
         .await;
 
-        let items = KnowledgeRepository::list_meeting_items(&pool, MEETING_ID)
+        let items = KnowledgeRepository::meeting_view(&pool, MEETING_ID)
             .await
-            .expect("listed items");
+            .expect("meeting view")
+            .items;
         let texts: Vec<&str> = items.iter().map(|item| item.text.as_str()).collect();
         assert_eq!(texts, vec!["Ship the beta", "Beta later", "Ship docs"]);
 
         let first = &items[0];
-        assert_eq!(first.review_state, ReviewState::Proposed);
-        assert_eq!(first.owner_support, Support::NotStated);
+        assert_eq!(first.review_state, crate::knowledge::models::ReviewState::Proposed);
+        assert_eq!(first.owner_support, crate::knowledge::models::FieldSupport::NotStated);
         assert_eq!(first.evidence.len(), 1);
         assert_eq!(first.evidence[0].evidence_id, EARLY_EVIDENCE);
         assert_eq!(first.evidence[0].role, EvidenceRole::Claim);
@@ -624,8 +506,8 @@ mod tests {
     async fn knowledge_repository_rejects_malformed_meeting_ids() {
         let pool = seeded_pool().await;
 
-        let result = KnowledgeRepository::list_meeting_items(&pool, "not-a-uuid").await;
+        let result = KnowledgeRepository::meeting_view(&pool, "not-a-uuid").await;
 
-        assert_eq!(result, Err(KnowledgeError::InvalidRequest));
+        assert_eq!(result.err(), Some(KnowledgeError::InvalidRequest));
     }
 }

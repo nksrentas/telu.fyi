@@ -475,9 +475,10 @@ mod tests {
 
         assert_eq!(outcome.status, RunStatus::Succeeded);
         assert_eq!(outcome.counts, RunCounts { proposed: 1, skipped: 0 });
-        let items = KnowledgeRepository::list_meeting_items(&pool, MEETING_ID)
+        let items = KnowledgeRepository::meeting_view(&pool, MEETING_ID)
             .await
-            .expect("items");
+            .expect("meeting view")
+            .items;
         let link = &items[0].evidence[0];
         assert_eq!(link.evidence_id, S2_EVIDENCE);
         assert_eq!(link.role, EvidenceRole::Claim);

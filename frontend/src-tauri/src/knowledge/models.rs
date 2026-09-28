@@ -134,10 +134,61 @@ impl AbstentionReason {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "snake_case")]
+#[sqlx(rename_all = "snake_case")]
 pub enum ReviewState {
     Proposed,
+    Accepted,
+    Rejected,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[serde(rename_all = "snake_case")]
+#[sqlx(rename_all = "snake_case")]
+pub enum ReviewAction {
+    Accept,
+    Correct,
+    Reject,
+    Restore,
+    Reopen,
+}
+
+impl ReviewAction {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Accept => "accept",
+            Self::Correct => "correct",
+            Self::Reject => "reject",
+            Self::Restore => "restore",
+            Self::Reopen => "reopen",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvidenceStatus {
+    Valid,
+    Changed,
+    Missing,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FieldSupport {
+    Stated,
+    NotStated,
+    User,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CorrectionInput {
+    pub text: String,
+    pub owner_text: Option<String>,
+    pub due_text: Option<String>,
+    pub based_on_revision_id: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,6 +198,10 @@ pub enum KnowledgeError {
     MeetingNotReady,
     NoEvidence,
     RunInProgress,
+    ItemNotFound,
+    InvalidInput,
+    InvalidTransition,
+    RevisionConflict,
     Route(String),
     Storage,
 }
@@ -159,6 +214,10 @@ impl KnowledgeError {
             Self::MeetingNotReady => "KNOWLEDGE_MEETING_NOT_READY",
             Self::NoEvidence => "KNOWLEDGE_NO_EVIDENCE",
             Self::RunInProgress => "KNOWLEDGE_RUN_IN_PROGRESS",
+            Self::ItemNotFound => "KNOWLEDGE_ITEM_NOT_FOUND",
+            Self::InvalidInput => "KNOWLEDGE_INVALID_INPUT",
+            Self::InvalidTransition => "KNOWLEDGE_INVALID_TRANSITION",
+            Self::RevisionConflict => "KNOWLEDGE_REVISION_CONFLICT",
             Self::Route(code) => code,
             Self::Storage => "KNOWLEDGE_STORAGE_FAILED",
         }
@@ -211,10 +270,15 @@ pub struct KnowledgeItemView {
     pub item_type: KnowledgeType,
     pub text: String,
     pub owner_text: Option<String>,
-    pub owner_support: Support,
+    pub owner_support: FieldSupport,
     pub due_text: Option<String>,
-    pub due_support: Support,
+    pub due_support: FieldSupport,
     pub review_state: ReviewState,
+    pub eligibility: bool,
+    pub evidence_status: EvidenceStatus,
+    pub corrected: bool,
+    pub latest_revision_id: Option<String>,
+    pub unresolved: bool,
     pub created_at_utc: String,
     pub evidence: Vec<EvidenceLinkView>,
 }
@@ -225,6 +289,61 @@ pub struct MeetingKnowledgeView {
     pub meeting_id: String,
     pub latest_run: Option<KnowledgeRunView>,
     pub items: Vec<KnowledgeItemView>,
+    pub rejected: Vec<KnowledgeItemView>,
+    pub pending_count: i64,
+    pub accepted_count: i64,
+    pub skipped_count: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OriginalProposalView {
+    pub text: String,
+    pub owner_text: Option<String>,
+    pub due_text: Option<String>,
+    pub created_at_utc: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct RevisionView {
+    pub revision_id: String,
+    pub based_on_revision_id: Option<String>,
+    pub text: String,
+    pub owner_text: Option<String>,
+    pub due_text: Option<String>,
+    pub created_at_utc: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewEventView {
+    pub review_id: String,
+    pub sequence: i64,
+    pub action: ReviewAction,
+    pub revision_id: Option<String>,
+    pub created_at_utc: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeItemHistory {
+    pub item_id: String,
+    pub origin_run_id: String,
+    pub run_started_at_utc: String,
+    pub original: OriginalProposalView,
+    pub revisions: Vec<RevisionView>,
+    pub reviews: Vec<ReviewEventView>,
+    pub evidence: Vec<EvidenceLinkView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeDeletionImpact {
+    pub accepted: i64,
+    pub suggestions: i64,
+    pub rejected: i64,
+    pub runs: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

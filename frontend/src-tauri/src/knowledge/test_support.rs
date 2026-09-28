@@ -64,3 +64,73 @@ pub async fn insert_evidence(
     .await
     .expect("evidence fixture");
 }
+
+pub const SEEDED_EVIDENCE_TEXT: &str = "We ship the beta on Friday.";
+
+pub async fn seed_items(pool: &SqlitePool, meeting_id: &str, texts: &[&str]) -> Vec<String> {
+    use crate::knowledge::models::{KnowledgeType, RunStatus, TriggerKind};
+    use crate::knowledge::repository::{KnowledgeRepository, NewItem, NewRun, RunCounts};
+    use crate::knowledge::span_verifier::{sha256_hex, AttributeSupport, VerifiedSpan};
+    use uuid::Uuid;
+
+    insert_meeting(pool, meeting_id, "complete", "complete").await;
+    let evidence_id = Uuid::new_v4().to_string();
+    insert_evidence(pool, meeting_id, &evidence_id, 0, SEEDED_EVIDENCE_TEXT).await;
+    let run_id = Uuid::new_v4().to_string();
+    KnowledgeRepository::insert_running_run(
+        pool,
+        &NewRun {
+            run_id: run_id.clone(),
+            meeting_id: meeting_id.to_string(),
+            trigger_kind: TriggerKind::User,
+            provider_id: "ollama".to_string(),
+            model_id: "llama3".to_string(),
+            location_class: "local".to_string(),
+            sanitized_origin: "This device".to_string(),
+            prompt_version: "knowledge-extract-v2".to_string(),
+            meeting_completeness_at_start: "complete".to_string(),
+            input_evidence_count: 1,
+            input_fingerprint: "fingerprint".to_string(),
+        },
+    )
+    .await
+    .expect("seeded run");
+    let items: Vec<NewItem> = texts
+        .iter()
+        .map(|text| NewItem {
+            item_id: Uuid::new_v4().to_string(),
+            item_type: KnowledgeType::Decision,
+            text: text.to_string(),
+            normalized_key: text.to_lowercase(),
+            claims: vec![VerifiedSpan {
+                evidence_id: evidence_id.clone(),
+                raw_start: 3,
+                raw_end: 16,
+                quote_text: "ship the beta".to_string(),
+                normalized_quote: "ship the beta".to_string(),
+                evidence_text_sha256: sha256_hex(SEEDED_EVIDENCE_TEXT),
+                segment_capture_incomplete: false,
+            }],
+            owner: AttributeSupport::NotStated,
+            due: AttributeSupport::NotStated,
+        })
+        .collect();
+    let mut transaction = pool.begin().await.expect("seed transaction");
+    KnowledgeRepository::insert_items_with_links(&mut transaction, meeting_id, &run_id, &items)
+        .await
+        .expect("seeded items");
+    KnowledgeRepository::finalize_run(
+        &mut transaction,
+        &run_id,
+        RunStatus::Succeeded,
+        RunCounts {
+            proposed: items.len() as i64,
+            skipped: 0,
+        },
+        None,
+    )
+    .await
+    .expect("seeded run finalized");
+    transaction.commit().await.expect("seed commit");
+    items.into_iter().map(|item| item.item_id).collect()
+}

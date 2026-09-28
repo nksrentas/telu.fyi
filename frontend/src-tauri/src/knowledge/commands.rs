@@ -8,9 +8,11 @@ use crate::knowledge::extraction::{
 };
 use crate::knowledge::prompt::PROMPT_VERSION;
 use crate::knowledge::models::{
-    EvidenceSegmentView, KnowledgeError, KnowledgeRunView, KnowledgeUpdatedEvent,
-    MeetingKnowledgeView, RunStatus, TriggerKind,
+    CorrectionInput, EvidenceSegmentView, KnowledgeDeletionImpact, KnowledgeError,
+    KnowledgeItemHistory, KnowledgeItemView, KnowledgeRunView, KnowledgeUpdatedEvent,
+    MeetingKnowledgeView, ReviewAction, RunStatus, TriggerKind,
 };
+use crate::knowledge::review::{accept_all, append_review, correct_item};
 use crate::knowledge::repository::{KnowledgeRepository, NewRun};
 use crate::state::AppState;
 use crate::summary::llm_client::generate_summary;
@@ -125,18 +127,94 @@ pub async fn knowledge_get_meeting(
     state: tauri::State<'_, AppState>,
     meeting_id: String,
 ) -> Result<MeetingKnowledgeView, String> {
+    KnowledgeRepository::meeting_view(state.db_manager.pool(), &meeting_id)
+        .await
+        .map_err(error_code)
+}
+
+#[tauri::command]
+pub async fn knowledge_review_item<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+    item_id: String,
+    action: ReviewAction,
+) -> Result<KnowledgeItemView, String> {
     let pool = state.db_manager.pool();
-    let latest_run = KnowledgeRepository::latest_run(pool, &meeting_id)
+    append_review(pool, &meeting_id, &item_id, action)
         .await
-        .map_err(error_code)?;
-    let items = KnowledgeRepository::list_meeting_items(pool, &meeting_id)
+        .map_err(|error| review_failure("review_item", &item_id, error))?;
+    notify_review(&app, pool, &meeting_id).await;
+    KnowledgeRepository::item_view(pool, &meeting_id, &item_id)
         .await
-        .map_err(error_code)?;
-    Ok(MeetingKnowledgeView {
-        meeting_id,
-        latest_run,
-        items,
-    })
+        .map_err(error_code)
+}
+
+#[tauri::command]
+pub async fn knowledge_correct_item<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+    item_id: String,
+    correction: CorrectionInput,
+) -> Result<KnowledgeItemView, String> {
+    let pool = state.db_manager.pool();
+    correct_item(pool, &meeting_id, &item_id, &correction)
+        .await
+        .map_err(|error| review_failure("correct_item", &item_id, error))?;
+    notify_review(&app, pool, &meeting_id).await;
+    KnowledgeRepository::item_view(pool, &meeting_id, &item_id)
+        .await
+        .map_err(error_code)
+}
+
+#[tauri::command]
+pub async fn knowledge_accept_all<R: Runtime>(
+    app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+    item_ids: Vec<String>,
+) -> Result<MeetingKnowledgeView, String> {
+    let pool = state.db_manager.pool();
+    accept_all(pool, &meeting_id, &item_ids)
+        .await
+        .map_err(|error| review_failure("accept_all", &meeting_id, error))?;
+    notify_review(&app, pool, &meeting_id).await;
+    KnowledgeRepository::meeting_view(pool, &meeting_id)
+        .await
+        .map_err(error_code)
+}
+
+#[tauri::command]
+pub async fn knowledge_item_history(
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+    item_id: String,
+) -> Result<KnowledgeItemHistory, String> {
+    Uuid::parse_str(&item_id).map_err(|_| error_code(KnowledgeError::InvalidInput))?;
+    KnowledgeRepository::item_history(state.db_manager.pool(), &meeting_id, &item_id)
+        .await
+        .map_err(error_code)
+}
+
+#[tauri::command]
+pub async fn knowledge_list_runs(
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+) -> Result<Vec<KnowledgeRunView>, String> {
+    KnowledgeRepository::list_runs(state.db_manager.pool(), &meeting_id)
+        .await
+        .map_err(error_code)
+}
+
+#[tauri::command]
+pub async fn knowledge_deletion_impact(
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+) -> Result<KnowledgeDeletionImpact, String> {
+    KnowledgeRepository::deletion_impact(state.db_manager.pool(), &meeting_id)
+        .await
+        .map_err(error_code)
 }
 
 #[tauri::command]
@@ -243,6 +321,19 @@ fn emit_updated<R: Runtime>(app: &AppHandle<R>, meeting_id: &str, run_id: &str, 
     if app.emit(KNOWLEDGE_UPDATED_EVENT, event).is_err() {
         warn!(run_id, "knowledge-updated event could not be emitted");
     }
+}
+
+async fn notify_review<R: Runtime>(app: &AppHandle<R>, pool: &SqlitePool, meeting_id: &str) {
+    match KnowledgeRepository::latest_run(pool, meeting_id).await {
+        Ok(Some(run)) => emit_updated(app, meeting_id, &run.run_id, run.status),
+        Ok(None) => {}
+        Err(error) => warn!(meeting_id, code = error.code(), "knowledge review update not emitted"),
+    }
+}
+
+fn review_failure(operation: &'static str, subject_id: &str, error: KnowledgeError) -> String {
+    warn!(operation, subject_id, code = error.code(), "knowledge review rejected");
+    error_code(error)
 }
 
 fn location_label(route: &EffectiveRoute) -> Result<&'static str, KnowledgeError> {
