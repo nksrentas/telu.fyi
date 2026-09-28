@@ -20,6 +20,7 @@ interface StatusOverlaysProps {
 type AuthoritativeFinalization = FinalizationProgressSnapshot | FinalizationSnapshot;
 
 const ANNOUNCEMENT_THROTTLE_MS = 5_000;
+export const WAITING_FOR_STATUS = 'Waiting for authoritative recording status';
 
 function isTerminalSnapshot(
   snapshot: AuthoritativeFinalization | null,
@@ -37,7 +38,7 @@ function formatOldestAge(ageMs: number | null): string {
   return `${minutes}m ${seconds.toString().padStart(2, '0')}s`; // 124s → 2m 04s
 }
 
-function finalizationDetail(snapshot: FinalizationProgressSnapshot): string {
+export function finalizationDetail(snapshot: FinalizationProgressSnapshot): string {
   const depth = snapshot.queue.depth;
   if (depth === 0) {
     return 'No transcript work pending · saving meeting';
@@ -119,7 +120,7 @@ export function StatusOverlays({
     : null;
   const visibleFinalizingDetail = snapshot?.lifecycle === 'finalizing'
     ? finalizationDetail(snapshot)
-    : 'Waiting for authoritative recording status';
+    : WAITING_FOR_STATUS;
 
   const announcement = useMemo(() => {
     if (visibleSnapshot?.lifecycle === 'incomplete') {

@@ -10,7 +10,7 @@ interface EmptyStateProps {
   title: string
   body: string
   icon?: LucideIcon
-  footnote?: string
+  footnote?: React.ReactNode
   actions?: React.ReactNode
   compact?: boolean
   className?: string
@@ -30,7 +30,7 @@ export function EmptyState({ title, body, icon, footnote, actions, compact = fal
       <h3 className="m-0 font-display text-[17px] font-semibold leading-[1.25] tracking-[-0.01em] text-label">{title}</h3>
       <p className="m-0 max-w-[340px]">{body}</p>
       {actions && <div className="mt-1.5 flex flex-wrap justify-center gap-2">{actions}</div>}
-      {footnote && <p className="m-0 text-[11px] text-label-3">{footnote}</p>}
+      {footnote && <p className="m-0 flex items-center gap-1.5 text-[11px] text-label-3">{footnote}</p>}
     </div>
   )
 }

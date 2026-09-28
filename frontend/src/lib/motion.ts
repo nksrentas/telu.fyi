@@ -8,6 +8,10 @@ export const EASE = {
   flightY: [0.6, 0, 0.9, 0.7],
 } as const
 
+export function cssEase(curve: readonly number[]): string {
+  return `cubic-bezier(${curve.join(', ')})`
+}
+
 export const SPRING: Transition = { type: 'spring', bounce: 0.12, visualDuration: 0.33 }
 export const SPRING_BOUNCE: Transition = { type: 'spring', bounce: 0.28, visualDuration: 0.42 }
 export const INSTANT: Transition = { duration: 0 }
@@ -29,6 +33,8 @@ export const DURATION = {
   crossfadeOut: 0.11,
   crossfadeIn: 0.19,
   viewFade: 0.2,
+  dayStepOut: 0.14,
+  dayStepIn: 0.22,
   listInsert: 0.28,
   listRemove: 0.22,
   flip: 0.32,

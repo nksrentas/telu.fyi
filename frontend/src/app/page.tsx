@@ -18,6 +18,7 @@ import { useRecordingStop } from '@/hooks/useRecordingStop';
 import { useTranscriptRecovery } from '@/hooks/useTranscriptRecovery';
 import { TranscriptRecovery } from '@/components/TranscriptRecovery';
 import { indexedDBService } from '@/services/indexedDBService';
+import { TodayView } from '@/components/agenda/today-view';
 import { toast } from 'sonner';
 
 export default function Home() {
@@ -154,9 +155,10 @@ export default function Home() {
 
   // Computed values using global status
   const isProcessingStop = status === RecordingStatus.PROCESSING_TRANSCRIPTS || isProcessing;
+  const showLiveTranscript = recordingState.isRecording || isStopping || isProcessingStop || isSaving;
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-content">
       {/* All Modals supported*/}
       <SettingsModals
         modals={modals}
@@ -173,12 +175,16 @@ export default function Home() {
         onDelete={deleteRecoverableMeeting}
         onLoadPreview={loadMeetingTranscripts}
       />
-      <div className="flex flex-1 overflow-hidden">
-        <TranscriptPanel
-          isProcessingStop={isProcessingStop}
-          isStopping={isStopping}
-          showModal={showModal}
-        />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {showLiveTranscript ? (
+          <TranscriptPanel
+            isProcessingStop={isProcessingStop}
+            isStopping={isStopping}
+            showModal={showModal}
+          />
+        ) : (
+          <TodayView />
+        )}
 
         {/* Recording controls - only show when permissions are granted or already recording and not showing status messages */}
         {(hasMicrophone || isRecording) &&

@@ -198,6 +198,13 @@ function useLatch(value: boolean) {
   return latched.current;
 }
 
+function useKnowledgeAnchor() {
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.location?.hash !== '#knowledge') return;
+    document.getElementById('knowledge')?.scrollIntoView({ block: 'start' });
+  }, []);
+}
+
 export function KnowledgeSection({
   meetingId,
   completeness = 'complete',
@@ -210,6 +217,7 @@ export function KnowledgeSection({
   const [regenerateOpen, setRegenerateOpen] = useState(false);
   const regenerateRunId = useRef<string | null>(null);
   const { knowledge, setKnowledge, reload } = useMeetingKnowledge(meetingId);
+  useKnowledgeAnchor();
   const onStarted = useCallback((run: KnowledgeRunView) => {
     setKnowledge((current) => (current ? { ...current, latestRun: run } : current));
   }, [setKnowledge]);
@@ -288,6 +296,7 @@ export function KnowledgeSection({
 
   return (
     <section
+      id="knowledge"
       aria-labelledby="knowledge-heading"
       data-surface={surface}
       className="scroll-mt-[72px] space-y-3"

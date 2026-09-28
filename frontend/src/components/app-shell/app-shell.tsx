@@ -4,12 +4,12 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react"
 import { usePathname, useRouter } from "next/navigation"
 
 import { Sidebar } from "@/components/app-shell/sidebar"
-import { EASE } from "@/lib/motion"
+import { DURATION, EASE, cssEase } from "@/lib/motion"
 
 type ShellRouter = ReturnType<typeof useRouter>
 
-const VIEW_FADE_EASING = `cubic-bezier(${EASE.out.join(", ")})`
-const VIEW_FADE_MS = 200
+const VIEW_FADE_EASING = cssEase(EASE.out)
+const VIEW_FADE_MS = DURATION.viewFade * 1000
 
 function useShellShortcuts(router: ShellRouter) {
   useEffect(() => {

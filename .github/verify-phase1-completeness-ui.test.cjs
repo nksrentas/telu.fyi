@@ -24,8 +24,8 @@ const sidebarProvider = readFileSync(
   join(root, 'frontend/src/components/Sidebar/SidebarProvider.tsx'),
   'utf8',
 );
-const sidebar = readFileSync(
-  join(root, 'frontend/src/components/Sidebar/index.tsx'),
+const eventCard = readFileSync(
+  join(root, 'frontend/src/components/agenda/event-card.tsx'),
   'utf8',
 );
 const meetingDetails = readFileSync(
@@ -109,8 +109,8 @@ test('history and detail project Rust lifecycle and completeness without droppin
   assert.match(rustApi, /pub gap_count:\s*u64/);
   assert.match(sidebarProvider, /lifecycle:\s*meeting\.lifecycle/);
   assert.match(sidebarProvider, /completeness:\s*meeting\.completeness/);
-  assert.match(sidebar, /<MeetingCompleteness/);
-  assert.match(sidebar, /line-clamp-2/);
+  assert.match(eventCard, /<MeetingCompleteness/);
+  assert.match(eventCard, /truncate/);
   assert.match(meetingDetails, /<MeetingCompleteness/);
   assert.match(meetingDetails, /variant="detail"/);
 });
