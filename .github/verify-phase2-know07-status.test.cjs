@@ -18,8 +18,8 @@ const thresholdsV1Path = join(REPO_ROOT, 'frontend/src-tauri/tests/fixtures/know
 const SHA = 'abc';
 
 function derivedFromCommittedFiles() {
-  const { thresholds, representativeReport, thresholdsSha256 } = readCommittedInputs(REPO_ROOT);
-  return deriveKnow07Status(thresholds, representativeReport, thresholdsSha256);
+  const { thresholds, representativeReport, thresholdsSha256, pilotReport } = readCommittedInputs(REPO_ROOT);
+  return deriveKnow07Status(thresholds, representativeReport, thresholdsSha256, pilotReport);
 }
 
 function setIn(value, [key, ...rest], leaf) {
@@ -65,6 +65,7 @@ const cleanReport = () => ({
   thresholdsSha256: SHA,
   gate: 'pass',
   failures: [],
+  fixtures: ['meeting-a', 'meeting-b'],
   invariants: {
     exactSpanSupport: { value: 1, status: 'measured', numerator: 4, denominator: 4 },
     resurrection: 0,
@@ -179,6 +180,29 @@ test('a report that is not labeled representative is not the representative eval
   for (const report of mislabeled) {
     assert.deepEqual(reasonsFor(declared, report), ['representative_kind_mismatch'], JSON.stringify(report));
   }
+});
+
+test('a representative report must be held out from the real-meeting pilot', () => {
+  const declared = declaredThresholds();
+  const pilot = { fixtures: ['p-1', 'p-2'] };
+  const withPilot = (report, pilotReport) => deriveKnow07Status(declared, report, SHA, pilotReport).reasons;
+  const notHeldOut = ['representative_not_held_out'];
+  assert.deepEqual(withPilot(cleanReport(), pilot), []);
+  assert.deepEqual(withPilot(cleanReport(), { fixtures: ['p-2', 'p-1'] }), []);
+  assert.deepEqual(withPilot(setIn(cleanReport(), ['fixtures'], ['meeting-a', 'p-2']), pilot), notHeldOut);
+  assert.deepEqual(withPilot(setIn(cleanReport(), ['fixtures'], ['p-2', 'meeting-a']), pilot), notHeldOut);
+  assert.deepEqual(withPilot(setIn(cleanReport(), ['fixtures'], ['meeting-a', 'p-2']), { fixtures: ['p-2', 'p-1'] }), notHeldOut);
+  assert.deepEqual(withPilot(cleanReport(), { fixtures: 'p-1' }), notHeldOut);
+  assert.deepEqual(withPilot(cleanReport(), {}), notHeldOut);
+  assert.deepEqual(withPilot(removeIn(cleanReport(), ['fixtures']), pilot), notHeldOut);
+  assert.deepEqual(withPilot(setIn(cleanReport(), ['fixtures'], 'meeting-a'), null), notHeldOut);
+  assert.deepEqual(withPilot(removeIn(cleanReport(), ['fixtures']), null), notHeldOut);
+  assert.deepEqual(withPilot(cleanReport(), null), []);
+  assert.deepEqual(reasonsFor(declared, removeIn(cleanReport(), ['fixtures'])), notHeldOut);
+  assert.deepEqual(
+    withPilot(setIn(setIn(cleanReport(), ['fixtures'], ['p-1']), ['evaluationKind'], 'real_meeting_pilot'), pilot),
+    ['representative_kind_mismatch', 'representative_not_held_out'],
+  );
 });
 
 test('content in a report is reported as content, not as pending', () => {
