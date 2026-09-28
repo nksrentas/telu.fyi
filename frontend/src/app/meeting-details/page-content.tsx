@@ -22,6 +22,7 @@ import { useSummaryGeneration } from '@/hooks/meeting-details/useSummaryGenerati
 import { useTemplates } from '@/hooks/meeting-details/useTemplates';
 import { useCopyOperations } from '@/hooks/meeting-details/useCopyOperations';
 import { useConfig } from '@/contexts/ConfigContext';
+import { LiveTranscript, useIsLiveMeeting } from '@/components/living-doc/live-transcript';
 import {
   ProviderBoundary,
   ProviderRouteFailureAlert,
@@ -55,7 +56,7 @@ export default function PageContent({
   hasEvidence?: boolean;
   durationSeconds?: number | null;
 }) {
-  // State
+  const live = useIsLiveMeeting(meeting.id);
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [summaryRouteState, setSummaryRouteState] = useState<ProviderRouteViewState>({
     status: 'loading',
@@ -294,6 +295,8 @@ export default function PageContent({
             showStatus={false}
           />
         </div>
+
+        {live && <LiveTranscript meetingId={meeting.id} />}
 
         <section aria-labelledby="summary-heading" className="scroll-mt-[72px] space-y-3">
           <div className="flex flex-wrap items-center gap-2">

@@ -4,6 +4,7 @@ import './globals.css'
 import { MotionConfig } from 'framer-motion'
 import { SidebarProvider } from '@/components/Sidebar/SidebarProvider'
 import { AppShell } from '@/components/app-shell/app-shell'
+import { RecordingHost } from '@/components/app-shell/recording-host'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
 import { Toaster, toast } from 'sonner'
 import "sonner/dist/styles.css"
@@ -263,7 +264,9 @@ export default function RootLayout({
                                 {showOnboarding ? (
                                   <OnboardingFlow onComplete={handleOnboardingComplete} />
                                 ) : (
-                                  <AppShell>{children}</AppShell>
+                                  <RecordingHost>
+                                    <AppShell>{children}</AppShell>
+                                  </RecordingHost>
                                 )}
                                 {/* Import audio overlay and dialog */}
                                 <ImportDropOverlay visible={showDropOverlay} />

@@ -31,6 +31,7 @@ interface ProviderBoundaryProps {
   className?: string;
   onRouteStateChange?: (state: ProviderRouteViewState) => void;
   showUnavailableAlert?: boolean;
+  compact?: boolean;
 }
 
 type ActionCapability = Extract<ProviderCapability, 'transcription' | 'summary'>;
@@ -89,6 +90,40 @@ const capabilityLabel = (capability: ProviderCapability) => {
   }
 };
 
+function CompactRoute({ capability, state, className }: { capability: ActionCapability; state: ProviderRouteViewState; className?: string }) {
+  if (state.status === 'loading') {
+    return (
+      <span role="status" className={cn('inline-flex items-center gap-1 px-2 text-[12px] text-label-3', className)}>
+        <LoaderCircle className="size-3 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        Checking route…
+      </span>
+    );
+  }
+  if (state.status !== 'validated') {
+    return (
+      <span className={cn('inline-flex items-center gap-1 px-2 text-[12px] font-medium text-coral-ink', className)}>
+        <AlertTriangle className="size-3" aria-hidden="true" />
+        {capabilityLabel(capability)} unavailable
+      </span>
+    );
+  }
+  const { route } = state;
+  const { Icon, label } = locationPresentation[route.locationClass];
+  return (
+    <span
+      className={cn('inline-flex min-w-0 items-center gap-1 whitespace-nowrap px-2 text-[12px] text-label-2', className)}
+      aria-label={`${capabilityLabel(route.capability)} route: ${label} · ${route.sanitizedOrigin}`}
+    >
+      <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+      <span aria-hidden="true">{label}</span>
+      <span aria-hidden="true" className="max-w-[140px] truncate text-label-3">· {middleTruncate(route.sanitizedOrigin, 24)}</span>
+      {route.locationClass === 'lan' && !route.encrypted && (
+        <span className="font-semibold text-coral-ink">Not encrypted</span>
+      )}
+    </span>
+  );
+}
+
 export function middleTruncate(value: string, maxLength = 48) {
   if (value.length <= maxLength) return value;
   const retainedLength = maxLength - 1;
@@ -103,6 +138,7 @@ export function ProviderBoundary({
   className,
   onRouteStateChange,
   showUnavailableAlert = true,
+  compact = false,
 }: ProviderBoundaryProps) {
   const [state, setState] = useState<ProviderRouteViewState>({
     status: 'loading',
@@ -183,6 +219,10 @@ export function ProviderBoundary({
     if (state.status !== 'validated') return null;
     return locationPresentation[state.route.locationClass];
   }, [state]);
+
+  if (compact) {
+    return <CompactRoute capability={capability} state={state} className={className} />;
+  }
 
   if (state.status === 'loading') {
     return (

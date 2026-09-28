@@ -13,7 +13,8 @@ const service = readSource('frontend/src/services/providerRouteService.ts');
 const boundary = readSource('frontend/src/components/ProviderBoundary.tsx');
 const transcriptSettings = readSource('frontend/src/components/TranscriptSettings.tsx');
 const summarySettings = readSource('frontend/src/components/SummaryModelSettings.tsx');
-const recordingControls = readSource('frontend/src/components/RecordingControls.tsx');
+const recordSlot = readSource('frontend/src/components/app-shell/recording-capsule.tsx');
+const recordingControls = readSource('frontend/src/hooks/use-recording-controls.ts');
 const meetingDetails = readSource('frontend/src/app/meeting-details/page-content.tsx');
 const recordingStart = readSource('frontend/src/hooks/useRecordingStart.ts');
 
@@ -54,10 +55,10 @@ test('loading or changed routes remain visible and unavailable before data-beari
 });
 
 test('recording and summary actions expose then freshly validate the Rust route', () => {
-  assert.match(recordingControls, /<ProviderBoundary[\s\S]*capability="transcription"/);
+  assert.match(recordSlot, /<ProviderBoundary[\s\S]*capability="transcription"/);
   assert.match(recordingControls, /validateProviderRoute\(transcriptionRouteState\.route\)[\s\S]*await onRecordingStart\(\)/);
   assert.ok(
-    recordingControls.indexOf('<ProviderBoundary') < recordingControls.indexOf('Start recording'),
+    recordSlot.indexOf('<ProviderBoundary') >= 0 && recordSlot.indexOf('<ProviderBoundary') < recordSlot.indexOf('<RecordButton'),
     'the transcription route disclosure must render before the start action',
   );
 
@@ -84,7 +85,7 @@ test('route failures use the exact no-fallback recovery copy and ordered actions
 
 test('retry state disables only the affected action CTA and never changes provider selection', () => {
   assert.match(recordingControls, /isRetryingRoute/);
-  assert.match(recordingControls, /disabled=\{[\s\S]*isRetryingRoute/);
+  assert.match(recordSlot, /disabled=\{[\s\S]*isRetryingRoute/);
   assert.match(meetingDetails, /isSummaryRouteRetrying/);
   assert.match(meetingDetails, /isModelConfigLoading=\{[\s\S]*isSummaryRouteRetrying/);
   assert.doesNotMatch(boundary, /setModelConfig|api_save_model_config/);

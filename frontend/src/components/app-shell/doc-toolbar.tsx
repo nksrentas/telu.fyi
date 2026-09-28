@@ -14,6 +14,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { GlassGroup } from "@/components/telu-ui/glass-group"
 import { cn } from "@/lib/utils"
+import { RecordSlot } from "./recording-capsule"
 
 export interface DocToolbarMenuItem {
   id: string
@@ -71,6 +72,7 @@ export function DocToolbar({
         {title}
       </div>
       <div data-tauri-drag-region className="flex-1 self-stretch" />
+      <RecordSlot />
       {menuItems.length > 0 && (
         <GlassGroup aria-label="Document actions">
           <DropdownMenu>

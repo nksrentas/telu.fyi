@@ -4,14 +4,18 @@ const { join } = require('node:path');
 const { test } = require('node:test');
 
 const root = join(__dirname, '..');
-const controls = readFileSync(join(root, 'frontend/src/components/RecordingControls.tsx'), 'utf8');
+const recordSlot = readFileSync(join(root, 'frontend/src/components/app-shell/recording-capsule.tsx'), 'utf8');
+const host = readFileSync(join(root, 'frontend/src/components/app-shell/recording-host.tsx'), 'utf8');
+const liveTranscript = readFileSync(join(root, 'frontend/src/components/living-doc/live-transcript.tsx'), 'utf8');
+const meetingPage = readFileSync(join(root, 'frontend/src/app/meeting-details/page-content.tsx'), 'utf8');
 const overlays = readFileSync(join(root, 'frontend/src/app/_components/StatusOverlays.tsx'), 'utf8');
-const home = readFileSync(join(root, 'frontend/src/app/page.tsx'), 'utf8');
 
 test('stop swaps controls for in-place finalization while the transcript remains mounted', () => {
-  assert.match(controls, /if \(isStopping\) \{\s*return null;/);
-  assert.match(controls, /disabled=.*isStopping/);
-  assert.match(home, /<TranscriptPanel[\s\S]*<StatusOverlays/);
+  assert.match(recordSlot, /controls\.isStopping\) return null/);
+  assert.match(recordSlot, /disabled=\{[^}]*isStopping/);
+  assert.match(host, /<StatusOverlays/);
+  assert.match(liveTranscript, /isRecording \|\| isStopping \|\| isProcessing \|\| isSaving/);
+  assert.match(meetingPage, /\{live && <LiveTranscript/);
   assert.match(overlays, /Finalizing recording/);
   assert.match(overlays, /h-4 w-4/);
 });

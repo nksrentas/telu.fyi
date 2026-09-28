@@ -4,18 +4,11 @@ import { forwardRef, type ComponentPropsWithoutRef } from "react"
 import { AlertTriangle, MessageCircle } from "lucide-react"
 
 import type { EvidenceLinkView, KnowledgeItemView } from "@/lib/knowledge-service"
+import { formatElapsed } from "@/lib/format-elapsed"
 import { cn } from "@/lib/utils"
 import { useEvidenceNavigation } from "./meeting-page"
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-export function formatEvidenceOffset(seconds: number): string {
-  const total = Math.max(0, Math.floor(seconds))
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  const rest = (total % 60).toString().padStart(2, "0")
-  return hours > 0 ? `${hours}:${minutes.toString().padStart(2, "0")}:${rest}` : `${minutes}:${rest}`
-}
 
 export function formatEvidenceDay(isoTime: string, now: Date = new Date()): string {
   const date = new Date(isoTime)
@@ -38,7 +31,7 @@ export const SourceChip = forwardRef<HTMLButtonElement, SourceChipProps>(functio
 ) {
   const { meetingStartedAt } = useEvidenceNavigation()
   const links = claimLinks(item)
-  const time = links.length > 0 ? formatEvidenceOffset(links[0].audioStartTime) : null
+  const time = links.length > 0 ? formatElapsed(links[0].audioStartTime) : null
   const day = formatEvidenceDay(meetingStartedAt ?? item.createdAtUtc)
   const Glyph = item.evidenceStatus === "valid" ? MessageCircle : AlertTriangle
 

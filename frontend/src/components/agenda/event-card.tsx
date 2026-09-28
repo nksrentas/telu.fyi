@@ -10,6 +10,7 @@ import { Chip } from "@/components/telu-ui/chip"
 import { RecDot, Shimmer, Waveform } from "@/components/telu-ui/indicators"
 import { Button } from "@/components/ui/button"
 import type { AgendaCardState, AgendaMeeting } from "@/lib/agenda-service"
+import { formatElapsed } from "@/lib/format-elapsed"
 import { cn } from "@/lib/utils"
 import type { FinalizationProgressSnapshot } from "@/services/transcriptService"
 
@@ -28,14 +29,6 @@ const CARD_ACTIONS: Partial<Record<AgendaCardState, CardAction>> = {
 }
 
 const DIMMED_STATES: AgendaCardState[] = ["reviewed", "transcript_only"]
-
-export function formatElapsed(seconds: number): string {
-  const total = Math.max(0, Math.floor(seconds))
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor((total % 3600) / 60)
-  const rest = (total % 60).toString().padStart(2, "0")
-  return hours > 0 ? `${hours}:${minutes.toString().padStart(2, "0")}:${rest}` : `${minutes}:${rest}`
-}
 
 function endedParts(meeting: AgendaMeeting): string[] {
   const start = new Date(meeting.startedAtUtc)
@@ -175,7 +168,7 @@ export const EventCard = forwardRef<HTMLDivElement, EventCardProps>(function Eve
       className={cn(
         "group relative min-w-0 cursor-default rounded-[12px] bg-surface pb-[11px] pl-[21px] pr-[14px] pt-[10px] shadow-card transition-[box-shadow,transform] duration-200 ease-out after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:opacity-0 after:shadow-[0_0_0_2px_var(--accent)] active:scale-[0.992] aria-selected:after:opacity-100 [@media(hover:hover)_and_(pointer:fine)]:hover:shadow-card-hover",
         live &&
-          "shadow-[0_0_0_1px_color-mix(in_srgb,var(--coral)_45%,transparent),var(--shadow-card-hover)] before:absolute before:bottom-[11px] before:left-[9px] before:top-[11px] before:w-[3px] before:rounded-[3px] before:bg-coral"
+          "shadow-card-hover ring-1 ring-coral before:absolute before:bottom-[11px] before:left-[9px] before:top-[11px] before:w-[3px] before:rounded-[3px] before:bg-coral"
       )}
     >
       {live && <LiveEyebrow seconds={recordingSeconds} />}

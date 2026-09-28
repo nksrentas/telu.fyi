@@ -6,10 +6,11 @@ import { AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverArrow, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import type { KnowledgeItemView, KnowledgeRunView } from "@/lib/knowledge-service"
+import { formatElapsed } from "@/lib/format-elapsed"
 import { cn } from "@/lib/utils"
 import { useEvidenceNavigation } from "./meeting-page"
 import { LOCATION_LABEL, formatRunTime } from "./run-details-popover"
-import { claimLinks, formatEvidenceDay, formatEvidenceOffset } from "./source-chip"
+import { claimLinks, formatEvidenceDay } from "./source-chip"
 
 export const EVIDENCE_CHANGED = "This line has changed since Telu quoted it."
 export const EVIDENCE_MISSING = "This line is no longer in the transcript."
@@ -41,7 +42,7 @@ export function EvidencePopover({ item, run = null, children }: EvidencePopoverP
   const links = claimLinks(item)
   const missing = item.evidenceStatus === "missing" || links.length === 0
   const day = formatEvidenceDay(meetingStartedAt ?? item.createdAtUtc)
-  const time = links.length > 0 ? ` · ${formatEvidenceOffset(links[0].audioStartTime)}` : ""
+  const time = links.length > 0 ? ` · ${formatElapsed(links[0].audioStartTime)}` : ""
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

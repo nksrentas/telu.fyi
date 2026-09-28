@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { GlassGroup } from "@/components/telu-ui/glass-group"
+import { RecordSlot } from "./recording-capsule"
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 const MONTHS = [
@@ -98,6 +99,7 @@ export function AgendaToolbar({ title, subtitle, scrolled, children }: AgendaToo
       </div>
       <div data-tauri-drag-region className="flex-1 self-stretch" />
       {children}
+      <RecordSlot />
     </header>
   )
 }

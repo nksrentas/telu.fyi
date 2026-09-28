@@ -174,9 +174,7 @@ export function StatusOverlays({
   };
 
   return (
-    <div className="absolute inset-x-0 bottom-4 z-10 px-4">
-      <div className="flex justify-center">
-        <div className="flex w-full max-w-[750px] justify-center">
+    <div className="flex w-full max-w-[750px] justify-center">
           <section className="w-full rounded-lg border border-border bg-card px-4 py-3 text-foreground shadow-lg">
             <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
               {announcedText}
@@ -245,8 +243,6 @@ export function StatusOverlays({
               </div>
             ) : null}
           </section>
-        </div>
-      </div>
     </div>
   );
 }

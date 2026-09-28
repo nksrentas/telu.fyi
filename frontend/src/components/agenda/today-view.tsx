@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react"
 import { useRouter } from "next/navigation"
 import { CalendarDays, Lock } from "lucide-react"
 import { toast } from "sonner"
@@ -14,6 +14,7 @@ import {
   startOfDay,
   weekdayName,
 } from "@/components/app-shell/agenda-toolbar"
+import { useRecordingControlsContext } from "@/components/app-shell/recording-host"
 import { clock } from "@/components/living-doc/meeting-header"
 import { EmptyState } from "@/components/telu-ui/empty-state"
 import { Skeleton } from "@/components/telu-ui/indicators"
@@ -23,7 +24,7 @@ import { listAgendaDay, localDayBounds, type AgendaMeeting } from "@/lib/agenda-
 import { onKnowledgeUpdated } from "@/lib/knowledge-service"
 import { MEETINGS_CHANGED_EVENT } from "@/lib/meeting-deletion-service"
 import { DURATION, EASE, cssEase } from "@/lib/motion"
-import { transcriptService, type FinalizationProgressSnapshot } from "@/services/transcriptService"
+import type { FinalizationProgressSnapshot } from "@/services/transcriptService"
 import { EventCard, type CardSection } from "./event-card"
 
 const LOAD_ERROR = "Couldn't load today's meetings."
@@ -80,20 +81,6 @@ function useAgendaDay(day: Date | null) {
   }, [load])
 
   return { shown, failed, reload: load }
-}
-
-function useFinalizationSnapshot(): FinalizationProgressSnapshot | null {
-  const [snapshot, setSnapshot] = useState<FinalizationProgressSnapshot | null>(null)
-  useEffect(() => {
-    const unlisten = transcriptService.onFinalizationProgress(setSnapshot).catch((error: unknown) => {
-      console.error("Failed to listen for finalization progress:", error)
-      return null
-    })
-    return () => {
-      void unlisten.then((stop) => stop?.())
-    }
-  }, [])
-  return snapshot
 }
 
 function prefersReducedMotion(): boolean {
@@ -295,12 +282,12 @@ function useScrolled(scrollRef: RefObject<HTMLDivElement>) {
   return { scrolled, onScroll }
 }
 
-export function TodayView() {
+export function TodayView({ notice }: { notice?: ReactNode }) {
   const router = useRouter()
   const recording = useRecordingState()
   const [requestedDay, setRequestedDay] = useState<Date | null>(null)
   const { shown, failed, reload } = useAgendaDay(requestedDay)
-  const finalization = useFinalizationSnapshot()
+  const finalization = useRecordingControlsContext()?.finalization ?? null
   const scrollRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const optionRefs = useRef(new Map<string, HTMLDivElement>())
@@ -363,6 +350,7 @@ export function TodayView() {
         />
       </AgendaToolbar>
       <div ref={scrollRef} onScroll={onScroll} className="@container min-h-0 flex-1 overflow-y-auto pt-[52px]">
+        {notice && <div className="px-5 pt-1.5 @[901px]:px-7">{notice}</div>}
         <div ref={listRef} className="px-5 pb-[72px] pt-1.5 @[901px]:px-7">
           {shown === null && !failed && <TimelineSkeleton />}
           {shown === null && failed && (
