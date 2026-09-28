@@ -272,12 +272,13 @@ fn verify_item(item: ParsedItem, segments: &LabeledSegments) -> Result<NewItem, 
             candidate_type: Some(item.item_type),
         });
     }
+    let claim_evidence_ids: Vec<String> = claims.iter().map(|span| span.evidence_id.clone()).collect();
     Ok(NewItem {
         item_id: Uuid::new_v4().to_string(),
         item_type: item.item_type,
         normalized_key: normalized_key(&item.text),
-        owner: attribute_support(item.owner.as_ref(), segments),
-        due: attribute_support(item.due.as_ref(), segments),
+        owner: attribute_support(item.owner.as_ref(), segments, &claim_evidence_ids),
+        due: attribute_support(item.due.as_ref(), segments, &claim_evidence_ids),
         text: item.text,
         claims,
     })
@@ -308,9 +309,15 @@ fn verify_claims(
     (spans, first_failure)
 }
 
-fn attribute_support(attribute: Option<&ParsedAttribute>, segments: &LabeledSegments) -> AttributeSupport {
+fn attribute_support(
+    attribute: Option<&ParsedAttribute>,
+    segments: &LabeledSegments,
+    claim_evidence_ids: &[String],
+) -> AttributeSupport {
     attribute
-        .map(|attribute| verify_attribute(&attribute.value, &attribute.segment, &attribute.quote, segments))
+        .map(|attribute| {
+            verify_attribute(&attribute.value, &attribute.segment, &attribute.quote, segments, claim_evidence_ids)
+        })
         .unwrap_or(AttributeSupport::NotStated)
 }
 

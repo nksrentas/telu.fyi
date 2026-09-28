@@ -199,6 +199,7 @@ pub fn verify_attribute(
     label: &str,
     quote: &str,
     segments: &LabeledSegments,
+    _claim_evidence_ids: &[String],
 ) -> AttributeSupport {
     let normalized_value = normalize_quote(value);
     if normalized_value.is_empty() || value.trim().chars().count() > MAX_ATTRIBUTE_CHARS {
@@ -275,6 +276,10 @@ mod tests {
         ])
     }
 
+    fn ids(labels: &[&str]) -> Vec<String> {
+        labels.iter().map(|label| format!("evidence-{label}")).collect()
+    }
+
     fn raw_slice(text: &str, span: &VerifiedSpan) -> String {
         text.chars()
             .skip(span.raw_start)
@@ -342,9 +347,9 @@ mod tests {
 
     #[test]
     fn verify_attribute_requires_the_value_inside_its_own_verified_quote() {
-        let stated = verify_attribute("maria", "S3", "Maria will own the release notes", &segments());
-        let unsupported = verify_attribute("Maria", "S4", "I'll take it from here", &segments());
-        let due = verify_attribute("by friday", "S4", "take it from here by Friday", &segments());
+        let stated = verify_attribute("maria", "S3", "Maria will own the release notes", &segments(), &ids(&["S3"]));
+        let unsupported = verify_attribute("Maria", "S4", "I'll take it from here", &segments(), &ids(&["S4"]));
+        let due = verify_attribute("by friday", "S4", "take it from here by Friday", &segments(), &ids(&["S4"]));
 
         match stated {
             AttributeSupport::Stated { text, spans } => {
@@ -371,12 +376,105 @@ mod tests {
             segment("S3", "Everyone decided to freeze the API.", false),
         ]);
 
-        let tom = verify_attribute("Tom", "S1", "we ship tomorrow for sure", &partial);
-        let ann = verify_attribute("Ann", "S2", "Joanne will handle it", &partial);
-        let ed = verify_attribute("Ed", "S3", "everyone decided to freeze the API", &partial);
+        let tom = verify_attribute("Tom", "S1", "we ship tomorrow for sure", &partial, &ids(&["S1"]));
+        let ann = verify_attribute("Ann", "S2", "Joanne will handle it", &partial, &ids(&["S2"]));
+        let ed = verify_attribute("Ed", "S3", "everyone decided to freeze the API", &partial, &ids(&["S3"]));
 
         assert_eq!(tom, AttributeSupport::NotStated);
         assert_eq!(ann, AttributeSupport::NotStated);
         assert_eq!(ed, AttributeSupport::NotStated);
+    }
+
+    #[test]
+    fn find_whole_token_sees_an_occurrence_that_overlaps_a_mid_word_one() {
+        assert_eq!(find_whole_token("xab ab ab", "ab ab"), Some(4));
+        assert_eq!(find_whole_token("ab", ""), None);
+    }
+
+    #[test]
+    fn verify_attribute_never_stores_text_that_crosses_a_segment_boundary() {
+        let crossing = verify_attribute("on Friday", "S2", "final beta - on Friday", &segments(), &ids(&["S2"]));
+
+        assert_eq!(crossing, AttributeSupport::NotStated);
+    }
+
+    #[test]
+    fn verify_attribute_rejects_a_raw_slice_longer_than_the_attribute_cap() {
+        let words = ["Maria", "Nadia", "Oscar", "Petra", "Quinn", "Rosa", "Sven", "Tara", "Uma", "Vera"];
+        let value = words.join(" ");
+        let spaced = LabeledSegments::new(vec![segment("S1", &words.join("     "), false)]);
+
+        let long = verify_attribute(&value, "S1", &value, &spaced, &ids(&["S1"]));
+
+        assert!(value.chars().count() <= MAX_ATTRIBUTE_CHARS);
+        assert!(words.join("     ").chars().count() > MAX_ATTRIBUTE_CHARS);
+        assert_eq!(long, AttributeSupport::NotStated);
+    }
+
+    #[test]
+    fn verify_attribute_never_states_short_values_or_pronouns() {
+        let pronouns = LabeledSegments::new(vec![
+            segment("S1", "I'll take it from here by Friday.", false),
+            segment("S2", "We'll ship the final beta.", false),
+            segment("S3", "You and they said M will ship it.", false),
+        ]);
+        let cases = [
+            ("I", "S1", "I'll take it from here"),
+            ("we", "S2", "We'll ship the final beta"),
+            ("You", "S3", "You and they said M will ship it"),
+            ("they", "S3", "You and they said M will ship it"),
+            ("", "S3", "You and they said M will ship it"),
+            ("   ", "S3", "You and they said M will ship it"),
+            ("M", "S3", "You and they said M will ship it"),
+        ];
+
+        for (value, label, quote) in cases {
+            let support = verify_attribute(value, label, quote, &pronouns, &ids(&[label]));
+            assert_eq!(support, AttributeSupport::NotStated, "value {value:?}");
+        }
+    }
+
+    #[test]
+    fn verify_attribute_requires_a_span_tied_to_the_claim() {
+        let quote = "Maria will own the release notes";
+        let same = verify_attribute("Maria", "S3", quote, &segments(), &ids(&["S3"]));
+        let following = verify_attribute("Maria", "S3", quote, &segments(), &ids(&["S2"]));
+        let unrelated = verify_attribute("Maria", "S3", quote, &segments(), &ids(&["S1"]));
+
+        assert!(matches!(same, AttributeSupport::Stated { .. }));
+        assert!(matches!(following, AttributeSupport::Stated { .. }));
+        assert_eq!(unrelated, AttributeSupport::NotStated);
+    }
+
+    #[test]
+    fn verify_attribute_stores_the_first_whole_token_occurrence() {
+        let repeated = LabeledSegments::new(vec![segment("S1", "MARIA said Maria will own the notes", false)]);
+
+        let stated = verify_attribute("maria", "S1", "MARIA said Maria will own the notes", &repeated, &ids(&["S1"]));
+
+        match stated {
+            AttributeSupport::Stated { text, .. } => assert_eq!(text, "MARIA"),
+            AttributeSupport::NotStated => panic!("quote names Maria"),
+        }
+    }
+
+    #[test]
+    fn verify_claim_quote_rejects_quotes_that_start_or_end_mid_word() {
+        let later = "They disagree with the plan to ship, we agree with the plan to ship";
+        let claims = LabeledSegments::new(vec![
+            segment("S1", "I disagree with the plan to ship Friday", false),
+            segment("S2", "We cannot ship the beta today", false),
+            segment("S3", later, false),
+        ]);
+
+        let disagree = verify_claim_quote("S1", "agree with the plan to ship Friday", &claims);
+        let cannot = verify_claim_quote("S2", "not ship the beta today", &claims);
+        let spans = verify_claim_quote("S3", "agree with the plan to ship", &claims).expect("whole-token occurrence");
+
+        assert_eq!(disagree, Err(AbstentionReason::QuoteNotFound));
+        assert_eq!(cannot, Err(AbstentionReason::QuoteNotFound));
+        assert_eq!(spans.len(), 1);
+        assert_eq!(raw_slice(later, &spans[0]), "agree with the plan to ship");
+        assert_eq!(spans[0].raw_start, later.find("we agree").expect("second occurrence") + 3);
     }
 }
