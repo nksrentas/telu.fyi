@@ -176,6 +176,26 @@ pub enum EvidenceStatus {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum SuppressionReason {
+    MatchedRejected,
+    ReconfirmedAccepted,
+    DuplicatePending,
+    DuplicateInRun,
+}
+
+impl SuppressionReason {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::MatchedRejected => "matched_rejected",
+            Self::ReconfirmedAccepted => "reconfirmed_accepted",
+            Self::DuplicatePending => "duplicate_pending",
+            Self::DuplicateInRun => "duplicate_in_run",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FieldSupport {
     Stated,
     NotStated,
@@ -241,6 +261,7 @@ pub struct KnowledgeRunView {
     pub skipped_count: i64,
     pub suppressed_count: i64,
     pub reconfirmed_count: i64,
+    pub duplicate_count: i64,
     pub failure_code: Option<String>,
     pub started_at_utc: String,
     pub finished_at_utc: Option<String>,

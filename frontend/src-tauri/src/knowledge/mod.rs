@@ -1,5 +1,6 @@
 pub mod commands;
 pub mod extraction;
+pub mod matcher;
 pub mod models;
 pub mod parse;
 pub mod projection;

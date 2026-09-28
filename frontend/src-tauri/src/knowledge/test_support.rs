@@ -126,6 +126,7 @@ pub async fn seed_items(pool: &SqlitePool, meeting_id: &str, texts: &[&str]) -> 
         RunCounts {
             proposed: items.len() as i64,
             skipped: 0,
+            ..RunCounts::default()
         },
         None,
     )

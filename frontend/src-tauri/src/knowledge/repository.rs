@@ -1,16 +1,18 @@
+use crate::knowledge::matcher::{normalized_key, ExistingItem};
 use crate::knowledge::models::{
-    AbstentionReason, EvidenceRole, KnowledgeError, KnowledgeRunView, KnowledgeType, RunStatus,
-    Support, TriggerKind,
+    AbstentionReason, EvidenceRole, KnowledgeError, KnowledgeRunView, KnowledgeType, ReviewState,
+    RunStatus, Support, SuppressionReason, TriggerKind,
 };
 use crate::knowledge::span_verifier::{AttributeSupport, VerifiedSpan};
 use chrono::Utc;
 use sqlx::{Error as SqlxError, SqliteConnection, SqlitePool};
+use std::collections::HashMap;
 use tracing::error;
 use uuid::Uuid;
 
 pub(crate) const RUN_COLUMNS: &str = "run_id, meeting_id, trigger_kind, status, provider_id, model_id,
     location_class, sanitized_origin, prompt_version, input_evidence_count, proposed_count,
-    skipped_count, suppressed_count, reconfirmed_count, failure_code, started_at_utc,
+    skipped_count, suppressed_count, reconfirmed_count, duplicate_count, failure_code, started_at_utc,
     finished_at_utc";
 
 #[derive(Debug, Clone, PartialEq)]
@@ -32,6 +34,9 @@ pub struct NewRun {
 pub struct RunCounts {
     pub proposed: i64,
     pub skipped: i64,
+    pub suppressed: i64,
+    pub reconfirmed: i64,
+    pub duplicate: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +48,14 @@ pub struct NewItem {
     pub claims: Vec<VerifiedSpan>,
     pub owner: AttributeSupport,
     pub due: AttributeSupport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NewSuppression {
+    pub matched_item_id: String,
+    pub reason: SuppressionReason,
+    pub candidate_normalized_key: String,
+    pub candidate_text: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,13 +113,16 @@ impl KnowledgeRepository {
     ) -> Result<(), KnowledgeError> {
         let result = sqlx::query(
             "UPDATE knowledge_runs
-             SET status = ?, proposed_count = ?, skipped_count = ?, failure_code = ?,
-                 finished_at_utc = ?
+             SET status = ?, proposed_count = ?, skipped_count = ?, suppressed_count = ?,
+                 reconfirmed_count = ?, duplicate_count = ?, failure_code = ?, finished_at_utc = ?
              WHERE run_id = ? AND status = 'running'",
         )
         .bind(status.as_str())
         .bind(counts.proposed)
         .bind(counts.skipped)
+        .bind(counts.suppressed)
+        .bind(counts.reconfirmed)
+        .bind(counts.duplicate)
         .bind(failure_code)
         .bind(Utc::now().to_rfc3339())
         .bind(run_id)
@@ -160,6 +176,71 @@ impl KnowledgeRepository {
             .map_err(|error| storage_error("insert_abstentions", meeting_id, error))?;
         }
         Ok(())
+    }
+
+    pub async fn insert_suppressions(
+        connection: &mut SqliteConnection,
+        meeting_id: &str,
+        run_id: &str,
+        suppressions: &[NewSuppression],
+    ) -> Result<(), KnowledgeError> {
+        for suppression in suppressions {
+            sqlx::query(
+                "INSERT INTO knowledge_suppressions (
+                    suppression_id, run_id, meeting_id, matched_item_id, reason,
+                    candidate_normalized_key, candidate_text, created_at_utc
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            )
+            .bind(Uuid::new_v4().to_string())
+            .bind(run_id)
+            .bind(meeting_id)
+            .bind(&suppression.matched_item_id)
+            .bind(suppression.reason.as_str())
+            .bind(&suppression.candidate_normalized_key)
+            .bind(&suppression.candidate_text)
+            .bind(Utc::now().to_rfc3339())
+            .execute(&mut *connection)
+            .await
+            .map_err(|error| storage_error("insert_suppressions", meeting_id, error))?;
+        }
+        Ok(())
+    }
+
+    pub async fn load_match_index(
+        pool: &SqlitePool,
+        meeting_id: &str,
+    ) -> Result<Vec<ExistingItem>, KnowledgeError> {
+        validate_meeting_id(meeting_id)?;
+        let items: Vec<(String, KnowledgeType, ReviewState, String)> = sqlx::query_as(
+            "SELECT c.item_id, c.item_type, c.review_state, i.text
+             FROM knowledge_item_current c
+             JOIN knowledge_items i ON i.item_id = c.item_id
+             WHERE c.meeting_id = ?
+             ORDER BY c.item_id",
+        )
+        .bind(meeting_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|error| storage_error("load_match_index", meeting_id, error))?;
+        let revisions = item_pairs(pool, meeting_id, "SELECT item_id, text FROM knowledge_revisions WHERE meeting_id = ?").await?;
+        let claims = item_pairs(
+            pool,
+            meeting_id,
+            "SELECT item_id, evidence_id FROM knowledge_evidence_links WHERE meeting_id = ? AND role = 'claim'",
+        )
+        .await?;
+        Ok(items
+            .into_iter()
+            .map(|(item_id, item_type, state, text)| ExistingItem {
+                keys: std::iter::once(normalized_key(&text))
+                    .chain(revisions.get(&item_id).into_iter().flatten().map(|revision| normalized_key(revision)))
+                    .collect(),
+                claim_evidence_ids: claims.get(&item_id).cloned().unwrap_or_default(),
+                item_id,
+                item_type,
+                state,
+            })
+            .collect())
     }
 
     pub async fn finalize_stale_running_run(
@@ -298,6 +379,22 @@ async fn insert_link(
     .map_err(|error| storage_error("insert_link", meeting_id, error))
 }
 
+async fn item_pairs(
+    pool: &SqlitePool,
+    meeting_id: &str,
+    query: &str,
+) -> Result<HashMap<String, Vec<String>>, KnowledgeError> {
+    let rows: Vec<(String, String)> = sqlx::query_as(query)
+        .bind(meeting_id)
+        .fetch_all(pool)
+        .await
+        .map_err(|error| storage_error("item_pairs", meeting_id, error))?;
+    Ok(rows.into_iter().fold(HashMap::new(), |mut grouped, (item_id, value)| {
+        grouped.entry(item_id).or_insert_with(Vec::new).push(value);
+        grouped
+    }))
+}
+
 pub(crate) fn validate_meeting_id(meeting_id: &str) -> Result<(), KnowledgeError> {
     Uuid::parse_str(meeting_id)
         .map(|_| ())
@@ -387,6 +484,7 @@ mod tests {
             RunCounts {
                 proposed: items.len() as i64,
                 skipped: 1,
+                ..RunCounts::default()
             },
             None,
         )
@@ -432,7 +530,7 @@ mod tests {
         )
         .await
         .expect("abstention");
-        KnowledgeRepository::finalize_run(&mut transaction, run_id, RunStatus::Succeeded, RunCounts { proposed: 1, skipped: 1 }, None)
+        KnowledgeRepository::finalize_run(&mut transaction, run_id, RunStatus::Succeeded, RunCounts { proposed: 1, skipped: 1, ..RunCounts::default() }, None)
             .await
             .expect("finalized run");
         transaction.commit().await.expect("commit");

@@ -1,13 +1,16 @@
 use crate::database::models::{MeetingCompleteness, MeetingLifecycle, TranscriptEvidence};
+use crate::knowledge::matcher::{match_candidate, normalized_key, Candidate, ExistingItem, MatchOutcome};
 use crate::knowledge::models::{
-    AbstentionReason, KnowledgeError, KnowledgeType, RunStatus, TriggerKind,
+    AbstentionReason, KnowledgeError, ReviewState, RunStatus, SuppressionReason, TriggerKind,
 };
 use crate::knowledge::parse::{parse_extraction, ParsedAttribute, ParsedExtraction, ParsedItem};
 use crate::knowledge::prompt::{chunk_windows, label_segments, ChunkWindow, EXTRACTION_SYSTEM_PROMPT};
-use crate::knowledge::repository::{KnowledgeRepository, NewAbstention, NewItem, RunCounts};
+use crate::knowledge::repository::{
+    KnowledgeRepository, NewAbstention, NewItem, NewSuppression, RunCounts,
+};
 use crate::knowledge::span_verifier::{
-    normalize_with_map, sha256_hex, verify_attribute, verify_claim_quote, AttributeSupport,
-    LabeledSegments, VerifiedSpan,
+    sha256_hex, verify_attribute, verify_claim_quote, AttributeSupport, LabeledSegments,
+    VerifiedSpan,
 };
 use sqlx::SqlitePool;
 use std::collections::{HashMap, HashSet};
@@ -36,7 +39,9 @@ pub struct RunOutcome {
 struct Candidates {
     items: Vec<NewItem>,
     abstentions: Vec<NewAbstention>,
-    seen_keys: HashSet<(KnowledgeType, String)>,
+    suppressions: Vec<NewSuppression>,
+    index: Vec<ExistingItem>,
+    in_run: HashSet<String>,
     malformed_windows: usize,
 }
 
@@ -141,7 +146,14 @@ where
     Fut: Future<Output = Result<String, String>>,
 {
     let windows = chunk_windows(&label_segments(evidence), budget_tokens);
-    let collected = collect_candidates(&windows, cancel, &mut complete).await;
+    let index = match KnowledgeRepository::load_match_index(pool, meeting_id).await {
+        Ok(index) => index,
+        Err(error) => {
+            mark_run_failed(pool, run_id).await;
+            return Err(error);
+        }
+    };
+    let collected = collect_candidates(&windows, index, cancel, &mut complete).await;
     let (candidates, outcome) = match collected {
         Ok(candidates) => {
             let outcome = completed_outcome(&candidates, windows.len());
@@ -164,6 +176,7 @@ where
 
 async fn collect_candidates<F, Fut>(
     windows: &[ChunkWindow],
+    index: Vec<ExistingItem>,
     cancel: &CancellationToken,
     complete: &mut F,
 ) -> Result<Candidates, WindowStop>
@@ -171,7 +184,10 @@ where
     F: FnMut(String, String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
-    let mut candidates = Candidates::default();
+    let mut candidates = Candidates {
+        index,
+        ..Candidates::default()
+    };
     for window in windows {
         if cancel.is_cancelled() {
             return Err(WindowStop::Cancelled);
@@ -202,15 +218,44 @@ fn absorb(candidates: &mut Candidates, parsed: ParsedExtraction, segments: &Labe
     candidates.abstentions.extend(parsed.rejected);
     for item in parsed.items {
         match verify_item(item, segments) {
-            Ok(verified) => {
-                let key = (verified.item_type, verified.normalized_key.clone());
-                if candidates.seen_keys.insert(key) {
-                    candidates.items.push(verified);
-                }
-            }
+            Ok(verified) => place(candidates, verified),
             Err(abstention) => candidates.abstentions.push(abstention),
         }
     }
+}
+
+fn place(candidates: &mut Candidates, verified: NewItem) {
+    let candidate = Candidate {
+        item_type: verified.item_type,
+        key: verified.normalized_key.clone(),
+        claim_evidence_ids: verified.claims.iter().map(|span| span.evidence_id.clone()).collect(),
+    };
+    let (matched_item_id, reason) = match match_candidate(&candidate, &candidates.index) {
+        MatchOutcome::New => {
+            candidates.in_run.insert(verified.item_id.clone());
+            candidates.index.push(ExistingItem {
+                item_id: verified.item_id.clone(),
+                item_type: verified.item_type,
+                state: ReviewState::Proposed,
+                keys: vec![candidate.key],
+                claim_evidence_ids: candidate.claim_evidence_ids,
+            });
+            candidates.items.push(verified);
+            return;
+        }
+        MatchOutcome::Suppressed(item_id) => (item_id, SuppressionReason::MatchedRejected),
+        MatchOutcome::Reconfirmed(item_id) => (item_id, SuppressionReason::ReconfirmedAccepted),
+        MatchOutcome::Duplicate(item_id) if candidates.in_run.contains(&item_id) => {
+            (item_id, SuppressionReason::DuplicateInRun)
+        }
+        MatchOutcome::Duplicate(item_id) => (item_id, SuppressionReason::DuplicatePending),
+    };
+    candidates.suppressions.push(NewSuppression {
+        matched_item_id,
+        reason,
+        candidate_normalized_key: candidate.key,
+        candidate_text: verified.text,
+    });
 }
 
 fn verify_item(item: ParsedItem, segments: &LabeledSegments) -> Result<NewItem, NewAbstention> {
@@ -224,7 +269,7 @@ fn verify_item(item: ParsedItem, segments: &LabeledSegments) -> Result<NewItem, 
     Ok(NewItem {
         item_id: Uuid::new_v4().to_string(),
         item_type: item.item_type,
-        normalized_key: normalize_with_map(&item.text).0,
+        normalized_key: normalized_key(&item.text),
         owner: attribute_support(item.owner.as_ref(), segments),
         due: attribute_support(item.due.as_ref(), segments),
         text: item.text,
@@ -264,10 +309,6 @@ fn attribute_support(attribute: Option<&ParsedAttribute>, segments: &LabeledSegm
 }
 
 fn completed_outcome(candidates: &Candidates, window_count: usize) -> RunOutcome {
-    let counts = RunCounts {
-        proposed: candidates.items.len() as i64,
-        skipped: candidates.abstentions.len() as i64,
-    };
     if window_count > 0 && candidates.malformed_windows == window_count {
         return RunOutcome {
             status: RunStatus::Failed,
@@ -275,9 +316,22 @@ fn completed_outcome(candidates: &Candidates, window_count: usize) -> RunOutcome
             failure_code: Some("MALFORMED_OUTPUT"),
         };
     }
+    let count_reason = |reasons: &[SuppressionReason]| {
+        candidates
+            .suppressions
+            .iter()
+            .filter(|suppression| reasons.contains(&suppression.reason))
+            .count() as i64
+    };
     RunOutcome {
         status: RunStatus::Succeeded,
-        counts,
+        counts: RunCounts {
+            proposed: candidates.items.len() as i64,
+            skipped: candidates.abstentions.len() as i64,
+            suppressed: count_reason(&[SuppressionReason::MatchedRejected]),
+            reconfirmed: count_reason(&[SuppressionReason::ReconfirmedAccepted]),
+            duplicate: count_reason(&[SuppressionReason::DuplicatePending, SuppressionReason::DuplicateInRun]),
+        },
         failure_code: (candidates.malformed_windows > 0).then_some("PARTIAL_MALFORMED_OUTPUT"),
     }
 }
@@ -338,6 +392,8 @@ async fn persist_outcome(
         .await?;
     KnowledgeRepository::insert_abstentions(&mut transaction, meeting_id, run_id, &candidates.abstentions)
         .await?;
+    KnowledgeRepository::insert_suppressions(&mut transaction, meeting_id, run_id, &candidates.suppressions)
+        .await?;
     KnowledgeRepository::finalize_run(
         &mut transaction,
         run_id,
@@ -379,6 +435,10 @@ async fn mark_run_failed(pool: &SqlitePool, run_id: &str) {
         warn!(run_id, "knowledge run could not be marked failed");
     }
 }
+
+#[cfg(test)]
+#[path = "extraction_regenerate_tests.rs"]
+mod regenerate_tests;
 
 #[cfg(test)]
 mod tests {
@@ -474,7 +534,7 @@ mod tests {
         let outcome = run_with_replies(&pool, &evidence, LARGE_BUDGET, vec![reply]).await;
 
         assert_eq!(outcome.status, RunStatus::Succeeded);
-        assert_eq!(outcome.counts, RunCounts { proposed: 1, skipped: 0 });
+        assert_eq!(outcome.counts, RunCounts { proposed: 1, skipped: 0, ..RunCounts::default() });
         let items = KnowledgeRepository::meeting_view(&pool, MEETING_ID)
             .await
             .expect("meeting view")
@@ -502,7 +562,7 @@ mod tests {
 
         let outcome = run_with_replies(&pool, &evidence, LARGE_BUDGET, vec![reply]).await;
 
-        assert_eq!(outcome.counts, RunCounts { proposed: 0, skipped: 2 });
+        assert_eq!(outcome.counts, RunCounts { proposed: 0, skipped: 2, ..RunCounts::default() });
         assert_eq!(count(&pool, "knowledge_items").await, 0);
         assert_eq!(count(&pool, "knowledge_abstentions").await, 2);
         let reasons: Vec<String> = sqlx::query_scalar(
@@ -530,7 +590,7 @@ mod tests {
 
         assert_eq!(outcome.status, RunStatus::Succeeded);
         assert_eq!(outcome.failure_code, Some("PARTIAL_MALFORMED_OUTPUT"));
-        assert_eq!(outcome.counts, RunCounts { proposed: 2, skipped: 0 });
+        assert_eq!(outcome.counts, RunCounts { proposed: 2, skipped: 0, ..RunCounts::default() });
         assert_eq!(count(&pool, "knowledge_items").await, 2);
     }
 
