@@ -144,12 +144,12 @@ Plans:
 **Verification approach:** Use representative held-out transcripts plus insufficient-evidence and degraded-capture cases; test exact evidence navigation and semantic support separately; exercise accept, reject, correct, restore, regenerate, delete, and retry scenarios; audit append-only lineage and future-context eligibility.
 **Exit gate:** Phase 3 may proceed only when item correctness, exact evidence-span support, abstention behavior, correction lineage, regeneration safety, and deletion effects meet the predeclared representative-review thresholds. If provenance or user actions do not deterministically control future eligibility, stop before preparation, live assistance, or series memory can amplify the defect.
 **Principal risks / stop conditions:** Fluent unsupported claims, reconstructed citations, destructive correction, rejected-item resurrection, incomplete evidence, mutable summary blobs, or one score conflating claim correctness with citation support. Stop when evidence lineage is ambiguous or review actions fail to propagate.
-**Plans:** 6/26 plans executed
+**Plans:** 7/26 plans executed
 Plans:
 **Wave 1**
 
 - [x] 02-01-PLAN.md — Tracer: Find knowledge end-to-end from evidence to verified, quoted candidates on the meeting page.
-- [ ] 02-02-PLAN.md — Visual gallery harness (pinned Playwright WebKit after a legitimacy gate) and the before gallery.
+- [x] 02-02-PLAN.md — Visual gallery harness (pinned Playwright WebKit after a legitimacy gate) and the before gallery.
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -290,7 +290,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6. Each phase's e
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Baseline Observability, Identity, and Trust Boundaries | 19/19 | Complete    | 2026-09-26 |
-| 2. Evidence-Linked Post-Meeting Knowledge | 6/26 | In Progress|  |
+| 2. Evidence-Linked Post-Meeting Knowledge | 7/26 | In Progress|  |
 | 3. Bounded Sourced Preparation | 0/TBD | Not started | - |
 | 4. Cancellable Live-Loop Validation | 0/TBD | Not started | - |
 | 5. Recurring-Series Memory | 0/TBD | Not started | - |
