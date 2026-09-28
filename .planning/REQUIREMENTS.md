@@ -32,7 +32,7 @@
 - [ ] **KNOW-05**: Rejected or superseded candidates do not reappear as current knowledge after regeneration, preparation, or series projection unless a user explicitly restores them.
 - [ ] **KNOW-06**: Telu abstains or exposes unresolved fields when available transcript evidence does not adequately support a candidate item.
 - [ ] **KNOW-07**: A maintainer can evaluate extraction quality by item type, evidence coverage, exact source-span correctness, attribution, duplication, and user review outcome on representative meetings.
-- [ ] **KNOW-08**: Deleting a meeting or transcript visibly removes or invalidates dependent candidate knowledge and evidence without leaving a claim that appears fully supported.
+- [x] **KNOW-08**: Deleting a meeting or transcript visibly removes or invalidates dependent candidate knowledge and evidence without leaving a claim that appears fully supported.
 
 ### Bounded Documents and Meeting Preparation
 
@@ -145,7 +145,7 @@
 | KNOW-05 | Phase 2 | Pending |
 | KNOW-06 | Phase 2 | Pending |
 | KNOW-07 | Phase 2 | Pending |
-| KNOW-08 | Phase 2 | Pending |
+| KNOW-08 | Phase 2 | Complete |
 | DOC-01 | Phase 3 | Pending |
 | DOC-02 | Phase 3 | Pending |
 | DOC-03 | Phase 3 | Pending |
