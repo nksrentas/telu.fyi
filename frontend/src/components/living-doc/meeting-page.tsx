@@ -1,6 +1,16 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react"
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react"
 import { useRouter } from "next/navigation"
 
 import { DocToolbar, type DocToolbarMenuItem } from "@/components/app-shell/doc-toolbar"
@@ -10,6 +20,7 @@ import { useConfig } from "@/contexts/ConfigContext"
 import { useCopyOperations } from "@/hooks/meeting-details/useCopyOperations"
 import { useMeetingOperations } from "@/hooks/meeting-details/useMeetingOperations"
 import Analytics from "@/lib/analytics"
+import type { EvidenceLinkView } from "@/lib/knowledge-service"
 import type { MeetingLifecycle } from "@/types"
 import { DeleteMeetingAlert, isDeleteDisabled } from "./delete-meeting-alert"
 import { formatMeetingDay } from "./meeting-header"
@@ -33,6 +44,42 @@ interface MeetingPageProps {
   initialEvidenceId?: string | null
   onRefetchTranscripts?: () => Promise<void>
   children: ReactNode
+}
+
+export interface EvidenceNavigation {
+  meetingStartedAt: string | null
+  openEvidence: (links: EvidenceLinkView[]) => void
+}
+
+export const EvidenceNavigationContext = createContext<EvidenceNavigation>({
+  meetingStartedAt: null,
+  openEvidence: () => undefined,
+})
+
+export function useEvidenceNavigation(): EvidenceNavigation {
+  return useContext(EvidenceNavigationContext)
+}
+
+export function highlightFor(links: EvidenceLinkView[]): EvidenceHighlight {
+  return {
+    evidenceIds: Array.from(new Set(links.map((link) => link.evidenceId))),
+    spans: links.map((link) => ({ evidenceId: link.evidenceId, start: link.rawStart, end: link.rawEnd })),
+  }
+}
+
+export function useEvidenceDrawer(initialEvidenceId: string | null) {
+  const drawerRef = useRef<TranscriptDrawerHandle>(null)
+  const [drawerOpen, setDrawerOpen] = useState(initialEvidenceId !== null)
+  const [highlight, setHighlight] = useState<EvidenceHighlight | null>(
+    initialEvidenceId ? { evidenceIds: [initialEvidenceId], spans: [] } : null
+  )
+  const openEvidence = useCallback((links: EvidenceLinkView[]) => {
+    if (links.length === 0) return
+    setHighlight(highlightFor(links))
+    setDrawerOpen(true)
+    drawerRef.current?.scrollToEvidence(links[0].evidenceId)
+  }, [])
+  return { drawerRef, drawerOpen, setDrawerOpen, highlight, openEvidence }
 }
 
 function drawerShift(mainWidth: number): number {
@@ -78,11 +125,11 @@ export function MeetingPage({
   const router = useRouter()
   const { betaFeatures } = useConfig()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const drawerRef = useRef<TranscriptDrawerHandle>(null)
   const blockNoteRef = useRef(null)
-  const [drawerOpen, setDrawerOpen] = useState(initialEvidenceId !== null)
-  const [highlight] = useState<EvidenceHighlight | null>(
-    initialEvidenceId ? { evidenceIds: [initialEvidenceId], spans: [] } : null
+  const { drawerRef, drawerOpen, setDrawerOpen, highlight, openEvidence } = useEvidenceDrawer(initialEvidenceId)
+  const navigation = useMemo(
+    () => ({ meetingStartedAt: meeting.created_at, openEvidence }),
+    [meeting.created_at, openEvidence]
   )
   const [retranscribeOpen, setRetranscribeOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -157,54 +204,56 @@ export function MeetingPage({
   const shift = drawerOpen ? drawerShift(mainWidth) : 0
 
   return (
-    <div className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-content">
-      <DocToolbar
-        originLabel={originLabel}
-        title={meeting.title}
-        showCompactTitle={compactTitle}
-        scrolled={scrolled}
-        drawerOpen={drawerOpen}
-        onBack={goBack}
-        onToggleDrawer={() => setDrawerOpen((open) => !open)}
-        menuItems={menuItems}
-      />
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto pt-[52px]">
-        <div
-          className="transition-transform ease-drawer"
-          style={{ transform: shift > 0 ? `translateX(-${shift}px)` : undefined, transitionDuration: drawerOpen ? "300ms" : "200ms" }}
-        >
-          <div className="mx-auto w-[min(720px,calc(100%-112px))] pb-[160px] pt-[30px]">{children}</div>
-        </div>
-      </div>
-      <TranscriptDrawer
-        ref={drawerRef}
-        meetingId={meeting.id}
-        title={meeting.title}
-        dateLabel={formatMeetingDay(meeting.created_at) ?? undefined}
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        highlight={highlight}
-        onCopyTranscript={copyTranscript}
-        onOpenRecordingFolder={openRecordingFolder}
-      />
-      <DeleteMeetingAlert
-        meetingId={meeting.id}
-        title={meeting.title}
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        onDeleted={() => void refetchMeetings()}
-      />
-      {canRetranscribe && meeting.folder_path && (
-        <RetranscribeDialog
-          open={retranscribeOpen}
-          onOpenChange={setRetranscribeOpen}
-          meetingId={meeting.id}
-          meetingFolderPath={meeting.folder_path}
-          onComplete={async () => {
-            await onRefetchTranscripts?.()
-          }}
+    <EvidenceNavigationContext.Provider value={navigation}>
+      <div className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-content">
+        <DocToolbar
+          originLabel={originLabel}
+          title={meeting.title}
+          showCompactTitle={compactTitle}
+          scrolled={scrolled}
+          drawerOpen={drawerOpen}
+          onBack={goBack}
+          onToggleDrawer={() => setDrawerOpen((open) => !open)}
+          menuItems={menuItems}
         />
-      )}
-    </div>
+        <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto pt-[52px]">
+          <div
+            className="transition-transform ease-drawer"
+            style={{ transform: shift > 0 ? `translateX(-${shift}px)` : undefined, transitionDuration: drawerOpen ? "300ms" : "200ms" }}
+          >
+            <div className="mx-auto w-[min(720px,calc(100%-112px))] pb-[160px] pt-[30px]">{children}</div>
+          </div>
+        </div>
+        <TranscriptDrawer
+          ref={drawerRef}
+          meetingId={meeting.id}
+          title={meeting.title}
+          dateLabel={formatMeetingDay(meeting.created_at) ?? undefined}
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          highlight={highlight}
+          onCopyTranscript={copyTranscript}
+          onOpenRecordingFolder={openRecordingFolder}
+        />
+        <DeleteMeetingAlert
+          meetingId={meeting.id}
+          title={meeting.title}
+          open={deleteOpen}
+          onOpenChange={setDeleteOpen}
+          onDeleted={() => void refetchMeetings()}
+        />
+        {canRetranscribe && meeting.folder_path && (
+          <RetranscribeDialog
+            open={retranscribeOpen}
+            onOpenChange={setRetranscribeOpen}
+            meetingId={meeting.id}
+            meetingFolderPath={meeting.folder_path}
+            onComplete={async () => {
+              await onRefetchTranscripts?.()
+            }}
+          />
+        )}
+      </div>
+    </EvidenceNavigationContext.Provider>
   )
 }

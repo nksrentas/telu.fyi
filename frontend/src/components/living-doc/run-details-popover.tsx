@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/telu-ui/indicators';
 import { listKnowledgeRuns, type KnowledgeRunView } from '@/lib/knowledge-service';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const LOCATION_LABEL: Record<string, string> = { local: 'Local', lan: 'LAN', remote: 'Remote' };
+export const LOCATION_LABEL: Record<string, string> = { local: 'Local', lan: 'LAN', remote: 'Remote' };
 
 type RunsState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; runs: KnowledgeRunView[] };
 
