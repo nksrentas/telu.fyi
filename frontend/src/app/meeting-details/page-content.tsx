@@ -11,6 +11,7 @@ import { SummaryPanel } from '@/components/MeetingDetails/SummaryPanel';
 import { MeetingDetailsSplitView, type MeetingDetailsTab } from '@/components/MeetingDetails/MeetingDetailsSplitView';
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { MeetingCompleteness } from '@/components/MeetingCompleteness';
+import { KnowledgeSection } from '@/components/living-doc/knowledge-section';
 
 // Custom hooks
 import { useMeetingData } from '@/hooks/meeting-details/useMeetingData';
@@ -408,6 +409,7 @@ export default function PageContent({
                 isModelConfigLoading={isModelConfigLoading || isSummaryRouteRetrying || summaryRouteState.status !== 'validated'}
                 onOpenModelSettings={handleRegisterModalOpen}
               />
+              <KnowledgeSection meetingId={meeting.id} />
             </div>
           }
         />
