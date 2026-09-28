@@ -27,6 +27,11 @@ const TOKENS = [
 const PALETTE = new RegExp(`^${PREFIX}-(${Object.keys(FAMILY_OF).join('|')})-(50|[1-9]00|950)${OPACITY}?$`);
 const MONO = new RegExp(`^(bg-white|bg-black|text-black|border-white)${OPACITY}?$`);
 const TOKEN_OPACITY = new RegExp(`^${PREFIX}-(${TOKENS})${OPACITY}$`);
+const LEGACY_OPACITY = /^(bg|text|border|divide|placeholder|ring)-opacity-\d+$/;
+const TRANSLUCENT_PAIRS = [
+  [/(?<![\w:-])bg-black((?:\s+[^\s"'`{}]+)*?)\s+bg-opacity-\d+(?![\w-])/g, 'bg-scrim$1'],
+  [/(?<![\w:-])bg-white((?:\s+[^\s"'`{}]+)*?)\s+bg-opacity-\d+(?![\w-])/g, 'bg-glass-strong$1'],
+];
 const HSL_VARIABLE = /hsl\(\s*var\(--[\w-]+\)[^)]*\)/g;
 const CANDIDATE = /(\s?)([^\s"'`{}(),;]+)/g;
 const MONO_MAP = {
@@ -107,6 +112,7 @@ function tokenName(prefix, token) {
 }
 
 function mapUtility(utility) {
+  if (LEGACY_OPACITY.test(utility)) return '';
   const palette = PALETTE.exec(utility);
   if (palette) {
     const [, prefix, name, shade, opacity] = palette;
@@ -123,7 +129,7 @@ function mapUtility(utility) {
 
 function isOffender(token) {
   const { utility } = splitVariant(token);
-  return PALETTE.test(utility) || MONO.test(utility) || TOKEN_OPACITY.test(utility);
+  return PALETTE.test(utility) || MONO.test(utility) || TOKEN_OPACITY.test(utility) || LEGACY_OPACITY.test(utility);
 }
 
 export function mapClass(token) {
@@ -143,10 +149,24 @@ export function findOffenders(source) {
   });
 }
 
+function mergeTranslucentPairs(source) {
+  let merged = 0;
+  const output = TRANSLUCENT_PAIRS.reduce(
+    (text, [pattern, replacement]) =>
+      text.replace(pattern, (...match) => {
+        merged += 1;
+        return replacement.replace('$1', match[1]);
+      }),
+    source,
+  );
+  return { output, merged };
+}
+
 function migrateSource(source) {
-  let replaced = 0;
+  const { output: paired, merged } = mergeTranslucentPairs(source);
+  let replaced = merged;
   let unmapped = 0;
-  const output = source.replace(CANDIDATE, (whole, space, token) => {
+  const output = paired.replace(CANDIDATE, (whole, space, token) => {
     if (!isOffender(token)) return whole;
     const mapped = mapClass(token);
     if (mapped === null) {

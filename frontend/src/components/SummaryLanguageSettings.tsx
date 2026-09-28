@@ -16,12 +16,12 @@ export function SummaryLanguageSettings() {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm relative">
+    <div className="rounded-card bg-surface p-6 shadow-card relative">
       <div className="flex items-center gap-2 mb-2">
-        <Globe size={18} className="text-gray-500" />
-        <h3 className="text-lg font-semibold text-gray-900">Summary Language</h3>
+        <Globe size={18} className="text-label-2" />
+        <h3 className="text-title3 text-label">Summary Language</h3>
       </div>
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-callout text-label-2 mb-4">
         Pin one language as the default for new meetings. Unpinned languages remain as
         quick-switch options in the summary generator. Auto uses the dominant transcript language.
       </p>
@@ -32,10 +32,8 @@ export function SummaryLanguageSettings() {
           return (
             <span
               key={code}
-              className={`inline-flex items-center rounded-full border text-sm overflow-hidden ${
-                isPinned
-                  ? 'bg-blue-50 border-blue-200 text-blue-800'
-                  : 'bg-gray-100 border-gray-200 text-gray-800'
+              className={`inline-flex h-7 items-center overflow-hidden rounded-full text-body ${
+                isPinned ? 'bg-accent-soft text-accent-strong' : 'bg-fill-2 text-label'
               }`}
             >
               <button
@@ -44,13 +42,13 @@ export function SummaryLanguageSettings() {
                 aria-pressed={isPinned}
                 title={isPinned ? 'Click to unset as default' : 'Click to set as default'}
                 onClick={() => togglePin(code)}
-                className={`flex items-center gap-1.5 pl-3 pr-2 py-1 hover:brightness-95 active:brightness-90 ${
-                  isPinned ? 'text-blue-800' : 'text-gray-800'
+                className={`flex h-full items-center gap-1.5 pl-3 pr-2 hover:brightness-95 active:brightness-90 ${
+                  isPinned ? 'text-accent-strong' : 'text-label'
                 }`}
               >
                 <Pin
                   size={14}
-                  className={isPinned ? 'text-blue-600' : 'text-gray-400'}
+                  className={isPinned ? 'text-accent' : 'text-label-3'}
                   fill={isPinned ? 'currentColor' : 'none'}
                 />
                 {labelForCode(code)}
@@ -59,7 +57,7 @@ export function SummaryLanguageSettings() {
                 type="button"
                 aria-label={`Remove ${labelForCode(code)}`}
                 onClick={() => removeRecent(code)}
-                className={`pr-2.5 pl-0.5 py-1 leading-none ${isPinned ? 'text-blue-400 hover:text-blue-700' : 'text-gray-400 hover:text-gray-700'}`}
+                className={`h-full pr-2.5 pl-0.5 leading-none ${isPinned ? 'text-accent hover:text-accent-strong' : 'text-label-3 hover:text-label'}`}
               >
                 ×
               </button>
@@ -72,7 +70,7 @@ export function SummaryLanguageSettings() {
             <button
               type="button"
               disabled={recents.length >= 5}
-              className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-3 py-1 text-sm text-gray-600 hover:border-gray-400 hover:text-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-7 items-center gap-1 rounded-full px-3 text-callout text-label-2 outline-dashed outline-1 -outline-offset-1 outline-label-4 hover:text-label disabled:cursor-not-allowed disabled:opacity-[0.45]"
             >
               ＋ Add language
             </button>
@@ -91,7 +89,7 @@ export function SummaryLanguageSettings() {
         </Popover>
       </div>
 
-      <p className="text-xs text-gray-400 mt-3">
+      <p className="text-xs text-label-3 mt-3">
         {pinned
           ? `Default: ${labelForCode(pinned)} - click it again to unset. Max 5 quick-switch options.`
           : 'Click any language to set it as your default. Max 5 quick-switch options.'}

@@ -102,6 +102,7 @@ describe('telu-palette gate', () => {
       ['border-border/60', 'border-separator'],
       ['shadow-blue-500/50', ''],
       ['shadow-gray-200', ''],
+      ['bg-opacity-50', ''],
     ];
 
     for (const [from, to] of rows) {
@@ -131,14 +132,19 @@ describe('telu-palette gate', () => {
     const directory = mkdtempSync(join(tmpdir(), 'telu-palette-'));
     const target = join(directory, 'target.tsx');
     const untouched = join(directory, 'untouched.tsx');
-    writeFileSync(target, '<div className="bg-white shadow-md shadow-blue-500/50 hover:bg-gray-100" />\n');
+    writeFileSync(
+      target,
+      '<div className="bg-white shadow-md shadow-blue-500/50 hover:bg-gray-100" />\n<div className="fixed inset-0 bg-black bg-opacity-50 flex" />\n',
+    );
     writeFileSync(untouched, '<div className="bg-white" />\n');
 
     const result = spawnSync('node', [script, 'migrate', target], { encoding: 'utf8' });
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain(`${target}: 3`);
-    expect(Bun.file(target).text()).resolves.toBe('<div className="bg-content shadow-md hover:bg-fill" />\n');
+    expect(result.stdout).toContain(`${target}: 4`);
+    expect(Bun.file(target).text()).resolves.toBe(
+      '<div className="bg-content shadow-md hover:bg-fill" />\n<div className="fixed inset-0 bg-scrim flex" />\n',
+    );
     expect(Bun.file(untouched).text()).resolves.toBe('<div className="bg-white" />\n');
   });
 });
