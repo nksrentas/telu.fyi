@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Evidence-Linked Post-Meeting Knowledge
 status: executing
-stopped_at: Completed 02-30-PLAN.md
-last_updated: "2026-09-28T14:28:31.081Z"
+stopped_at: Completed 02-31-PLAN.md
+last_updated: "2026-09-28T15:11:28.892Z"
 last_activity: 2026-09-28
 last_activity_desc: Phase 02 execution started
-state_head: db16a7dd87087094fbd6a550ff57f4e867f102ec
+state_head: a13134e301072e6be6310dd77a4d6e743274302a
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 52
-  completed_plans: 49
+  completed_plans: 50
   percent: 17
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 02 (Evidence-Linked Post-Meeting Knowledge) — EXECUTING
-Plan: 5 of 33
+Plan: 6 of 33
 Status: Ready to execute
 Last activity: 2026-09-28 — Phase 02 execution started
 
@@ -106,6 +106,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P28 | 3 min | 2 tasks | 3 files |
 | Phase 02 P29 | 11min | 2 tasks | 2 files |
 | Phase 02 P30 | 13min | 2 tasks | 3 files |
+| Phase 02 P31 | 15min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -188,6 +189,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-29: find_whole_token scans every char start (not match_indices) so whole-token hits overlapping a mid-word hit are found; owner/due stated only as verbatim single-span whole tokens tied to a claim segment or the one after it, never i/we/you/they or <2 chars
 - [Phase 02]: 02-30: KNOW-07 gate is pass only for a complete, fully declared, measured and met evaluation; null leaves give undeclared; unmeasured invariants, prediction mismatch and category minimums (5/1/1) fail
 - [Phase 02]: 02-30: deletion residue is measured through MeetingsRepository::delete_meeting on the in-memory replay ledger for both replay and export
+- [Phase 02]: 02-31: telu-knowledge-eval fails closed on inputs: non-v2 or unknown-key thresholds -> THRESHOLDS_INVALID, non-fixture or duplicate gold JSON -> FIXTURE_INVALID, empty gold dir -> NO_FIXTURES
+- [Phase 02]: 02-31: score --db review outcomes are scoped to the scored fixture ids (UUIDs, bound placeholders); synthetic report re-scored against thresholds-v2 (sha aa1261fa..., gate fail on inputs.representativeFixtures), KNOW-07 stays open
 
 ### Pending Todos
 
@@ -224,6 +227,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-28T14:28:31.008Z
-Stopped at: Completed 02-30-PLAN.md
+Last session: 2026-09-28T15:11:28.824Z
+Stopped at: Completed 02-31-PLAN.md
 Resume file: None

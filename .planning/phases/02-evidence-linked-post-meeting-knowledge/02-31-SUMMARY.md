@@ -49,7 +49,7 @@ key-decisions:
 patterns-established:
   - "Gold directories hold only GoldFixture JSON; sidecars (completions, labels, thresholds) live beside, not inside"
 
-requirements-completed: [KNOW-07]
+requirements-completed: []
 
 coverage:
   - id: D1
@@ -149,6 +149,7 @@ status: complete
 
 - Parse and validation failures of the thresholds file share one code (THRESHOLDS_INVALID). The CLI does not echo which check failed, so it never prints paths or content.
 - Filesystem errors on a gold file (too large, symlink, missing) keep their `INPUT_*` codes. An empty or undeserializable gold file is FIXTURE_INVALID.
+- `requirements-completed` is empty even though the plan lists KNOW-07. The derived KNOW-07 status is still open, and the plan says not to touch REQUIREMENTS.md. This follows the 02-28 precedent, so `requirements.mark-complete` was not run.
 - `review_rows` returns no rows for an empty id list rather than building `IN ()`. `load_fixtures` already guarantees at least one id, so this only guards the library function.
 
 ## Deviations from Plan
