@@ -117,6 +117,25 @@ impl TranscriptsRepository {
         Ok(persisted)
     }
 
+    pub async fn list_evidence_by_meeting(
+        pool: &SqlitePool,
+        meeting_id: &str,
+    ) -> Result<Vec<TranscriptEvidence>, SqlxError> {
+        if Uuid::parse_str(meeting_id).is_err() {
+            return Err(SqlxError::Protocol(
+                "meeting_id must be a valid UUID".to_string(),
+            ));
+        }
+        sqlx::query_as::<_, TranscriptEvidence>(
+            "SELECT * FROM transcript_evidence
+             WHERE meeting_id = ?
+             ORDER BY sequence, audio_start_time",
+        )
+        .bind(meeting_id)
+        .fetch_all(pool)
+        .await
+    }
+
     fn validate_final_evidence(evidence: &TranscriptEvidenceInput) -> Result<(), SqlxError> {
         if Uuid::parse_str(&evidence.evidence_id).is_err() {
             return Err(SqlxError::Protocol(
@@ -452,5 +471,64 @@ mod transcript_evidence_repository_tests {
             .await
             .expect("evidence count after rejected partial");
         assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn transcript_evidence_repository_lists_one_meeting_in_sequence_then_start_order() {
+        let pool = migrated_pool().await;
+        let other_meeting = "018f5e27-2f68-7e27-9c90-7c72123141b0";
+        let now = Utc::now();
+        sqlx::query(
+            "INSERT INTO meetings (
+                id, title, created_at, updated_at, lifecycle, completeness,
+                completeness_reason, started_at_utc
+             ) VALUES (?, 'Other meeting', ?, ?, 'recording', 'pending', NULL, ?)",
+        )
+        .bind(other_meeting)
+        .bind(now)
+        .bind(now)
+        .bind(now.to_rfc3339())
+        .execute(&pool)
+        .await
+        .expect("second meeting fixture");
+
+        let fixtures = [
+            ("018f5e27-2f68-7e27-9c90-7c72123141c1", MEETING_ID, "segment-b", 2, 9.0),
+            ("018f5e27-2f68-7e27-9c90-7c72123141c2", MEETING_ID, "segment-a", 1, 4.0),
+            ("018f5e27-2f68-7e27-9c90-7c72123141c3", MEETING_ID, "segment-c", 2, 7.5),
+            ("018f5e27-2f68-7e27-9c90-7c72123141c4", other_meeting, "segment-a", 0, 0.0),
+        ];
+        for (evidence_id, meeting_id, segment_key, sequence, start) in fixtures {
+            TranscriptsRepository::upsert_final_evidence(
+                &pool,
+                &TranscriptEvidenceInput {
+                    evidence_id: evidence_id.to_string(),
+                    meeting_id: meeting_id.to_string(),
+                    source_track: "mixed".to_string(),
+                    source_segment_key: segment_key.to_string(),
+                    sequence,
+                    transcript: format!("text {segment_key}"),
+                    audio_start_time: start,
+                    audio_end_time: start + 1.0,
+                    capture_completeness: CaptureCompleteness::Complete,
+                },
+            )
+            .await
+            .expect("evidence fixture");
+        }
+
+        let listed = TranscriptsRepository::list_evidence_by_meeting(&pool, MEETING_ID)
+            .await
+            .expect("listed evidence");
+        let ids: Vec<&str> = listed.iter().map(|row| row.evidence_id.as_str()).collect();
+
+        assert_eq!(
+            ids,
+            vec![
+                "018f5e27-2f68-7e27-9c90-7c72123141c2",
+                "018f5e27-2f68-7e27-9c90-7c72123141c3",
+                "018f5e27-2f68-7e27-9c90-7c72123141c1",
+            ]
+        );
     }
 }
