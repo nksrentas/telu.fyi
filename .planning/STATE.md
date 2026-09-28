@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Evidence-Linked Post-Meeting Knowledge
 status: executing
-stopped_at: Completed 02-20-PLAN.md
-last_updated: "2026-09-28T13:26:11.961Z"
-last_activity: 2026-09-27
+stopped_at: Completed 02-27-PLAN.md
+last_updated: "2026-09-28T13:43:17.669Z"
+last_activity: 2026-09-28
 last_activity_desc: Phase 02 execution started
-state_head: 6e8375340c942482c85baa5090faaaa1ed677730
+state_head: 63ed83ae4364c17289e174eaf227a864eaa9b220
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 52
-  completed_plans: 45
+  completed_plans: 46
   percent: 17
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 
 ## Current Position
 
-Phase: 02 (Evidence-Linked Post-Meeting Knowledge) — READY TO EXECUTE
-Plan: 26 of 26
+Phase: 02 (Evidence-Linked Post-Meeting Knowledge) — EXECUTING
+Plan: 2 of 33
 Status: Ready to execute
-Last activity: 2026-09-27 — Phase 02 execution started
+Last activity: 2026-09-28 — Phase 02 execution started
 
 Progress: [██░░░░░░░░] 17%
 
@@ -102,6 +102,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P26 | 50min | 2 tasks | 8 files |
 | Phase 02 P21 | 150min | 3 tasks | 22 files |
 | Phase 02 P20 | 30min | 3 tasks | 5 files |
+| Phase 02 P27 | 11 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Diagnostics IPC revalidates local bundles and returns only typed allowlisted evidence; raw artifacts and filesystem paths remain native-side.
 - [Phase 01]: Diagnostic export folder authority stays in Rust behind opaque tokens, and every copy is reserialized, revalidated, and atomically published under a generated child.
 - [Phase 01]: Transcript and audio export choices reset independently off and record requested versus actually included content in the export manifest.
+- [Phase 02]: 02-27: Rejection identity is wording or shared-evidence similarity, not (type, wording); type stays a match key only for reconfirmed/duplicate outcomes on current wording
+- [Phase 02]: 02-27: Shared-evidence similarity applies to superseded_keys, so a different-type candidate similar to corrected-away wording is reconfirmed (accepted false-suppression bias T-02-76)
 
 ### Pending Todos
 
@@ -213,6 +216,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-28T11:50:52.199Z
-Stopped at: Completed 02-20-PLAN.md
+Last session: 2026-09-28T13:43:17.604Z
+Stopped at: Completed 02-27-PLAN.md
 Resume file: None
