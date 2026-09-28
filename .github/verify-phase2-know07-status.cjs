@@ -7,6 +7,7 @@ const THRESHOLDS_PATH = 'frontend/src-tauri/tests/fixtures/knowledge-eval/thresh
 const EVAL_DIR = '.planning/phases/02-evidence-linked-post-meeting-knowledge/eval';
 const STATUS_PATH = `${EVAL_DIR}/know-07-status.json`;
 const REPRESENTATIVE_REPORT_PATH = `${EVAL_DIR}/representative-report.json`;
+const REAL_MEETING_PILOT_REPORT_PATH = `${EVAL_DIR}/real-meeting-pilot-report.json`;
 
 const THRESHOLDS_VERSION = 2;
 const REPORT_SCHEMA_VERSION = 1;
@@ -90,13 +91,20 @@ function invariantsMet(invariants) {
   );
 }
 
+function heldOutFromPilot(report, pilotReport) {
+  const pilotIds = pilotReport === null ? [] : pilotReport?.fixtures;
+  if (!Array.isArray(report.fixtures) || !Array.isArray(pilotIds)) return false;
+  const pilot = new Set(pilotIds);
+  return report.fixtures.every((id) => !pilot.has(id));
+}
+
 function thresholdsReasons(thresholds) {
   if (!thresholdsValid(thresholds)) return ['thresholds_invalid'];
   if (!thresholdsDeclared(thresholds)) return ['quality_thresholds_undeclared'];
   return [];
 }
 
-function reportReasons(report, thresholdsSha256) {
+function reportReasons(report, thresholdsSha256, pilotReport) {
   if (report === null || report === undefined) return ['representative_evaluation_pending'];
   if (!contentFree(report)) return ['representative_report_contains_content'];
   const checks = [
@@ -105,28 +113,36 @@ function reportReasons(report, thresholdsSha256) {
     [gatePassed(report), 'representative_gate_not_pass'],
     [invariantsMet(report.invariants), 'representative_invariants_not_met'],
     [report.evaluationKind === REPRESENTATIVE_KIND, 'representative_kind_mismatch'],
+    [heldOutFromPilot(report, pilotReport), 'representative_not_held_out'],
   ];
   return checks.filter(([met]) => !met).map(([, reason]) => reason);
 }
 
-function deriveKnow07Status(thresholds, representativeReport, thresholdsSha256) {
-  const reasons = [...thresholdsReasons(thresholds), ...reportReasons(representativeReport, thresholdsSha256)].sort();
+function deriveKnow07Status(thresholds, representativeReport, thresholdsSha256, pilotReport = null) {
+  const reasons = [
+    ...thresholdsReasons(thresholds),
+    ...reportReasons(representativeReport, thresholdsSha256, pilotReport),
+  ].sort();
   return { status: reasons.length === 0 ? 'satisfied' : 'open', reasons };
+}
+
+function readJsonIfPresent(path) {
+  return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null;
 }
 
 function readCommittedInputs(root) {
   const thresholdsSource = readFileSync(join(root, THRESHOLDS_PATH));
-  const reportPath = join(root, REPRESENTATIVE_REPORT_PATH);
   return {
     thresholds: JSON.parse(thresholdsSource.toString('utf8')),
-    representativeReport: existsSync(reportPath) ? JSON.parse(readFileSync(reportPath, 'utf8')) : null,
+    representativeReport: readJsonIfPresent(join(root, REPRESENTATIVE_REPORT_PATH)),
     thresholdsSha256: createHash('sha256').update(thresholdsSource).digest('hex'),
+    pilotReport: readJsonIfPresent(join(root, REAL_MEETING_PILOT_REPORT_PATH)),
   };
 }
 
 function deriveCommittedStatus(root) {
-  const { thresholds, representativeReport, thresholdsSha256 } = readCommittedInputs(root);
-  return deriveKnow07Status(thresholds, representativeReport, thresholdsSha256);
+  const { thresholds, representativeReport, thresholdsSha256, pilotReport } = readCommittedInputs(root);
+  return deriveKnow07Status(thresholds, representativeReport, thresholdsSha256, pilotReport);
 }
 
 if (require.main === module) {
@@ -136,6 +152,7 @@ if (require.main === module) {
 module.exports = {
   REPO_ROOT,
   STATUS_PATH,
+  REAL_MEETING_PILOT_REPORT_PATH,
   THRESHOLDS_VERSION,
   REPORT_SCHEMA_VERSION,
   REPRESENTATIVE_KIND,
