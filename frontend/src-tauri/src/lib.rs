@@ -763,6 +763,7 @@ pub fn run() {
             knowledge::commands::knowledge_start_extraction,
             knowledge::commands::knowledge_get_meeting,
             knowledge::commands::knowledge_list_evidence,
+            knowledge::commands::knowledge_cancel_extraction,
             summary::commands::api_get_summary,
             summary::commands::api_save_meeting_summary,
             summary::commands::api_get_meeting_summary_language,

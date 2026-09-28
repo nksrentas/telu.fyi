@@ -368,6 +368,59 @@ async fn resolve_summary_route(
     .await
 }
 
+pub(crate) async fn summary_context_tokens(dispatch: &SummaryDispatch, meeting_id: &str) -> usize {
+    match dispatch.provider {
+        LLMProvider::Ollama => ollama_context_tokens(dispatch, meeting_id).await,
+        LLMProvider::BuiltInAI => builtin_context_tokens(&dispatch.model_name),
+        _ => 100000,
+    }
+}
+
+async fn ollama_context_tokens(dispatch: &SummaryDispatch, meeting_id: &str) -> usize {
+    match METADATA_CACHE
+        .get_or_fetch(
+            &dispatch.model_name,
+            dispatch.ollama_endpoint.as_deref(),
+            Some(meeting_id),
+        )
+        .await
+    {
+        Ok(metadata) => {
+            let optimal = metadata.context_size.saturating_sub(300);
+            info!(
+                "Using dynamic context for {}: {} tokens (chunk size: {})",
+                dispatch.model_name, metadata.context_size, optimal
+            );
+            optimal
+        }
+        Err(e) => {
+            warn!(
+                "Failed to fetch context for {}: {}. Using default 4000",
+                dispatch.model_name, e
+            );
+            4000
+        }
+    }
+}
+
+fn builtin_context_tokens(model_name: &str) -> usize {
+    use crate::summary::summary_engine::models;
+    match models::get_model_by_name(model_name) {
+        Some(model_def) => {
+            let optimal = model_def.context_size.saturating_sub(300) as usize;
+            info!(
+                "Using BuiltInAI context size: {} tokens (chunk size: {})",
+                model_def.context_size, optimal
+            );
+            optimal
+        }
+        None => {
+            warn!("Unknown model: {}, using default 2048", model_name);
+            1748
+        }
+    }
+}
+
 pub struct SummaryService;
 
 impl SummaryService {
@@ -515,6 +568,7 @@ impl SummaryService {
                 return;
             }
         };
+        let token_threshold = summary_context_tokens(&dispatch, &meeting_id).await;
         let SummaryDispatch {
             provider,
             api_key: final_api_key,
@@ -527,53 +581,6 @@ impl SummaryService {
         } = dispatch;
 
         // Dynamically fetch context size based on provider and model
-        let token_threshold = if provider == LLMProvider::Ollama {
-            match METADATA_CACHE
-                .get_or_fetch(&model_name, ollama_endpoint.as_deref(), Some(&meeting_id))
-                .await
-            {
-                Ok(metadata) => {
-                    // Reserve 300 tokens for prompt overhead
-                    let optimal = metadata.context_size.saturating_sub(300);
-                    info!(
-                        "✓ Using dynamic context for {}: {} tokens (chunk size: {})",
-                        model_name, metadata.context_size, optimal
-                    );
-                    optimal
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to fetch context for {}: {}. Using default 4000",
-                        model_name, e
-                    );
-                    4000  // Fallback to safe default
-                }
-            }
-        } else if provider == LLMProvider::BuiltInAI {
-            // Get model's context size from registry
-            use crate::summary::summary_engine::models;
-            let model = models::get_model_by_name(&model_name)
-                .ok_or_else(|| format!("Unknown model: {}", model_name));
-
-            match model {
-                Ok(model_def) => {
-                    // Reserve 300 tokens for prompt overhead
-                    let optimal = model_def.context_size.saturating_sub(300) as usize;
-                    info!(
-                        "✓ Using BuiltInAI context size: {} tokens (chunk size: {})",
-                        model_def.context_size, optimal
-                    );
-                    optimal
-                }
-                Err(e) => {
-                    warn!("{}, using default 2048", e);
-                    1748  // 2048 - 300 for overhead
-                }
-            }
-        } else {
-            // Cloud providers (OpenAI, Claude, Groq, CustomOpenAI) handle large contexts automatically
-            100000  // Effectively unlimited for single-pass processing
-        };
 
         // Get app data directory for BuiltInAI provider
         let app_data_dir = _app.path().app_data_dir().ok();

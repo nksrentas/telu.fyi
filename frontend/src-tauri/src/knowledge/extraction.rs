@@ -1,38 +1,29 @@
-use crate::database::models::{
-    CaptureCompleteness, MeetingCompleteness, MeetingLifecycle, TranscriptEvidence,
-};
+use crate::database::models::{MeetingCompleteness, MeetingLifecycle, TranscriptEvidence};
 use crate::knowledge::models::{
     AbstentionReason, KnowledgeError, KnowledgeType, RunStatus, TriggerKind,
 };
+use crate::knowledge::parse::{parse_extraction, ParsedAttribute, ParsedExtraction, ParsedItem};
+use crate::knowledge::prompt::{chunk_windows, label_segments, ChunkWindow, EXTRACTION_SYSTEM_PROMPT};
 use crate::knowledge::repository::{KnowledgeRepository, NewAbstention, NewItem, RunCounts};
 use crate::knowledge::span_verifier::{
-    normalize_with_map, sha256_hex, verify_claim_quote, LabeledSegment, LabeledSegments,
+    normalize_with_map, sha256_hex, verify_attribute, verify_claim_quote, AttributeSupport,
+    LabeledSegments, VerifiedSpan,
 };
-use serde::Deserialize;
-use serde_json::Value;
 use sqlx::SqlitePool;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
+use std::sync::{LazyLock, Mutex, MutexGuard};
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 use uuid::Uuid;
 
-pub const PROMPT_VERSION: &str = "knowledge-extract-v1";
-const MAX_ITEMS: usize = 40;
-const MAX_TEXT_CHARS: usize = 400;
-
-pub const EXTRACTION_SYSTEM_PROMPT: &str = r#"You extract meeting knowledge from a transcript. Output JSON only, no prose.
-Types: "decision" (something agreed), "commitment" (someone will do something), "question" (asked and not answered in the transcript), "fact" (a stated fact relevant later).
-Rules:
-- Every item needs at least one evidence entry: {"segment": "<label>", "quote": "<exact words copied from that segment>"}.
-- Copy quotes character for character from the labeled segment. Never paraphrase inside "quote".
-- Never guess who "I" or "we" is.
-- If nothing qualifies, return {"items": []}.
-Schema: {"items":[{"type":"...","text":"...","evidence":[{"segment":"S3","quote":"..."}]}]}"#;
-
-pub struct ExtractionInput {
-    pub user_prompt: String,
-    pub segments: LabeledSegments,
+struct RegisteredExtraction {
+    run_id: String,
+    token: CancellationToken,
 }
+
+static EXTRACTION_REGISTRY: LazyLock<Mutex<HashMap<String, RegisteredExtraction>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RunOutcome {
@@ -42,24 +33,60 @@ pub struct RunOutcome {
 }
 
 #[derive(Default)]
-struct VerifiedCandidates {
+struct Candidates {
     items: Vec<NewItem>,
     abstentions: Vec<NewAbstention>,
+    seen_keys: HashSet<(KnowledgeType, String)>,
+    malformed_windows: usize,
 }
 
-#[derive(Deserialize)]
-struct RawItem {
-    #[serde(rename = "type")]
-    item_type: String,
-    text: String,
-    #[serde(default)]
-    evidence: Vec<RawEvidence>,
+enum WindowStop {
+    Cancelled,
+    ProviderError,
 }
 
-#[derive(Deserialize)]
-struct RawEvidence {
-    segment: String,
-    quote: String,
+fn registry() -> MutexGuard<'static, HashMap<String, RegisteredExtraction>> {
+    EXTRACTION_REGISTRY
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn registry_key(meeting_id: &str) -> String {
+    format!("knowledge:{meeting_id}")
+}
+
+pub fn register_extraction(meeting_id: &str, run_id: &str) -> CancellationToken {
+    let token = CancellationToken::new();
+    registry().insert(
+        registry_key(meeting_id),
+        RegisteredExtraction {
+            run_id: run_id.to_string(),
+            token: token.clone(),
+        },
+    );
+    token
+}
+
+pub fn has_active_extraction(meeting_id: &str) -> bool {
+    registry().contains_key(&registry_key(meeting_id))
+}
+
+pub fn cancel_active_extraction(meeting_id: &str) -> bool {
+    match registry().remove(&registry_key(meeting_id)) {
+        Some(registered) => {
+            registered.token.cancel();
+            true
+        }
+        None => false,
+    }
+}
+
+pub fn release_extraction(meeting_id: &str, run_id: &str) {
+    let mut entries = registry();
+    let key = registry_key(meeting_id);
+    if entries.get(&key).is_some_and(|registered| registered.run_id == run_id) {
+        entries.remove(&key);
+    }
 }
 
 pub fn check_extraction_gate(
@@ -92,40 +119,6 @@ pub fn check_extraction_gate(
     Ok(())
 }
 
-pub fn build_extraction_input(evidence: &[TranscriptEvidence]) -> ExtractionInput {
-    let user_prompt = evidence
-        .iter()
-        .enumerate()
-        .map(|(index, row)| {
-            format!(
-                "[S{} {}] {}",
-                index + 1,
-                format_timestamp(row.audio_start_time),
-                row.transcript
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    let segments = evidence
-        .iter()
-        .enumerate()
-        .map(|(index, row)| {
-            (
-                format!("S{}", index + 1),
-                LabeledSegment {
-                    evidence_id: row.evidence_id.clone(),
-                    text: row.transcript.clone(),
-                    capture_incomplete: row.capture_completeness == CaptureCompleteness::Incomplete,
-                },
-            )
-        })
-        .collect();
-    ExtractionInput {
-        user_prompt,
-        segments,
-    }
-}
-
 pub fn input_fingerprint(evidence: &[TranscriptEvidence]) -> String {
     let ordered: String = evidence
         .iter()
@@ -139,130 +132,202 @@ pub async fn run_extraction<F, Fut>(
     meeting_id: &str,
     run_id: &str,
     evidence: &[TranscriptEvidence],
-    complete: F,
+    budget_tokens: usize,
+    cancel: &CancellationToken,
+    mut complete: F,
 ) -> Result<RunOutcome, KnowledgeError>
 where
-    F: FnOnce(String, String) -> Fut,
+    F: FnMut(String, String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
-    let input = build_extraction_input(evidence);
-    let completion = complete(EXTRACTION_SYSTEM_PROMPT.to_string(), input.user_prompt).await;
-    let (candidates, failure_code) = match completion.map(|text| parse_completion(&text)) {
-        Err(_) => (VerifiedCandidates::default(), Some("PROVIDER_ERROR")),
-        Ok(None) => (VerifiedCandidates::default(), Some("MALFORMED_OUTPUT")),
-        Ok(Some(values)) => (verify_candidates(values, &input.segments), None),
+    let windows = chunk_windows(&label_segments(evidence), budget_tokens);
+    let collected = collect_candidates(&windows, cancel, &mut complete).await;
+    let (candidates, outcome) = match collected {
+        Ok(candidates) => {
+            let outcome = completed_outcome(&candidates, windows.len());
+            (candidates, outcome)
+        }
+        Err(stop) => (Candidates::default(), stopped_outcome(stop)),
     };
-    let outcome = RunOutcome {
-        status: if failure_code.is_some() {
-            RunStatus::Failed
-        } else {
-            RunStatus::Succeeded
-        },
-        counts: RunCounts {
-            proposed: candidates.items.len() as i64,
-            skipped: candidates.abstentions.len() as i64,
-        },
-        failure_code,
-    };
+    info!(
+        meeting_id,
+        run_id,
+        windows = windows.len(),
+        malformed_windows = candidates.malformed_windows,
+        status = outcome.status.as_str(),
+        proposed = outcome.counts.proposed,
+        skipped = outcome.counts.skipped,
+        "knowledge run finished"
+    );
+    finish(pool, meeting_id, run_id, &candidates, outcome).await
+}
 
-    match persist_outcome(pool, meeting_id, run_id, &candidates, outcome).await {
-        Ok(()) => {
-            info!(
-                meeting_id,
-                run_id,
-                status = outcome.status.as_str(),
-                proposed = outcome.counts.proposed,
-                skipped = outcome.counts.skipped,
-                "knowledge run finalized"
-            );
-            Ok(outcome)
+async fn collect_candidates<F, Fut>(
+    windows: &[ChunkWindow],
+    cancel: &CancellationToken,
+    complete: &mut F,
+) -> Result<Candidates, WindowStop>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
+    let mut candidates = Candidates::default();
+    for window in windows {
+        if cancel.is_cancelled() {
+            return Err(WindowStop::Cancelled);
         }
-        Err(error) => {
-            mark_run_failed(pool, run_id).await;
-            Err(error)
+        let reply = complete(EXTRACTION_SYSTEM_PROMPT.to_string(), window.user_prompt.clone())
+            .await
+            .map_err(|_| stop_reason(cancel))?;
+        match parse_extraction(&reply) {
+            Ok(parsed) => absorb(&mut candidates, parsed, &window.segments),
+            Err(_) => candidates.malformed_windows += 1,
         }
+    }
+    if cancel.is_cancelled() {
+        return Err(WindowStop::Cancelled);
+    }
+    Ok(candidates)
+}
+
+fn stop_reason(cancel: &CancellationToken) -> WindowStop {
+    if cancel.is_cancelled() {
+        WindowStop::Cancelled
+    } else {
+        WindowStop::ProviderError
     }
 }
 
-fn format_timestamp(seconds: f64) -> String {
-    let total = seconds.max(0.0).floor() as u64;
-    format!("{:02}:{:02}", total / 60, total % 60)
-}
-
-fn parse_completion(completion: &str) -> Option<Vec<Value>> {
-    let start = completion.find('{')?;
-    let end = completion.rfind('}')?;
-    if end <= start {
-        return None;
-    }
-    let root: Value = serde_json::from_str(&completion[start..=end]).ok()?;
-    root.get("items")?.as_array().cloned()
-}
-
-fn verify_candidates(values: Vec<Value>, segments: &LabeledSegments) -> VerifiedCandidates {
-    let mut verified = VerifiedCandidates::default();
-    let mut seen_keys = HashSet::new();
-    for (index, value) in values.into_iter().enumerate() {
-        match verify_candidate(index, value, segments) {
-            Ok(item) => {
-                if seen_keys.insert((item.item_type, item.normalized_key.clone())) {
-                    verified.items.push(item);
+fn absorb(candidates: &mut Candidates, parsed: ParsedExtraction, segments: &LabeledSegments) {
+    candidates.abstentions.extend(parsed.rejected);
+    for item in parsed.items {
+        match verify_item(item, segments) {
+            Ok(verified) => {
+                let key = (verified.item_type, verified.normalized_key.clone());
+                if candidates.seen_keys.insert(key) {
+                    candidates.items.push(verified);
                 }
             }
-            Err(abstention) => verified.abstentions.push(abstention),
+            Err(abstention) => candidates.abstentions.push(abstention),
         }
     }
-    verified
 }
 
-fn verify_candidate(
-    index: usize,
-    value: Value,
-    segments: &LabeledSegments,
-) -> Result<NewItem, NewAbstention> {
-    let malformed = NewAbstention {
-        reason: AbstentionReason::MalformedItem,
-        candidate_type: None,
-    };
-    if index >= MAX_ITEMS {
-        return Err(malformed);
+fn verify_item(item: ParsedItem, segments: &LabeledSegments) -> Result<NewItem, NewAbstention> {
+    let (claims, first_failure) = verify_claims(&item, segments);
+    if claims.is_empty() {
+        return Err(NewAbstention {
+            reason: first_failure.unwrap_or(AbstentionReason::QuoteNotFound),
+            candidate_type: Some(item.item_type),
+        });
     }
-    let raw: RawItem = serde_json::from_value(value).map_err(|_| malformed)?;
-    let item_type = KnowledgeType::parse(&raw.item_type).ok_or(NewAbstention {
-        reason: AbstentionReason::InvalidType,
-        candidate_type: None,
-    })?;
-    let abstain = |reason| NewAbstention {
-        reason,
-        candidate_type: Some(item_type),
-    };
-    let text = raw.text.trim();
-    if text.is_empty() {
-        return Err(abstain(AbstentionReason::EmptyText));
-    }
-    if text.chars().count() > MAX_TEXT_CHARS {
-        return Err(abstain(AbstentionReason::MalformedItem));
-    }
-    let claim = raw
-        .evidence
-        .first()
-        .ok_or(abstain(AbstentionReason::MalformedItem))?;
-    let span = verify_claim_quote(&claim.segment, &claim.quote, segments).map_err(abstain)?;
-
     Ok(NewItem {
         item_id: Uuid::new_v4().to_string(),
-        item_type,
-        text: text.to_string(),
-        normalized_key: normalize_with_map(text).0,
-        claim: span,
+        item_type: item.item_type,
+        normalized_key: normalize_with_map(&item.text).0,
+        owner: attribute_support(item.owner.as_ref(), segments),
+        due: attribute_support(item.due.as_ref(), segments),
+        text: item.text,
+        claims,
     })
+}
+
+fn verify_claims(
+    item: &ParsedItem,
+    segments: &LabeledSegments,
+) -> (Vec<VerifiedSpan>, Option<AbstentionReason>) {
+    let mut spans: Vec<VerifiedSpan> = Vec::new();
+    let mut first_failure = None;
+    for quote in &item.evidence {
+        match verify_claim_quote(&quote.segment, &quote.quote, segments) {
+            Ok(verified) => {
+                for span in verified {
+                    let duplicate = spans.iter().any(|known| {
+                        (known.evidence_id.as_str(), known.raw_start, known.raw_end)
+                            == (span.evidence_id.as_str(), span.raw_start, span.raw_end)
+                    });
+                    if !duplicate {
+                        spans.push(span);
+                    }
+                }
+            }
+            Err(reason) => first_failure = first_failure.or(Some(reason)),
+        }
+    }
+    (spans, first_failure)
+}
+
+fn attribute_support(attribute: Option<&ParsedAttribute>, segments: &LabeledSegments) -> AttributeSupport {
+    attribute
+        .map(|attribute| verify_attribute(&attribute.value, &attribute.segment, &attribute.quote, segments))
+        .unwrap_or(AttributeSupport::NotStated)
+}
+
+fn completed_outcome(candidates: &Candidates, window_count: usize) -> RunOutcome {
+    let counts = RunCounts {
+        proposed: candidates.items.len() as i64,
+        skipped: candidates.abstentions.len() as i64,
+    };
+    if window_count > 0 && candidates.malformed_windows == window_count {
+        return RunOutcome {
+            status: RunStatus::Failed,
+            counts: RunCounts::default(),
+            failure_code: Some("MALFORMED_OUTPUT"),
+        };
+    }
+    RunOutcome {
+        status: RunStatus::Succeeded,
+        counts,
+        failure_code: (candidates.malformed_windows > 0).then_some("PARTIAL_MALFORMED_OUTPUT"),
+    }
+}
+
+fn stopped_outcome(stop: WindowStop) -> RunOutcome {
+    let (status, failure_code) = match stop {
+        WindowStop::Cancelled => (RunStatus::Cancelled, "CANCELLED_BY_USER"),
+        WindowStop::ProviderError => (RunStatus::Failed, "PROVIDER_ERROR"),
+    };
+    RunOutcome {
+        status,
+        counts: RunCounts::default(),
+        failure_code: Some(failure_code),
+    }
+}
+
+async fn finish(
+    pool: &SqlitePool,
+    meeting_id: &str,
+    run_id: &str,
+    candidates: &Candidates,
+    outcome: RunOutcome,
+) -> Result<RunOutcome, KnowledgeError> {
+    let persisted = if outcome.status == RunStatus::Succeeded {
+        persist_outcome(pool, meeting_id, run_id, candidates, outcome).await
+    } else {
+        persist_outcome(pool, meeting_id, run_id, &Candidates::default(), outcome).await
+    };
+    match persisted {
+        Ok(()) => Ok(outcome),
+        Err(error) => {
+            if meeting_exists(pool, meeting_id).await {
+                mark_run_failed(pool, run_id).await;
+                return Err(error);
+            }
+            info!(meeting_id, run_id, code = "MEETING_DELETED", "knowledge run ended with its meeting");
+            Ok(RunOutcome {
+                status: RunStatus::Cancelled,
+                counts: RunCounts::default(),
+                failure_code: Some("MEETING_DELETED"),
+            })
+        }
+    }
 }
 
 async fn persist_outcome(
     pool: &SqlitePool,
     meeting_id: &str,
     run_id: &str,
-    candidates: &VerifiedCandidates,
+    candidates: &Candidates,
     outcome: RunOutcome,
 ) -> Result<(), KnowledgeError> {
     let mut transaction = pool.begin().await.map_err(|error| {
@@ -287,6 +352,15 @@ async fn persist_outcome(
     })
 }
 
+async fn meeting_exists(pool: &SqlitePool, meeting_id: &str) -> bool {
+    sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM meetings WHERE id = ?")
+        .bind(meeting_id)
+        .fetch_one(pool)
+        .await
+        .map(|count| count > 0)
+        .unwrap_or(true)
+}
+
 async fn mark_run_failed(pool: &SqlitePool, run_id: &str) {
     let Ok(mut connection) = pool.acquire().await else {
         warn!(run_id, "knowledge run could not be marked failed");
@@ -309,28 +383,24 @@ async fn mark_run_failed(pool: &SqlitePool, run_id: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::repositories::transcript::TranscriptsRepository;
     use crate::knowledge::models::EvidenceRole;
+    use crate::knowledge::prompt::PROMPT_VERSION;
     use crate::knowledge::repository::NewRun;
     use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
-    use crate::database::repositories::transcript::TranscriptsRepository;
+    use crate::summary::service::SummaryService;
+    use chrono::Utc;
 
     const RUN_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141c1";
     const S2_EVIDENCE: &str = "018f5e27-2f68-7e27-9c90-7c72123141b2";
+    const LARGE_BUDGET: usize = 100_000;
 
-    async fn meeting_with_evidence() -> (SqlitePool, Vec<TranscriptEvidence>) {
-        let pool = migrated_pool().await;
-        insert_meeting(&pool, MEETING_ID, "complete", "complete").await;
-        insert_evidence(&pool, MEETING_ID, "018f5e27-2f68-7e27-9c90-7c72123141b1", 0, "Good morning everyone.").await;
-        insert_evidence(&pool, MEETING_ID, S2_EVIDENCE, 1, "We agreed to ship the beta on Friday.").await;
-        insert_evidence(&pool, MEETING_ID, "018f5e27-2f68-7e27-9c90-7c72123141b3", 2, "Any other questions?").await;
-        let evidence = TranscriptsRepository::list_evidence_by_meeting(&pool, MEETING_ID)
-            .await
-            .expect("evidence rows");
+    async fn start_run(pool: &SqlitePool, meeting_id: &str, evidence: &[TranscriptEvidence]) {
         KnowledgeRepository::insert_running_run(
-            &pool,
+            pool,
             &NewRun {
                 run_id: RUN_ID.to_string(),
-                meeting_id: MEETING_ID.to_string(),
+                meeting_id: meeting_id.to_string(),
                 trigger_kind: TriggerKind::User,
                 provider_id: "ollama".to_string(),
                 model_id: "llama3".to_string(),
@@ -339,12 +409,37 @@ mod tests {
                 prompt_version: PROMPT_VERSION.to_string(),
                 meeting_completeness_at_start: "complete".to_string(),
                 input_evidence_count: evidence.len() as i64,
-                input_fingerprint: input_fingerprint(&evidence),
+                input_fingerprint: input_fingerprint(evidence),
             },
         )
         .await
         .expect("running run");
+    }
+
+    async fn meeting_with_texts(meeting_id: &str, texts: &[&str]) -> (SqlitePool, Vec<TranscriptEvidence>) {
+        let pool = migrated_pool().await;
+        insert_meeting(&pool, meeting_id, "complete", "complete").await;
+        for (sequence, text) in texts.iter().enumerate() {
+            let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123141{:02x}", 0xb1 + sequence);
+            insert_evidence(&pool, meeting_id, &evidence_id, sequence as i64, text).await;
+        }
+        let evidence = TranscriptsRepository::list_evidence_by_meeting(&pool, meeting_id)
+            .await
+            .expect("evidence rows");
+        start_run(&pool, meeting_id, &evidence).await;
         (pool, evidence)
+    }
+
+    async fn meeting_with_evidence() -> (SqlitePool, Vec<TranscriptEvidence>) {
+        meeting_with_texts(
+            MEETING_ID,
+            &[
+                "Good morning everyone.",
+                "We agreed to ship the beta on Friday.",
+                "Maria will own the release notes by Monday.",
+            ],
+        )
+        .await
     }
 
     async fn count(pool: &SqlitePool, table: &str) -> i64 {
@@ -354,26 +449,35 @@ mod tests {
             .expect("row count")
     }
 
+    async fn run_with_replies(
+        pool: &SqlitePool,
+        evidence: &[TranscriptEvidence],
+        budget: usize,
+        replies: Vec<&'static str>,
+    ) -> RunOutcome {
+        let mut remaining = replies.into_iter();
+        run_extraction(pool, MEETING_ID, RUN_ID, evidence, budget, &CancellationToken::new(), |_, _| {
+            let reply = remaining.next().unwrap_or("{\"items\": []}").to_string();
+            async move { Ok(reply) }
+        })
+        .await
+        .expect("extraction outcome")
+    }
+
     #[tokio::test]
     async fn knowledge_extraction_persists_a_verified_decision_with_its_exact_evidence_link() {
         let (pool, evidence) = meeting_with_evidence().await;
-        let completion = r#"```json
-{"items":[{"type":"decision","text":"Ship the beta on Friday","evidence":[{"segment":"S2","quote":"ship the beta on Friday"}]}]}
+        let reply = r#"```json
+{"items":[{"type":"decision","text":"Ship the beta on Friday","evidence":[{"segment":"S2","quote":"ship the beta on Friday"}],"owner":null,"due":null}]}
 ```"#;
 
-        let outcome = run_extraction(&pool, MEETING_ID, RUN_ID, &evidence, |_, prompt| async move {
-            assert!(prompt.contains("[S2 00:05] We agreed to ship the beta on Friday."));
-            Ok(completion.to_string())
-        })
-        .await
-        .expect("extraction outcome");
+        let outcome = run_with_replies(&pool, &evidence, LARGE_BUDGET, vec![reply]).await;
 
         assert_eq!(outcome.status, RunStatus::Succeeded);
         assert_eq!(outcome.counts, RunCounts { proposed: 1, skipped: 0 });
         let items = KnowledgeRepository::list_meeting_items(&pool, MEETING_ID)
             .await
             .expect("items");
-        assert_eq!(items.len(), 1);
         let link = &items[0].evidence[0];
         assert_eq!(link.evidence_id, S2_EVIDENCE);
         assert_eq!(link.role, EvidenceRole::Claim);
@@ -385,29 +489,21 @@ mod tests {
             .collect();
         assert_eq!(raw, "ship the beta on Friday");
         assert_eq!(link.quote_text, raw);
-        let run = KnowledgeRepository::latest_run(&pool, MEETING_ID)
-            .await
-            .expect("latest run")
-            .expect("run exists");
-        assert_eq!((run.status, run.proposed_count), (RunStatus::Succeeded, 1));
     }
 
     #[tokio::test]
     async fn knowledge_extraction_abstains_on_missing_quotes_and_unknown_segments() {
         let (pool, evidence) = meeting_with_evidence().await;
-        let completion = r#"{"items":[
+        let reply = r#"{"items":[
             {"type":"fact","text":"Budget doubled","evidence":[{"segment":"S2","quote":"the budget doubled"}]},
-            {"type":"question","text":"Who owns QA","evidence":[{"segment":"S9","quote":"who owns QA"}]}
+            {"type":"question","text":"Who owns QA","evidence":[{"segment":"S9","quote":"who owns the QA pass"}]}
         ]}"#;
 
-        let outcome = run_extraction(&pool, MEETING_ID, RUN_ID, &evidence, |_, _| async move {
-            Ok(completion.to_string())
-        })
-        .await
-        .expect("extraction outcome");
+        let outcome = run_with_replies(&pool, &evidence, LARGE_BUDGET, vec![reply]).await;
 
         assert_eq!(outcome.counts, RunCounts { proposed: 0, skipped: 2 });
         assert_eq!(count(&pool, "knowledge_items").await, 0);
+        assert_eq!(count(&pool, "knowledge_abstentions").await, 2);
         let reasons: Vec<String> = sqlx::query_scalar(
             "SELECT reason_code FROM knowledge_abstentions ORDER BY reason_code",
         )
@@ -415,25 +511,126 @@ mod tests {
         .await
         .expect("abstention reasons");
         assert_eq!(reasons, vec!["quote_not_found", "unknown_segment"]);
+    }
+
+    #[tokio::test]
+    async fn knowledge_extraction_keeps_good_windows_when_one_window_is_malformed() {
+        let texts = [
+            "Alpha team will ship the docs", "Bravo team will ship the docs",
+            "Delta team will ship the docs", "Gamma team will ship the docs",
+            "Hotel team will ship the docs", "Kappa team will ship the docs",
+            "Lemur team will ship the docs", "Omega team will ship the docs",
+        ];
+        let (pool, evidence) = meeting_with_texts(MEETING_ID, &texts).await;
+        let first = r#"{"items":[{"type":"commitment","text":"Alpha ships docs","evidence":[{"segment":"S1","quote":"Alpha team will ship the docs"}]}]}"#;
+        let last = r#"{"items":[{"type":"commitment","text":"Omega ships docs","evidence":[{"segment":"S8","quote":"Omega team will ship the docs"}]}]}"#;
+
+        let outcome = run_with_replies(&pool, &evidence, 40, vec![first, "not json at all", last]).await;
+
+        assert_eq!(outcome.status, RunStatus::Succeeded);
+        assert_eq!(outcome.failure_code, Some("PARTIAL_MALFORMED_OUTPUT"));
+        assert_eq!(outcome.counts, RunCounts { proposed: 2, skipped: 0 });
+        assert_eq!(count(&pool, "knowledge_items").await, 2);
+    }
+
+    #[tokio::test]
+    async fn knowledge_extraction_fails_when_every_window_is_malformed() {
+        let (pool, evidence) = meeting_with_evidence().await;
+
+        let outcome = run_with_replies(&pool, &evidence, LARGE_BUDGET, vec!["I could not find anything useful."]).await;
+
+        assert_eq!(outcome.status, RunStatus::Failed);
+        assert_eq!(outcome.failure_code, Some("MALFORMED_OUTPUT"));
+        assert_eq!(count(&pool, "knowledge_items").await, 0);
+    }
+
+    #[tokio::test]
+    async fn knowledge_extraction_with_no_items_succeeds_with_zero_counts() {
+        let (pool, evidence) = meeting_with_evidence().await;
+
+        let outcome = run_with_replies(&pool, &evidence, LARGE_BUDGET, vec!["{\"items\": []}"]).await;
+
+        assert_eq!(outcome.status, RunStatus::Succeeded);
+        assert_eq!(outcome.counts, RunCounts::default());
         let run = KnowledgeRepository::latest_run(&pool, MEETING_ID)
             .await
             .expect("latest run")
             .expect("run exists");
-        assert_eq!(run.skipped_count, 2);
+        assert_eq!((run.proposed_count, run.skipped_count), (0, 0));
+        assert_eq!(count(&pool, "knowledge_abstentions").await, run.skipped_count);
     }
 
     #[tokio::test]
-    async fn knowledge_extraction_records_provider_and_malformed_output_failures() {
+    async fn knowledge_extraction_stores_stated_owner_and_due_as_links_and_absent_ones_as_null() {
         let (pool, evidence) = meeting_with_evidence().await;
+        let reply = r#"{"items":[{"type":"commitment","text":"Maria owns the release notes","evidence":[{"segment":"S3","quote":"Maria will own the release notes"}],"owner":{"value":"Maria","segment":"S3","quote":"Maria will own the release notes"},"due":null}]}"#;
 
-        let outcome = run_extraction(&pool, MEETING_ID, RUN_ID, &evidence, |_, _| async move {
-            Ok("I could not find anything useful.".to_string())
+        run_with_replies(&pool, &evidence, LARGE_BUDGET, vec![reply]).await;
+
+        let (owner_text, owner_support, due_text, due_support): (Option<String>, String, Option<String>, String) =
+            sqlx::query_as("SELECT owner_text, owner_support, due_text, due_support FROM knowledge_items")
+                .fetch_one(&pool)
+                .await
+                .expect("item attributes");
+        assert_eq!((owner_text.as_deref(), owner_support.as_str()), (Some("Maria"), "stated"));
+        assert_eq!((due_text, due_support.as_str()), (None, "not_stated"));
+        let roles: Vec<String> = sqlx::query_scalar("SELECT role FROM knowledge_evidence_links ORDER BY role")
+            .fetch_all(&pool)
+            .await
+            .expect("link roles");
+        assert_eq!(roles, vec!["claim", "owner"]);
+    }
+
+    #[tokio::test]
+    async fn knowledge_cancel_stops_the_run_without_touching_the_summary_token() {
+        let meeting_id = "018f5e27-2f68-7e27-9c90-7c7212314201";
+        let (pool, evidence) = meeting_with_texts(meeting_id, &["We agreed to ship the beta on Friday."]).await;
+        let token = register_extraction(meeting_id, RUN_ID);
+        let summary_token = SummaryService::register_cancellation_token(meeting_id, Utc::now());
+        let reply = r#"{"items":[{"type":"decision","text":"Ship the beta","evidence":[{"segment":"S1","quote":"ship the beta on Friday"}]}]}"#;
+
+        let outcome = run_extraction(&pool, meeting_id, RUN_ID, &evidence, LARGE_BUDGET, &token, |_, _| {
+            assert!(cancel_active_extraction(meeting_id));
+            async move { Ok(reply.to_string()) }
         })
         .await
-        .expect("extraction outcome");
+        .expect("cancelled outcome");
 
-        assert_eq!(outcome.status, RunStatus::Failed);
-        assert_eq!(outcome.failure_code, Some("MALFORMED_OUTPUT"));
+        assert_eq!(outcome.status, RunStatus::Cancelled);
+        assert_eq!(outcome.failure_code, Some("CANCELLED_BY_USER"));
+        assert_eq!(count(&pool, "knowledge_items").await, 0);
+        assert!(!summary_token.is_cancelled());
+        assert!(!has_active_extraction(meeting_id));
+    }
+
+    #[tokio::test]
+    async fn knowledge_run_ends_quietly_when_its_meeting_is_deleted_mid_run() {
+        let (pool, evidence) = meeting_with_evidence().await;
+        let deleting_pool = pool.clone();
+        let reply = r#"{"items":[{"type":"decision","text":"Ship the beta","evidence":[{"segment":"S2","quote":"ship the beta on Friday"}]}]}"#;
+
+        let outcome = run_extraction(&pool, MEETING_ID, RUN_ID, &evidence, LARGE_BUDGET, &CancellationToken::new(), |_, _| {
+            let deleting_pool = deleting_pool.clone();
+            async move {
+                sqlx::query("DELETE FROM knowledge_runs WHERE meeting_id = ?")
+                    .bind(MEETING_ID)
+                    .execute(&deleting_pool)
+                    .await
+                    .expect("run removed");
+                sqlx::query("DELETE FROM meetings WHERE id = ?")
+                    .bind(MEETING_ID)
+                    .execute(&deleting_pool)
+                    .await
+                    .expect("meeting removed");
+                Ok(reply.to_string())
+            }
+        })
+        .await;
+
+        assert_eq!(
+            outcome.map(|outcome| outcome.failure_code),
+            Ok(Some("MEETING_DELETED"))
+        );
         assert_eq!(count(&pool, "knowledge_items").await, 0);
     }
 

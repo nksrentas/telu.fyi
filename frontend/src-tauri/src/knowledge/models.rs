@@ -115,6 +115,7 @@ impl EvidenceRole {
 pub enum AbstentionReason {
     UnknownSegment,
     QuoteNotFound,
+    QuoteTooShort,
     EmptyText,
     InvalidType,
     MalformedItem,
@@ -125,6 +126,7 @@ impl AbstentionReason {
         match self {
             Self::UnknownSegment => "unknown_segment",
             Self::QuoteNotFound => "quote_not_found",
+            Self::QuoteTooShort => "quote_too_short",
             Self::EmptyText => "empty_text",
             Self::InvalidType => "invalid_type",
             Self::MalformedItem => "malformed_item",

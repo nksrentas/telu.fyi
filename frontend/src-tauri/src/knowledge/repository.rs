@@ -2,7 +2,7 @@ use crate::knowledge::models::{
     AbstentionReason, EvidenceLinkView, EvidenceRole, KnowledgeError, KnowledgeItemView,
     KnowledgeRunView, KnowledgeType, ReviewState, RunStatus, Support, TriggerKind,
 };
-use crate::knowledge::span_verifier::VerifiedSpan;
+use crate::knowledge::span_verifier::{AttributeSupport, VerifiedSpan};
 use chrono::Utc;
 use sqlx::{Error as SqlxError, FromRow, SqliteConnection, SqlitePool};
 use std::collections::HashMap;
@@ -41,7 +41,9 @@ pub struct NewItem {
     pub item_type: KnowledgeType,
     pub text: String,
     pub normalized_key: String,
-    pub claim: VerifiedSpan,
+    pub claims: Vec<VerifiedSpan>,
+    pub owner: AttributeSupport,
+    pub due: AttributeSupport,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,7 +160,9 @@ impl KnowledgeRepository {
     ) -> Result<(), KnowledgeError> {
         for item in items {
             insert_item(connection, meeting_id, run_id, item).await?;
-            insert_claim_link(connection, meeting_id, item).await?;
+            for (role, span) in item_links(item) {
+                insert_link(connection, meeting_id, &item.item_id, role, span).await?;
+            }
         }
         Ok(())
     }
@@ -186,6 +190,24 @@ impl KnowledgeRepository {
             .map_err(|error| storage_error("insert_abstentions", meeting_id, error))?;
         }
         Ok(())
+    }
+
+    pub async fn finalize_stale_running_run(
+        pool: &SqlitePool,
+        meeting_id: &str,
+    ) -> Result<bool, KnowledgeError> {
+        validate_meeting_id(meeting_id)?;
+        let result = sqlx::query(
+            "UPDATE knowledge_runs
+             SET status = 'cancelled', failure_code = 'INTERRUPTED', finished_at_utc = ?
+             WHERE meeting_id = ? AND status = 'running'",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .bind(meeting_id)
+        .execute(pool)
+        .await
+        .map_err(|error| storage_error("finalize_stale_running_run", meeting_id, error))?;
+        Ok(result.rows_affected() > 0)
     }
 
     pub async fn latest_run(
@@ -257,13 +279,17 @@ async fn insert_item(
         "INSERT INTO knowledge_items (
             item_id, meeting_id, origin_run_id, item_type, text, owner_text, owner_support,
             due_text, due_support, normalized_key, created_at_utc
-         ) VALUES (?, ?, ?, ?, ?, NULL, 'not_stated', NULL, 'not_stated', ?, ?)",
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(&item.item_id)
     .bind(meeting_id)
     .bind(run_id)
     .bind(item.item_type.as_str())
     .bind(&item.text)
+    .bind(stated_text(&item.owner))
+    .bind(support(&item.owner).as_str())
+    .bind(stated_text(&item.due))
+    .bind(support(&item.due).as_str())
     .bind(&item.normalized_key)
     .bind(Utc::now().to_rfc3339())
     .execute(connection)
@@ -272,33 +298,65 @@ async fn insert_item(
     .map_err(|error| storage_error("insert_item", meeting_id, error))
 }
 
-async fn insert_claim_link(
+fn item_links(item: &NewItem) -> Vec<(EvidenceRole, &VerifiedSpan)> {
+    item.claims
+        .iter()
+        .map(|span| (EvidenceRole::Claim, span))
+        .chain(attribute_links(EvidenceRole::Owner, &item.owner))
+        .chain(attribute_links(EvidenceRole::Due, &item.due))
+        .collect()
+}
+
+fn attribute_links(role: EvidenceRole, attribute: &AttributeSupport) -> Vec<(EvidenceRole, &VerifiedSpan)> {
+    match attribute {
+        AttributeSupport::Stated { spans, .. } => spans.iter().map(|span| (role, span)).collect(),
+        AttributeSupport::NotStated => Vec::new(),
+    }
+}
+
+fn stated_text(attribute: &AttributeSupport) -> Option<&str> {
+    match attribute {
+        AttributeSupport::Stated { text, .. } => Some(text.as_str()),
+        AttributeSupport::NotStated => None,
+    }
+}
+
+fn support(attribute: &AttributeSupport) -> Support {
+    match attribute {
+        AttributeSupport::Stated { .. } => Support::Stated,
+        AttributeSupport::NotStated => Support::NotStated,
+    }
+}
+
+async fn insert_link(
     connection: &mut SqliteConnection,
     meeting_id: &str,
-    item: &NewItem,
+    item_id: &str,
+    role: EvidenceRole,
+    span: &VerifiedSpan,
 ) -> Result<(), KnowledgeError> {
-    let claim = &item.claim;
     sqlx::query(
         "INSERT INTO knowledge_evidence_links (
             link_id, meeting_id, item_id, evidence_id, role, quote_text, normalized_quote,
             raw_start, raw_end, evidence_text_sha256, segment_capture_incomplete, created_at_utc
-         ) VALUES (?, ?, ?, ?, 'claim', ?, ?, ?, ?, ?, ?, ?)",
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(Uuid::new_v4().to_string())
     .bind(meeting_id)
-    .bind(&item.item_id)
-    .bind(&claim.evidence_id)
-    .bind(&claim.quote_text)
-    .bind(&claim.normalized_quote)
-    .bind(claim.raw_start as i64)
-    .bind(claim.raw_end as i64)
-    .bind(&claim.evidence_text_sha256)
-    .bind(claim.segment_capture_incomplete)
+    .bind(item_id)
+    .bind(&span.evidence_id)
+    .bind(role.as_str())
+    .bind(&span.quote_text)
+    .bind(&span.normalized_quote)
+    .bind(span.raw_start as i64)
+    .bind(span.raw_end as i64)
+    .bind(&span.evidence_text_sha256)
+    .bind(span.segment_capture_incomplete)
     .bind(Utc::now().to_rfc3339())
     .execute(connection)
     .await
     .map(|_| ())
-    .map_err(|error| storage_error("insert_claim_link", meeting_id, error))
+    .map_err(|error| storage_error("insert_link", meeting_id, error))
 }
 
 fn assemble_items(items: Vec<ItemRow>, links: Vec<LinkRow>) -> Vec<KnowledgeItemView> {
@@ -400,7 +458,9 @@ mod tests {
             item_type: KnowledgeType::Decision,
             text: text.to_string(),
             normalized_key: text.to_lowercase(),
-            claim: VerifiedSpan {
+            owner: AttributeSupport::NotStated,
+            due: AttributeSupport::NotStated,
+            claims: vec![VerifiedSpan {
                 evidence_id: evidence_id.to_string(),
                 raw_start,
                 raw_end: raw_start + 4,
@@ -408,7 +468,7 @@ mod tests {
                 normalized_quote: "ship".to_string(),
                 evidence_text_sha256: "hash".to_string(),
                 segment_capture_incomplete: false,
-            },
+            }],
         }
     }
 
