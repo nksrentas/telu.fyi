@@ -90,6 +90,47 @@ fn score_writes_a_content_free_report_tied_to_the_thresholds_file() {
     }
 }
 
+fn score_with_thresholds(predictions: &Path, thresholds: &Path, out: &Path) -> Output {
+    run(&[
+        "score",
+        "--gold-dir",
+        fixtures().to_str().unwrap(),
+        "--predictions",
+        predictions.to_str().unwrap(),
+        "--labels",
+        fixtures().join("labels-sample.json").to_str().unwrap(),
+        "--thresholds",
+        thresholds.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ])
+}
+
+fn misspelled_thresholds(directory: &Path, name: &str, key: &str, typo: &str) -> PathBuf {
+    let original = text(&fixtures().join("thresholds-test.json"));
+    let path = directory.join(name);
+    fs::write(&path, original.replacen(&format!("\"{key}\""), &format!("\"{typo}\""), 1)).expect("thresholds copy");
+    path
+}
+
+#[test]
+fn score_rejects_a_thresholds_file_that_is_not_v2() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let predictions = replay_predictions(&temp.path().join("run"));
+    let candidates = [
+        fixtures().join("thresholds-v1.json"),
+        misspelled_thresholds(temp.path(), "scope.json", "decision", "decisoin"),
+        misspelled_thresholds(temp.path(), "metric.json", "claimCorrectness", "claimCorectness"),
+    ];
+
+    for (index, thresholds) in candidates.iter().enumerate() {
+        let output = score_with_thresholds(&predictions, thresholds, &temp.path().join(format!("out-{index}")));
+
+        assert!(!output.status.success(), "thresholds candidate {index} was accepted");
+        assert!(String::from_utf8_lossy(&output.stderr).contains("THRESHOLDS_INVALID"), "candidate {index}");
+    }
+}
+
 #[test]
 fn score_rejects_inputs_over_32_mib() {
     let temp = tempfile::tempdir().expect("temp dir");
