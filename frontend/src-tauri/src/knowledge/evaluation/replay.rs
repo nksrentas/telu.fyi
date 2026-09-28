@@ -3,6 +3,7 @@ use super::{
     PredictedItem, PredictedLink, PredictionSet, ReviewOutcomeRates,
 };
 use crate::database::models::{CaptureCompleteness, DateTimeUtc, TranscriptEvidence};
+use crate::database::repositories::meeting::MeetingsRepository;
 use crate::database::repositories::transcript::TranscriptsRepository;
 use crate::knowledge::extraction::{extract_from_segments, input_fingerprint, run_extraction, ExtractionOutcome};
 use crate::knowledge::matcher::normalized_key;
@@ -25,6 +26,8 @@ use uuid::Uuid;
 
 const REPLAY_BUDGET_TOKENS: usize = 100_000;
 const EMPTY_REPLY: &str = "{\"items\": []}";
+const MEETING_SCOPED_TABLES: &str = "SELECT m.name FROM sqlite_master m JOIN pragma_table_info(m.name) p
+     WHERE m.type = 'table' AND p.name = 'meeting_id' ORDER BY m.name";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplayError {
@@ -48,18 +51,24 @@ pub async fn run_replay(
     completions: &HashMap<String, Vec<String>>,
 ) -> Result<PredictionSet, ReplayError> {
     let mut predicted = Vec::new();
-    let mut resurrection = 0;
+    let mut counts = Vec::new();
     for fixture in fixtures {
         let replies = completions.get(&fixture.fixture_id).cloned().unwrap_or_default();
         let outcome = extract_fixture(fixture, &replies).await;
         predicted.push(fixture_predictions(&fixture.fixture_id, &outcome));
-        resurrection += measure_resurrection(fixture, &replies).await?;
+        counts.push(measure_invariants(fixture, FirstPass::Recorded(&replies)).await?);
     }
-    Ok(PredictionSet {
+    Ok(prediction_set(predicted, &counts))
+}
+
+fn prediction_set(fixtures: Vec<FixturePredictions>, counts: &[InvariantCounts]) -> PredictionSet {
+    let probes: u64 = counts.iter().map(|count| count.probes).sum();
+    PredictionSet {
         prompt_version: PROMPT_VERSION.to_string(),
-        fixtures: predicted,
-        resurrection_count: Some(resurrection),
-    })
+        fixtures,
+        resurrection_count: (probes > 0).then(|| counts.iter().map(|count| count.resurrected).sum()),
+        deletion_residue_count: (!counts.is_empty()).then(|| counts.iter().map(|count| count.deletion_residue).sum()),
+    }
 }
 
 fn labeled(fixture: &GoldFixture) -> LabeledSegments {
@@ -162,21 +171,71 @@ fn attribute_links(role: &str, attribute: &AttributeSupport) -> Vec<PredictedLin
     }
 }
 
-async fn measure_resurrection(fixture: &GoldFixture, replies: &[String]) -> Result<u64, ReplayError> {
+enum FirstPass<'a> {
+    Recorded(&'a [String]),
+    Synthesized(String),
+}
+
+struct InvariantCounts {
+    resurrected: u64,
+    probes: u64,
+    deletion_residue: u64,
+}
+
+async fn measure_invariants(fixture: &GoldFixture, first_pass: FirstPass<'_>) -> Result<InvariantCounts, ReplayError> {
     let pool = replay_pool().await?;
     let meeting_id = Uuid::new_v4().to_string();
     seed_meeting(&pool, &meeting_id, &fixture.segments).await?;
     let evidence = TranscriptsRepository::list_evidence_by_meeting(&pool, &meeting_id)
         .await
         .map_err(|_| ReplayError::Storage)?;
-    let first_run = replay_run(&pool, &meeting_id, &evidence, TriggerKind::User, replayer(replies)).await?;
+    let first_run = first_pass_run(&pool, &meeting_id, &evidence, first_pass).await?;
     let rejected = items_of_run(&pool, &meeting_id, &first_run).await?;
     reject_all(&pool, &meeting_id, &rejected).await?;
     let reply = regenerate_reply(&rejected, fixture);
     let second_run =
         replay_run(&pool, &meeting_id, &evidence, TriggerKind::Regenerate, repeat_replayer(reply)).await?;
     let regenerated = items_of_run(&pool, &meeting_id, &second_run).await?;
-    Ok(count_resurrected(&texts(&rejected), &texts(&regenerated)))
+    MeetingsRepository::delete_meeting(&pool, &meeting_id)
+        .await
+        .map_err(|_| ReplayError::Storage)?;
+    Ok(InvariantCounts {
+        resurrected: count_resurrected(&texts(&rejected), &texts(&regenerated)),
+        probes: rejected.len() as u64,
+        deletion_residue: count_deletion_residue(&pool, &meeting_id).await?,
+    })
+}
+
+async fn first_pass_run(
+    pool: &SqlitePool,
+    meeting_id: &str,
+    evidence: &[TranscriptEvidence],
+    first_pass: FirstPass<'_>,
+) -> Result<String, ReplayError> {
+    match first_pass {
+        FirstPass::Recorded(replies) => replay_run(pool, meeting_id, evidence, TriggerKind::User, replayer(replies)).await,
+        FirstPass::Synthesized(reply) => {
+            replay_run(pool, meeting_id, evidence, TriggerKind::User, repeat_replayer(reply)).await
+        }
+    }
+}
+
+pub(super) async fn count_deletion_residue(pool: &SqlitePool, meeting_id: &str) -> Result<u64, ReplayError> {
+    let tables: Vec<String> = sqlx::query_scalar(MEETING_SCOPED_TABLES)
+        .fetch_all(pool)
+        .await
+        .map_err(|_| ReplayError::Storage)?;
+    let terms: Vec<String> = tables
+        .iter()
+        .map(|table| format!("(SELECT COUNT(*) FROM \"{table}\" WHERE meeting_id = ?1)"))
+        .chain(std::iter::once("(SELECT COUNT(*) FROM meetings WHERE id = ?1)".to_string()))
+        .collect();
+    let residue: i64 = sqlx::query_scalar(&format!("SELECT {}", terms.join(" + ")))
+        .bind(meeting_id)
+        .fetch_one(pool)
+        .await
+        .map_err(|_| ReplayError::Storage)?;
+    Ok(residue.max(0) as u64)
 }
 
 async fn reject_all(pool: &SqlitePool, meeting_id: &str, items: &[KnowledgeItemView]) -> Result<(), ReplayError> {
@@ -240,7 +299,7 @@ fn repeat_replayer(reply: String) -> impl FnMut(String, String) -> std::future::
     move |_, _| std::future::ready(Ok(reply.clone()))
 }
 
-async fn replay_pool() -> Result<SqlitePool, ReplayError> {
+pub(super) async fn replay_pool() -> Result<SqlitePool, ReplayError> {
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
         .connect("sqlite::memory:")
@@ -253,7 +312,7 @@ async fn replay_pool() -> Result<SqlitePool, ReplayError> {
     Ok(pool)
 }
 
-async fn seed_meeting(pool: &SqlitePool, meeting_id: &str, segments: &[GoldSegment]) -> Result<(), ReplayError> {
+pub(super) async fn seed_meeting(pool: &SqlitePool, meeting_id: &str, segments: &[GoldSegment]) -> Result<(), ReplayError> {
     let now = Utc::now();
     sqlx::query(
         "INSERT INTO meetings (id, title, created_at, updated_at, lifecycle, completeness, completeness_reason, started_at_utc)
@@ -372,19 +431,41 @@ pub async fn export_from_db(
     let pool = read_only_pool(db_path).await?;
     let mut fixtures = Vec::new();
     let mut predicted = Vec::new();
+    let mut counts = Vec::new();
     for meeting_id in meeting_ids {
         let (fixture, predictions) = export_meeting(&pool, meeting_id).await?;
+        let first_pass = FirstPass::Synthesized(claim_reply(&fixture, &predictions.items));
+        counts.push(measure_invariants(&fixture, first_pass).await?);
         fixtures.push(fixture);
         predicted.push(predictions);
     }
-    Ok((
-        fixtures,
-        PredictionSet {
-            prompt_version: PROMPT_VERSION.to_string(),
-            fixtures: predicted,
-            resurrection_count: None,
-        },
-    ))
+    Ok((fixtures, prediction_set(predicted, &counts)))
+}
+
+fn claim_reply(fixture: &GoldFixture, items: &[PredictedItem]) -> String {
+    let entries: Vec<Value> = items
+        .iter()
+        .filter_map(|item| {
+            claim_link_evidence(fixture, &item.links).map(|evidence| {
+                json!({
+                    "type": item.item_type.as_str(),
+                    "text": item.text,
+                    "evidence": [evidence],
+                    "owner": null,
+                    "due": null,
+                })
+            })
+        })
+        .collect();
+    json!({ "items": entries }).to_string()
+}
+
+fn claim_link_evidence(fixture: &GoldFixture, links: &[PredictedLink]) -> Option<Value> {
+    let claims: Vec<&PredictedLink> = links.iter().filter(|link| link.role == EvidenceRole::Claim.as_str()).collect();
+    let first = claims.first()?;
+    let position = fixture.segments.iter().position(|segment| segment.id == first.segment_id)?;
+    let quote = claims.iter().map(|link| link.quote.as_str()).collect::<Vec<_>>().join(" ");
+    Some(json!({ "segment": format!("S{}", position + 1), "quote": quote }))
 }
 
 async fn read_only_pool(db_path: &Path) -> Result<SqlitePool, ReplayError> {

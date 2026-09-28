@@ -91,7 +91,10 @@ pub struct FixturePredictions {
 pub struct PredictionSet {
     pub prompt_version: String,
     pub fixtures: Vec<FixturePredictions>,
+    #[serde(default)]
     pub resurrection_count: Option<u64>,
+    #[serde(default)]
+    pub deletion_residue_count: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -387,18 +390,27 @@ pub fn gate(report: &EvaluationReport, thresholds: &Thresholds) -> (GateStatus, 
 }
 
 fn invariant_failures(report: &EvaluationReport, thresholds: &Thresholds) -> Vec<String> {
-    let mut failures = Vec::new();
-    let exact = report.invariants.exact_span_support;
-    if exact.status == MetricStatus::Measured && !meets(exact, thresholds.invariants.exact_span_support) {
-        failures.push("invariants.exactSpanSupport".to_string());
-    }
-    if report.invariants.resurrection.is_some_and(|count| count > thresholds.invariants.resurrection) {
-        failures.push("invariants.resurrection".to_string());
-    }
-    if report.invariants.deletion_residue.is_some_and(|count| count > thresholds.invariants.deletion_residue) {
-        failures.push("invariants.deletionResidue".to_string());
-    }
-    failures
+    let invariants = &report.invariants;
+    let exact = invariants.exact_span_support;
+    let limits = thresholds.invariants;
+    [
+        ("invariants.exactSpanSupport.unmeasured", exact.status != MetricStatus::Measured),
+        ("invariants.resurrection.unmeasured", invariants.resurrection.is_none()),
+        ("invariants.deletionResidue.unmeasured", invariants.deletion_residue.is_none()),
+        (
+            "invariants.exactSpanSupport",
+            exact.status == MetricStatus::Measured && !meets(exact, limits.exact_span_support),
+        ),
+        ("invariants.resurrection", invariants.resurrection.is_some_and(|count| count > limits.resurrection)),
+        (
+            "invariants.deletionResidue",
+            invariants.deletion_residue.is_some_and(|count| count > limits.deletion_residue),
+        ),
+    ]
+    .into_iter()
+    .filter(|(_, failed)| *failed)
+    .map(|(name, _)| name.to_string())
+    .collect()
 }
 
 fn scope_failures(metrics: &ScopeMetrics, scope: &ScopeThresholds) -> Vec<String> {
@@ -440,7 +452,7 @@ pub fn score(input: &ScoreInput<'_>, envelope: ReportEnvelope) -> EvaluationRepo
         invariants: InvariantResults {
             exact_span_support: overall_exact,
             resurrection: input.predictions.resurrection_count,
-            deletion_residue: None,
+            deletion_residue: input.predictions.deletion_residue_count,
         },
         metrics,
         gate: GateStatus::Undeclared,
