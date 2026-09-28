@@ -15,7 +15,6 @@ import {
 interface StatusOverlaysProps {
   isProcessing: boolean;
   isSaving: boolean;
-  sidebarCollapsed: boolean;
 }
 
 type AuthoritativeFinalization = FinalizationProgressSnapshot | FinalizationSnapshot;
@@ -51,7 +50,6 @@ function finalizationDetail(snapshot: FinalizationProgressSnapshot): string {
 export function StatusOverlays({
   isProcessing,
   isSaving,
-  sidebarCollapsed,
 }: StatusOverlaysProps) {
   const router = useRouter();
   const recordingState = useRecordingState();
@@ -175,11 +173,8 @@ export function StatusOverlays({
   };
 
   return (
-    <div className="fixed bottom-4 left-0 right-0 z-10 px-4">
-      <div
-        className="flex justify-center transition-[margin] duration-200"
-        style={{ marginLeft: sidebarCollapsed ? '4rem' : '16rem' }}
-      >
+    <div className="absolute inset-x-0 bottom-4 z-10 px-4">
+      <div className="flex justify-center">
         <div className="flex w-full max-w-[750px] justify-center">
           <section className="w-full rounded-lg border border-border bg-card px-4 py-3 text-foreground shadow-lg">
             <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">

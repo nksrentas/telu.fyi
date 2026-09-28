@@ -1,19 +1,16 @@
 import { afterAll, describe, expect, mock, test } from 'bun:test';
-import { listAgendaDay, localDayBounds } from '../../src/lib/agenda-service';
-
-type TauriWindow = { __TAURI_INTERNALS__: { invoke: typeof ipcInvoke } };
 
 const originalTimeZone = process.env.TZ;
-const globalWithWindow = globalThis as typeof globalThis & { window?: TauriWindow };
-const originalWindow = globalWithWindow.window;
+const originalCore = { ...await import('@tauri-apps/api/core') };
 const ipcInvoke = mock(async (_command: string, _args?: unknown, _options?: unknown): Promise<unknown> => []);
+mock.module('@tauri-apps/api/core', () => ({ ...originalCore, invoke: ipcInvoke }));
+const { listAgendaDay, localDayBounds } = await import('../../src/lib/agenda-service');
 
 process.env.TZ = 'Europe/Istanbul';
-globalWithWindow.window = { __TAURI_INTERNALS__: { invoke: ipcInvoke } };
 
 afterAll(() => {
   process.env.TZ = originalTimeZone;
-  globalWithWindow.window = originalWindow;
+  mock.module('@tauri-apps/api/core', () => originalCore);
 });
 
 describe('agenda-service', () => {

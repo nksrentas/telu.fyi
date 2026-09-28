@@ -1,0 +1,50 @@
+[
+  {
+    "name": "home-in-shell",
+    "path": "/"
+  },
+  {
+    "name": "settings-in-shell",
+    "path": "/settings"
+  },
+  {
+    "name": "sidebar-today-count",
+    "path": "/",
+    "ipc": {
+      "agenda_counts": {
+        "dayCount": 3,
+        "pendingTotal": 0
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "a[aria-label=\"Today, 3 meetings\"]"
+      }
+    ]
+  },
+  {
+    "name": "sidebar-import-row",
+    "path": "/",
+    "localStorage": {
+      "betaFeatures": "{\"importAndRetranscribe\": true}"
+    },
+    "steps": [
+      {
+        "waitFor": "nav button:has-text(\"Import audio\")"
+      }
+    ]
+  },
+  {
+    "name": "shell-min-height",
+    "path": "/settings",
+    "viewport": {
+      "width": 900,
+      "height": 600
+    },
+    "steps": [
+      {
+        "waitFor": "text=Stored on this Mac"
+      }
+    ]
+  }
+]

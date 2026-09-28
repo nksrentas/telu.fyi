@@ -76,7 +76,7 @@
     },
     {
       "id": "9d3e4f50-6172-4c8d-8e9f-1a2b3c4d5e6f",
-      "title": "Customer call \u2014 Acme",
+      "title": "Customer call — Acme",
       "lifecycle": "legacy",
       "completeness": "completion_not_verified",
       "gap_count": 0,
@@ -334,5 +334,10 @@
       "status": "Missing"
     }
   ],
-  "track_analytics_transparency_viewed": null
+  "track_analytics_transparency_viewed": null,
+  "agenda_counts": {
+    "dayCount": 0,
+    "pendingTotal": 0
+  },
+  "agenda_list_day": []
 }
