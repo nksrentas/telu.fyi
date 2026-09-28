@@ -7,40 +7,109 @@ const THRESHOLDS_PATH = 'frontend/src-tauri/tests/fixtures/knowledge-eval/thresh
 const EVAL_DIR = '.planning/phases/02-evidence-linked-post-meeting-knowledge/eval';
 const STATUS_PATH = `${EVAL_DIR}/know-07-status.json`;
 const REPRESENTATIVE_REPORT_PATH = `${EVAL_DIR}/representative-report.json`;
-const MAX_CONTENT_FREE_STRING = 80;
 
-function leaves(value) {
-  if (value !== null && typeof value === 'object') return Object.values(value).flatMap(leaves);
-  return [value];
+const THRESHOLDS_VERSION = 2;
+const REPORT_SCHEMA_VERSION = 1;
+const SCOPES = ['decision', 'commitment', 'question', 'fact', 'overall'];
+const MIN_METRICS = ['claimCorrectness', 'semanticSupport', 'evidenceCoverage', 'attribution', 'minReviewAccepted'];
+const MAX_METRICS = ['maxDuplication'];
+const ABSTENTION_METRICS = ['insufficientEvidence'];
+const INVARIANTS = { exactSpanSupport: 1, resurrection: 0, deletionResidue: 0 };
+const CONTENT_FREE_TOKEN = /^[A-Za-z0-9_.:+#-]{0,80}$/;
+
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const minimumInRange = (leaf) => leaf === null || (typeof leaf === 'number' && leaf > 0 && leaf <= 1);
+const maximumInRange = (leaf) => leaf === null || (typeof leaf === 'number' && leaf >= 0 && leaf < 1);
+
+function hasExactKeys(value, keys) {
+  return isPlainObject(value) && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
+}
+
+function scopeValid(scope) {
+  return (
+    hasExactKeys(scope, [...MIN_METRICS, ...MAX_METRICS]) &&
+    MIN_METRICS.every((metric) => minimumInRange(scope[metric])) &&
+    MAX_METRICS.every((metric) => maximumInRange(scope[metric]))
+  );
+}
+
+function qualityValid(quality) {
+  return (
+    hasExactKeys(quality, ['abstention', ...SCOPES]) &&
+    hasExactKeys(quality.abstention, ABSTENTION_METRICS) &&
+    ABSTENTION_METRICS.every((metric) => minimumInRange(quality.abstention[metric])) &&
+    SCOPES.every((scope) => scopeValid(quality[scope]))
+  );
+}
+
+function invariantsExact(invariants) {
+  return (
+    hasExactKeys(invariants, Object.keys(INVARIANTS)) &&
+    Object.entries(INVARIANTS).every(([name, required]) => invariants[name] === required)
+  );
 }
 
 function thresholdsValid(thresholds) {
-  return thresholds !== null && typeof thresholds === 'object';
+  return (
+    hasExactKeys(thresholds, ['version', 'invariants', 'quality']) &&
+    thresholds.version === THRESHOLDS_VERSION &&
+    invariantsExact(thresholds.invariants) &&
+    qualityValid(thresholds.quality)
+  );
 }
 
 function thresholdsDeclared(thresholds) {
-  const quality = Object.entries(thresholds)
-    .filter(([key]) => key !== 'version' && key !== 'invariants')
-    .flatMap(([, value]) => leaves(value));
-  return quality.length > 0 && quality.every((leaf) => typeof leaf === 'number' && leaf >= 0 && leaf <= 1);
+  if (!thresholdsValid(thresholds)) return false;
+  const { quality } = thresholds;
+  const leaves = [quality.abstention, ...SCOPES.map((scope) => quality[scope])].flatMap(Object.values);
+  return leaves.every((leaf) => leaf !== null);
 }
 
 function contentFree(value) {
-  return leaves(value).every((leaf) => typeof leaf !== 'string' || leaf.length <= MAX_CONTENT_FREE_STRING);
+  if (typeof value === 'string') return CONTENT_FREE_TOKEN.test(value);
+  if (value !== null && typeof value === 'object') {
+    return Object.entries(value).every(([key, child]) => CONTENT_FREE_TOKEN.test(key) && contentFree(child));
+  }
+  return true;
+}
+
+function gatePassed(report) {
+  return report.gate === 'pass' && Array.isArray(report.failures) && report.failures.length === 0;
+}
+
+function invariantsMet(invariants) {
+  const exactSpan = invariants?.exactSpanSupport;
+  return (
+    isPlainObject(invariants) &&
+    isPlainObject(exactSpan) &&
+    exactSpan.status === 'measured' &&
+    exactSpan.value === 1 &&
+    invariants.resurrection === 0 &&
+    invariants.deletionResidue === 0
+  );
+}
+
+function thresholdsReasons(thresholds) {
+  if (!thresholdsValid(thresholds)) return ['thresholds_invalid'];
+  if (!thresholdsDeclared(thresholds)) return ['quality_thresholds_undeclared'];
+  return [];
+}
+
+function reportReasons(report, thresholdsSha256) {
+  if (report === null || report === undefined) return ['representative_evaluation_pending'];
+  if (!contentFree(report)) return ['representative_report_contains_content'];
+  const checks = [
+    [report.schemaVersion === REPORT_SCHEMA_VERSION, 'representative_schema_unknown'],
+    [typeof report.thresholdsSha256 === 'string' && report.thresholdsSha256 === thresholdsSha256, 'representative_thresholds_mismatch'],
+    [gatePassed(report), 'representative_gate_not_pass'],
+    [invariantsMet(report.invariants), 'representative_invariants_not_met'],
+  ];
+  return checks.filter(([met]) => !met).map(([, reason]) => reason);
 }
 
 function deriveKnow07Status(thresholds, representativeReport, thresholdsSha256) {
-  const reasons = [];
-  if (!thresholdsValid(thresholds)) reasons.push('thresholds_invalid');
-  else if (!thresholdsDeclared(thresholds)) reasons.push('quality_thresholds_undeclared');
-  if (!representativeReport || !contentFree(representativeReport)) {
-    reasons.push('representative_evaluation_pending');
-  } else {
-    if (representativeReport.thresholdsSha256 !== thresholdsSha256) reasons.push('representative_thresholds_mismatch');
-    if (representativeReport.gate !== 'pass') reasons.push('representative_gate_not_pass');
-  }
-  const sorted = [...reasons].sort();
-  return { status: sorted.length === 0 ? 'satisfied' : 'open', reasons: sorted };
+  const reasons = [...thresholdsReasons(thresholds), ...reportReasons(representativeReport, thresholdsSha256)].sort();
+  return { status: reasons.length === 0 ? 'satisfied' : 'open', reasons };
 }
 
 function readCommittedInputs(root) {
@@ -65,6 +134,12 @@ if (require.main === module) {
 module.exports = {
   REPO_ROOT,
   STATUS_PATH,
+  THRESHOLDS_VERSION,
+  REPORT_SCHEMA_VERSION,
+  SCOPES,
+  MIN_METRICS,
+  MAX_METRICS,
+  CONTENT_FREE_TOKEN,
   deriveKnow07Status,
   thresholdsValid,
   thresholdsDeclared,
