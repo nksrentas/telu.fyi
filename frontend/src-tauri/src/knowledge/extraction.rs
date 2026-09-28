@@ -450,7 +450,8 @@ mod regenerate_tests;
 mod tests {
     use super::*;
     use crate::database::repositories::transcript::TranscriptsRepository;
-    use crate::knowledge::models::EvidenceRole;
+    use crate::knowledge::models::{EvidenceRole, FieldSupport, ReviewAction};
+    use crate::knowledge::review::append_review;
     use crate::knowledge::prompt::PROMPT_VERSION;
     use crate::knowledge::repository::NewRun;
     use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
@@ -646,6 +647,45 @@ mod tests {
             .await
             .expect("link roles");
         assert_eq!(roles, vec!["claim", "owner"]);
+    }
+
+    #[tokio::test]
+    async fn knowledge_extraction_never_states_an_owner_that_only_matches_part_of_a_word() {
+        let texts = [
+            "Good morning everyone.",
+            "We ship tomorrow for sure.",
+            "Joanne will handle the rollout plan.",
+            "Everyone decided to freeze the API.",
+        ];
+        let (pool, evidence) = meeting_with_texts(MEETING_ID, &texts).await;
+        let reply = r#"{"items":[
+            {"type":"commitment","text":"Ship tomorrow","evidence":[{"segment":"S2","quote":"We ship tomorrow for sure"}],"owner":{"value":"Tom","segment":"S2","quote":"We ship tomorrow for sure"},"due":null},
+            {"type":"commitment","text":"Handle the rollout plan","evidence":[{"segment":"S3","quote":"Joanne will handle the rollout plan"}],"owner":{"value":"Ann","segment":"S3","quote":"Joanne will handle the rollout plan"},"due":null},
+            {"type":"decision","text":"Freeze the API","evidence":[{"segment":"S4","quote":"Everyone decided to freeze the API"}],"owner":{"value":"Ed","segment":"S4","quote":"Everyone decided to freeze the API"},"due":null}
+        ]}"#;
+
+        let outcome = run_with_replies(&pool, &evidence, LARGE_BUDGET, vec![reply]).await;
+
+        assert_eq!(outcome.counts.proposed, 3);
+        let owners: Vec<(Option<String>, String)> = sqlx::query_as("SELECT owner_text, owner_support FROM knowledge_items")
+            .fetch_all(&pool)
+            .await
+            .expect("item owners");
+        assert!(owners.iter().all(|owner| owner == &(None, "not_stated".to_string())));
+        let roles: Vec<String> = sqlx::query_scalar("SELECT DISTINCT role FROM knowledge_evidence_links")
+            .fetch_all(&pool)
+            .await
+            .expect("link roles");
+        assert_eq!(roles, vec!["claim"]);
+        let item_ids: Vec<String> = sqlx::query_scalar("SELECT item_id FROM knowledge_items")
+            .fetch_all(&pool)
+            .await
+            .expect("item ids");
+        for item_id in item_ids {
+            append_review(&pool, MEETING_ID, &item_id, ReviewAction::Accept).await.expect("accept");
+            let view = KnowledgeRepository::item_view(&pool, MEETING_ID, &item_id).await.expect("item view");
+            assert_eq!((view.owner_support, view.unresolved), (FieldSupport::NotStated, true));
+        }
     }
 
     #[tokio::test]

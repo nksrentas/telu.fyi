@@ -349,4 +349,21 @@ mod tests {
             AttributeSupport::NotStated => panic!("due quote states by Friday"),
         }
     }
+
+    #[test]
+    fn verify_attribute_rejects_values_that_only_match_part_of_a_word() {
+        let partial = LabeledSegments::new(vec![
+            segment("S1", "We ship tomorrow for sure.", false),
+            segment("S2", "Joanne will handle it.", false),
+            segment("S3", "Everyone decided to freeze the API.", false),
+        ]);
+
+        let tom = verify_attribute("Tom", "S1", "we ship tomorrow for sure", &partial);
+        let ann = verify_attribute("Ann", "S2", "Joanne will handle it", &partial);
+        let ed = verify_attribute("Ed", "S3", "everyone decided to freeze the API", &partial);
+
+        assert_eq!(tom, AttributeSupport::NotStated);
+        assert_eq!(ann, AttributeSupport::NotStated);
+        assert_eq!(ed, AttributeSupport::NotStated);
+    }
 }
