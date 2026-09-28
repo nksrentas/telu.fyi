@@ -50,6 +50,8 @@
     const table = window.__TELU_IPC__ || {};
     if (Object.prototype.hasOwnProperty.call(table, cmd)) {
       const value = resolveEntry(table[cmd], args);
+      if (value && typeof value === 'object' && '$pending' in value) return new Promise(() => {});
+      if (value && typeof value === 'object' && '$error' in value) throw value.$error;
       return value === undefined ? null : JSON.parse(JSON.stringify(value));
     }
     window.__TELU_UNMOCKED__.push(cmd);

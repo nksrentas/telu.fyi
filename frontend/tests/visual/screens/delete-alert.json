@@ -1,0 +1,151 @@
+[
+  {
+    "name": "delete-alert-counts",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [],
+      "knowledge_deletion_impact": {
+        "accepted": 3,
+        "suggestions": 5,
+        "rejected": 1,
+        "runs": 2
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"More\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Delete meeting…\")"
+      },
+      {
+        "waitFor": "[role=alertdialog]"
+      },
+      {
+        "waitFor": "text=3 accepted items"
+      }
+    ]
+  },
+  {
+    "name": "delete-alert-zero",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [],
+      "knowledge_deletion_impact": {
+        "accepted": 0,
+        "suggestions": 0,
+        "rejected": 0,
+        "runs": 0
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"More\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Delete meeting…\")"
+      },
+      {
+        "waitFor": "[role=alertdialog]"
+      },
+      {
+        "waitFor": "text=Its transcript and summary"
+      }
+    ]
+  },
+  {
+    "name": "delete-alert-loading",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [],
+      "knowledge_deletion_impact": {
+        "$pending": true
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"More\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Delete meeting…\")"
+      },
+      {
+        "waitFor": "[role=alertdialog]"
+      }
+    ]
+  },
+  {
+    "name": "delete-alert-error",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [],
+      "knowledge_deletion_impact": {
+        "accepted": 1,
+        "suggestions": 1,
+        "rejected": 0,
+        "runs": 1
+      },
+      "api_delete_meeting": {
+        "$error": "Failed to delete meeting"
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"More\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Delete meeting…\")"
+      },
+      {
+        "waitFor": "[role=alertdialog]"
+      },
+      {
+        "waitFor": "text=1 accepted item"
+      },
+      {
+        "click": "[role=alertdialog] button:has-text(\"Delete\")"
+      },
+      {
+        "waitFor": "text=Couldn't delete this meeting."
+      }
+    ]
+  },
+  {
+    "name": "delete-alert-long-title",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [],
+      "knowledge_deletion_impact": {
+        "accepted": 2,
+        "suggestions": 0,
+        "rejected": 0,
+        "runs": 1
+      },
+      "api_get_meeting_metadata": {
+        "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "title": "Quarterly planning review with the platform, design and customer success teams about the Q4 launch sequence",
+        "created_at": "2026-09-27T09:00:00Z",
+        "updated_at": "2026-09-27T09:44:00Z",
+        "folder_path": "/Users/demo/Movies/Telu/Weekly product sync",
+        "lifecycle": "complete",
+        "completeness": "complete",
+        "gap_count": 0,
+        "gaps": []
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"More\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Delete meeting…\")"
+      },
+      {
+        "waitFor": "[role=alertdialog]"
+      },
+      {
+        "waitFor": "text=2 accepted items"
+      }
+    ]
+  }
+]

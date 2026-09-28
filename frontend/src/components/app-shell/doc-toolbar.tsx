@@ -1,5 +1,6 @@
 "use client"
 
+import { Fragment } from "react"
 import { ChevronLeft, MoreHorizontal, PanelRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -7,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -17,6 +19,9 @@ export interface DocToolbarMenuItem {
   id: string
   label: string
   onSelect: () => void
+  danger?: boolean
+  disabled?: boolean
+  separatorBefore?: boolean
 }
 
 interface DocToolbarProps {
@@ -76,9 +81,16 @@ export function DocToolbar({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               {menuItems.map((item) => (
-                <DropdownMenuItem key={item.id} onSelect={item.onSelect}>
-                  {item.label}
-                </DropdownMenuItem>
+                <Fragment key={item.id}>
+                  {item.separatorBefore && <DropdownMenuSeparator />}
+                  <DropdownMenuItem
+                    variant={item.danger ? "danger" : "default"}
+                    disabled={item.disabled}
+                    onSelect={item.onSelect}
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                </Fragment>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>

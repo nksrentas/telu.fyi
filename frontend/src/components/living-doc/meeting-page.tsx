@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation"
 
 import { DocToolbar, type DocToolbarMenuItem } from "@/components/app-shell/doc-toolbar"
 import { RetranscribeDialog } from "@/components/MeetingDetails/RetranscribeDialog"
+import { useSidebar } from "@/components/Sidebar/SidebarProvider"
 import { useConfig } from "@/contexts/ConfigContext"
 import { useCopyOperations } from "@/hooks/meeting-details/useCopyOperations"
 import { useMeetingOperations } from "@/hooks/meeting-details/useMeetingOperations"
 import Analytics from "@/lib/analytics"
+import type { MeetingLifecycle } from "@/types"
+import { DeleteMeetingAlert, isDeleteDisabled } from "./delete-meeting-alert"
 import { formatMeetingDay } from "./meeting-header"
 import { TranscriptDrawer, type EvidenceHighlight, type TranscriptDrawerHandle } from "./transcript-drawer"
 
@@ -20,6 +23,7 @@ export interface MeetingPageMeeting {
   title: string
   created_at: string
   folder_path?: string
+  lifecycle?: MeetingLifecycle
 }
 
 interface MeetingPageProps {
@@ -81,6 +85,8 @@ export function MeetingPage({
     initialEvidenceId ? { evidenceIds: [initialEvidenceId], spans: [] } : null
   )
   const [retranscribeOpen, setRetranscribeOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const { refetchMeetings } = useSidebar()
   const { scrolled, compactTitle, onScroll } = useScrollState(scrollRef)
   const mainWidth = useMainWidth(scrollRef)
   const { handleOpenMeetingFolder } = useMeetingOperations({ meeting })
@@ -125,19 +131,28 @@ export function MeetingPage({
       { id: "copy-transcript", label: "Copy transcript", onSelect: copyTranscript },
       { id: "open-recording-folder", label: "Open recording folder", onSelect: openRecordingFolder },
     ]
-    if (!canRetranscribe) return items
-    return [
-      ...items,
-      {
-        id: "retranscribe",
-        label: "Retranscribe…",
-        onSelect: () => {
-          Analytics.trackButtonClick("enhance_transcript", "meeting_details")
-          setRetranscribeOpen(true)
-        },
-      },
-    ]
-  }, [canRetranscribe, copyTranscript, openRecordingFolder])
+    const retranscribe: DocToolbarMenuItem[] = canRetranscribe
+      ? [
+          {
+            id: "retranscribe",
+            label: "Retranscribe…",
+            onSelect: () => {
+              Analytics.trackButtonClick("enhance_transcript", "meeting_details")
+              setRetranscribeOpen(true)
+            },
+          },
+        ]
+      : []
+    const deletion: DocToolbarMenuItem = {
+      id: "delete-meeting",
+      label: "Delete meeting…",
+      danger: true,
+      separatorBefore: true,
+      disabled: isDeleteDisabled(meeting.lifecycle),
+      onSelect: () => setDeleteOpen(true),
+    }
+    return [...items, ...retranscribe, deletion]
+  }, [canRetranscribe, copyTranscript, openRecordingFolder, meeting.lifecycle])
 
   const shift = drawerOpen ? drawerShift(mainWidth) : 0
 
@@ -171,6 +186,13 @@ export function MeetingPage({
         highlight={highlight}
         onCopyTranscript={copyTranscript}
         onOpenRecordingFolder={openRecordingFolder}
+      />
+      <DeleteMeetingAlert
+        meetingId={meeting.id}
+        title={meeting.title}
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        onDeleted={() => void refetchMeetings()}
       />
       {canRetranscribe && meeting.folder_path && (
         <RetranscribeDialog
