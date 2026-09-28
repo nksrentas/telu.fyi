@@ -2,10 +2,14 @@ pub mod replay;
 
 use crate::knowledge::models::KnowledgeType;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub const REPORT_SCHEMA_VERSION: u16 = 1;
 pub const SCOPES: [&str; 5] = ["decision", "commitment", "question", "fact", "overall"];
+pub const THRESHOLDS_VERSION: u16 = 2;
+pub const MIN_REPRESENTATIVE_FIXTURES: usize = 5;
+pub const MIN_INSUFFICIENT_EVIDENCE_FIXTURES: usize = 1;
+pub const MIN_DEGRADED_CAPTURE_FIXTURES: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -124,12 +128,39 @@ pub struct ScopeThresholds {
     pub semantic_support: Option<f64>,
     pub evidence_coverage: Option<f64>,
     pub attribution: Option<f64>,
+    pub max_duplication: Option<f64>,
+    pub min_review_accepted: Option<f64>,
+}
+
+impl ScopeThresholds {
+    fn minimums(&self) -> [Option<f64>; 5] {
+        [
+            self.claim_correctness,
+            self.semantic_support,
+            self.evidence_coverage,
+            self.attribution,
+            self.min_review_accepted,
+        ]
+    }
+
+    fn fully_declared(&self) -> bool {
+        self.minimums().iter().all(Option::is_some) && self.max_duplication.is_some()
+    }
+
+    fn in_range(&self) -> bool {
+        self.minimums().into_iter().flatten().all(minimum_in_range)
+            && self.max_duplication.map_or(true, |value| (0.0..1.0).contains(&value))
+    }
+}
+
+fn minimum_in_range(value: f64) -> bool {
+    value > 0.0 && value <= 1.0
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AbstentionThreshold {
-    pub insufficient_evidence: f64,
+    pub insufficient_evidence: Option<f64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -146,6 +177,37 @@ pub struct Thresholds {
     pub version: u16,
     pub invariants: InvariantThresholds,
     pub quality: QualityThresholds,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThresholdsError {
+    UnsupportedVersion,
+    InvariantsChanged,
+    UnknownScope,
+    OutOfRange,
+}
+
+impl Thresholds {
+    pub fn validate(&self) -> Result<(), ThresholdsError> {
+        let fixed = InvariantThresholds { exact_span_support: 1.0, resurrection: 0, deletion_residue: 0 };
+        let scopes_in_range = self.quality.scopes.values().flatten().all(ScopeThresholds::in_range);
+        let abstention_in_range = self
+            .quality
+            .abstention
+            .and_then(|abstention| abstention.insufficient_evidence)
+            .map_or(true, minimum_in_range);
+        if self.version != THRESHOLDS_VERSION {
+            Err(ThresholdsError::UnsupportedVersion)
+        } else if self.invariants != fixed {
+            Err(ThresholdsError::InvariantsChanged)
+        } else if self.quality.scopes.keys().any(|scope| !SCOPES.contains(&scope.as_str())) {
+            Err(ThresholdsError::UnknownScope)
+        } else if !(scopes_in_range && abstention_in_range) {
+            Err(ThresholdsError::OutOfRange)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -247,9 +309,10 @@ pub fn score_scope(scope: &str, input: &ScoreInput<'_>, categories: Option<Fixtu
         .filter(|fixture| categories.map_or(true, |category| fixture.category == category))
         .collect();
     let in_scope = |item_type: KnowledgeType| scope == "overall" || scope == item_type.as_str();
+    let missing = FixturePredictions::default();
     let pairs: Vec<(&GoldFixture, &FixturePredictions)> = fixtures
         .iter()
-        .filter_map(|fixture| predictions_for(input.predictions, &fixture.fixture_id).map(|found| (*fixture, found)))
+        .map(|fixture| (*fixture, predictions_for(input.predictions, &fixture.fixture_id).unwrap_or(&missing)))
         .collect();
     let shown: Vec<(&GoldFixture, &PredictedItem)> = pairs
         .iter()
@@ -351,7 +414,7 @@ pub fn abstention_rate(input: &ScoreInput<'_>) -> MetricValue {
     let abstained = insufficient
         .iter()
         .filter(|fixture| {
-            predictions_for(input.predictions, &fixture.fixture_id).map_or(true, |predicted| {
+            predictions_for(input.predictions, &fixture.fixture_id).is_some_and(|predicted| {
                 predicted
                     .items
                     .iter()
@@ -362,31 +425,88 @@ pub fn abstention_rate(input: &ScoreInput<'_>) -> MetricValue {
     ratio(abstained, insufficient.len() as u64)
 }
 
-pub fn gate(report: &EvaluationReport, thresholds: &Thresholds) -> (GateStatus, Vec<String>) {
-    let mut failures = invariant_failures(report, thresholds);
-    let mut undeclared = false;
-    for metrics in &report.metrics {
-        match thresholds.quality.scopes.get(&metrics.scope) {
-            Some(Some(scope)) => failures.extend(scope_failures(metrics, scope)),
-            _ => undeclared = true,
-        }
-    }
-    match &thresholds.quality.abstention {
-        Some(threshold) => {
-            if !meets(report.abstention, threshold.insufficient_evidence) {
-                failures.push("abstention.insufficientEvidence".to_string());
-            }
-        }
-        None => undeclared = true,
-    }
+pub fn gate(report: &EvaluationReport, thresholds: &Thresholds, input_failures: Vec<String>) -> (GateStatus, Vec<String>) {
+    let failures: Vec<String> = invariant_failures(report, thresholds)
+        .into_iter()
+        .chain(input_failures)
+        .chain(SCOPES.iter().flat_map(|scope| declared_scope_failures(report, thresholds, scope)))
+        .chain(abstention_failures(report, thresholds))
+        .collect();
     let status = if !failures.is_empty() {
         GateStatus::Fail
-    } else if undeclared {
+    } else if undeclared(thresholds) {
         GateStatus::Undeclared
     } else {
         GateStatus::Pass
     };
     (status, failures)
+}
+
+fn undeclared(thresholds: &Thresholds) -> bool {
+    let scope_undeclared = SCOPES.iter().any(|scope| {
+        !thresholds
+            .quality
+            .scopes
+            .get(*scope)
+            .copied()
+            .flatten()
+            .is_some_and(|declared| declared.fully_declared())
+    });
+    let abstention_undeclared = thresholds
+        .quality
+        .abstention
+        .and_then(|abstention| abstention.insufficient_evidence)
+        .is_none();
+    scope_undeclared || abstention_undeclared
+}
+
+fn abstention_failures(report: &EvaluationReport, thresholds: &Thresholds) -> Option<String> {
+    thresholds
+        .quality
+        .abstention
+        .and_then(|abstention| abstention.insufficient_evidence)
+        .filter(|threshold| !meets(report.abstention, *threshold))
+        .map(|_| "abstention.insufficientEvidence".to_string())
+}
+
+pub fn input_failures(input: &ScoreInput<'_>) -> Vec<String> {
+    let count = |category: FixtureCategory| input.fixtures.iter().filter(|fixture| fixture.category == category).count();
+    [
+        ("inputs.predictionsMismatch", predictions_mismatch(input)),
+        ("inputs.representativeFixtures", count(FixtureCategory::Representative) < MIN_REPRESENTATIVE_FIXTURES),
+        (
+            "inputs.insufficientEvidenceFixtures",
+            count(FixtureCategory::InsufficientEvidence) < MIN_INSUFFICIENT_EVIDENCE_FIXTURES,
+        ),
+        ("inputs.degradedCaptureFixtures", count(FixtureCategory::DegradedCapture) < MIN_DEGRADED_CAPTURE_FIXTURES),
+    ]
+    .into_iter()
+    .filter(|(_, failed)| *failed)
+    .map(|(name, _)| name.to_string())
+    .collect()
+}
+
+fn predictions_mismatch(input: &ScoreInput<'_>) -> bool {
+    let predicted: Vec<&str> = input.predictions.fixtures.iter().map(|set| set.fixture_id.as_str()).collect();
+    let unique: HashSet<&str> = predicted.iter().copied().collect();
+    let gold: HashSet<&str> = input.fixtures.iter().map(|fixture| fixture.fixture_id.as_str()).collect();
+    unique.len() != predicted.len() || unique != gold
+}
+
+pub fn review_accepted(rates: &ReviewOutcomeRates) -> MetricValue {
+    ratio(rates.accepted.numerator + rates.corrected.numerator, rates.accepted.denominator)
+}
+
+fn scope_review(report: &EvaluationReport, scope: &str) -> Option<MetricValue> {
+    let outcomes = report.review_outcomes.as_ref()?;
+    if scope != "overall" {
+        return outcomes.get(scope).map(review_accepted);
+    }
+    let per_type: Vec<MetricValue> = outcomes.values().map(review_accepted).collect();
+    Some(ratio(
+        per_type.iter().map(|value| value.numerator).sum(),
+        per_type.iter().map(|value| value.denominator).sum(),
+    ))
 }
 
 fn invariant_failures(report: &EvaluationReport, thresholds: &Thresholds) -> Vec<String> {
@@ -413,20 +533,37 @@ fn invariant_failures(report: &EvaluationReport, thresholds: &Thresholds) -> Vec
     .collect()
 }
 
-fn scope_failures(metrics: &ScopeMetrics, scope: &ScopeThresholds) -> Vec<String> {
+#[derive(Clone, Copy)]
+enum Bound {
+    Minimum,
+    Maximum,
+}
+
+fn declared_scope_failures(report: &EvaluationReport, thresholds: &Thresholds, scope: &str) -> Vec<String> {
+    let Some(declared) = thresholds.quality.scopes.get(scope).copied().flatten() else {
+        return Vec::new();
+    };
+    let metrics = report.metrics.iter().find(|metrics| metrics.scope == scope);
+    let metric = |pick: fn(&ScopeMetrics) -> MetricValue| metrics.map(pick);
     [
-        ("claimCorrectness", metrics.claim_correctness, scope.claim_correctness),
-        ("semanticSupport", metrics.semantic_support, scope.semantic_support),
-        ("evidenceCoverage", metrics.evidence_coverage, scope.evidence_coverage),
-        ("attribution", metrics.attribution, scope.attribution),
+        ("claimCorrectness", metric(|m| m.claim_correctness), declared.claim_correctness, Bound::Minimum),
+        ("semanticSupport", metric(|m| m.semantic_support), declared.semantic_support, Bound::Minimum),
+        ("evidenceCoverage", metric(|m| m.evidence_coverage), declared.evidence_coverage, Bound::Minimum),
+        ("attribution", metric(|m| m.attribution), declared.attribution, Bound::Minimum),
+        ("maxDuplication", metric(|m| m.duplication), declared.max_duplication, Bound::Maximum),
+        ("minReviewAccepted", scope_review(report, scope), declared.min_review_accepted, Bound::Minimum),
     ]
     .into_iter()
-    .filter_map(|(name, value, threshold)| {
-        threshold
-            .filter(|threshold| !meets(value, *threshold))
-            .map(|_| format!("{}.{}", metrics.scope, name))
-    })
+    .filter(|(_, value, threshold, bound)| threshold.is_some_and(|threshold| !within(*value, threshold, *bound)))
+    .map(|(name, ..)| format!("{scope}.{name}"))
     .collect()
+}
+
+fn within(value: Option<MetricValue>, threshold: f64, bound: Bound) -> bool {
+    value.is_some_and(|value| match bound {
+        Bound::Minimum => meets(value, threshold),
+        Bound::Maximum => value.value.is_some_and(|measured| measured <= threshold),
+    })
 }
 
 fn meets(value: MetricValue, threshold: f64) -> bool {
@@ -458,7 +595,7 @@ pub fn score(input: &ScoreInput<'_>, envelope: ReportEnvelope) -> EvaluationRepo
         gate: GateStatus::Undeclared,
         failures: Vec::new(),
     };
-    let (status, failures) = gate(&report, input.thresholds);
+    let (status, failures) = gate(&report, input.thresholds, input_failures(input));
     report.gate = status;
     report.failures = failures;
     report

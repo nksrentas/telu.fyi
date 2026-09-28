@@ -739,8 +739,9 @@ fn score_fails_when_predictions_name_an_unknown_or_duplicated_fixture() {
 
 #[test]
 fn score_fails_below_the_minimum_fixture_counts_per_category() {
-    let failures_without = |fixture_id: &str| {
-        score_complete(&without_fixture(complete_input(), fixture_id, true, true), &declared(0.5), true).failures
+    let input_failures_without = |fixture_id: &str| {
+        let report = score_complete(&without_fixture(complete_input(), fixture_id, true, true), &declared(0.5), true);
+        report.failures.into_iter().filter(|failure| failure.starts_with("inputs.")).collect::<Vec<_>>()
     };
     let fixtures = fixtures();
     let set = predictions(standard_items());
@@ -748,9 +749,9 @@ fn score_fails_below_the_minimum_fixture_counts_per_category() {
     let limits = declared(0.5);
     let legacy = score(&ScoreInput { fixtures: &fixtures, predictions: &set, labels: &labels, thresholds: &limits }, envelope());
 
-    assert_eq!(failures_without("standup-5"), vec!["inputs.representativeFixtures".to_string()]);
-    assert_eq!(failures_without("vague"), vec!["inputs.insufficientEvidenceFixtures".to_string()]);
-    assert_eq!(failures_without("degraded"), vec!["inputs.degradedCaptureFixtures".to_string()]);
+    assert_eq!(input_failures_without("standup-5"), ["inputs.representativeFixtures"]);
+    assert_eq!(input_failures_without("vague"), ["inputs.insufficientEvidenceFixtures"]);
+    assert_eq!(input_failures_without("degraded"), ["inputs.degradedCaptureFixtures"]);
     assert!(legacy.failures.contains(&"inputs.representativeFixtures".to_string()));
     assert!(legacy.failures.contains(&"inputs.degradedCaptureFixtures".to_string()));
     assert_eq!(legacy.gate, GateStatus::Fail);

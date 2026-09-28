@@ -136,9 +136,7 @@ fn fixture_predictions(fixture_id: &str, outcome: &ExtractionOutcome) -> Fixture
         duplicates: outcome
             .suppressions
             .iter()
-            .filter(|suppression| {
-                matches!(suppression.reason, SuppressionReason::DuplicateInRun | SuppressionReason::DuplicatePending)
-            })
+            .filter(|suppression| suppression.reason == SuppressionReason::DuplicateInRun)
             .filter_map(|suppression| type_of.get(suppression.matched_item_id.as_str()).copied())
             .collect(),
     }
@@ -492,7 +490,7 @@ async fn export_meeting(pool: &SqlitePool, meeting_id: &str) -> Result<(GoldFixt
     let duplicates: Vec<KnowledgeType> = sqlx::query_scalar(
         "SELECT i.item_type FROM knowledge_suppressions s
          JOIN knowledge_items i ON i.item_id = s.matched_item_id
-         WHERE s.meeting_id = ? AND s.reason IN ('duplicate_pending', 'duplicate_in_run')",
+         WHERE s.meeting_id = ? AND s.reason = 'duplicate_in_run'",
     )
     .bind(meeting_id)
     .fetch_all(pool)
