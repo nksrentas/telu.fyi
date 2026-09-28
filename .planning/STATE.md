@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Evidence-Linked Post-Meeting Knowledge
 status: executing
-stopped_at: Completed 02-29-PLAN.md
-last_updated: "2026-09-28T14:12:32.167Z"
+stopped_at: Completed 02-30-PLAN.md
+last_updated: "2026-09-28T14:28:31.081Z"
 last_activity: 2026-09-28
 last_activity_desc: Phase 02 execution started
-state_head: 9b4986b1b416c5518a767b392c2c5a9527943b0a
+state_head: db16a7dd87087094fbd6a550ff57f4e867f102ec
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 52
-  completed_plans: 48
+  completed_plans: 49
   percent: 17
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 02 (Evidence-Linked Post-Meeting Knowledge) — EXECUTING
-Plan: 4 of 33
+Plan: 5 of 33
 Status: Ready to execute
 Last activity: 2026-09-28 — Phase 02 execution started
 
@@ -105,6 +105,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P27 | 11 min | 2 tasks | 6 files |
 | Phase 02 P28 | 3 min | 2 tasks | 3 files |
 | Phase 02 P29 | 11min | 2 tasks | 2 files |
+| Phase 02 P30 | 13min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -185,6 +186,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-28: thresholds-v2.json is the only authoritative KNOW-07 gate file; v1 stays unchanged as the 02-20 record and derives thresholds_invalid
 - [Phase 02]: 02-28: KNOW-07 satisfied only with a fully declared valid v2 file plus a content-free, schema-1, sha-bound, pass-with-empty-failures report with met invariants
 - [Phase 02]: 02-29: find_whole_token scans every char start (not match_indices) so whole-token hits overlapping a mid-word hit are found; owner/due stated only as verbatim single-span whole tokens tied to a claim segment or the one after it, never i/we/you/they or <2 chars
+- [Phase 02]: 02-30: KNOW-07 gate is pass only for a complete, fully declared, measured and met evaluation; null leaves give undeclared; unmeasured invariants, prediction mismatch and category minimums (5/1/1) fail
+- [Phase 02]: 02-30: deletion residue is measured through MeetingsRepository::delete_meeting on the in-memory replay ledger for both replay and export
 
 ### Pending Todos
 
@@ -221,6 +224,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-09-28T14:12:31.524Z
-Stopped at: Completed 02-29-PLAN.md
+Last session: 2026-09-28T14:28:31.008Z
+Stopped at: Completed 02-30-PLAN.md
 Resume file: None
