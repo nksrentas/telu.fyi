@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Lock, SlidersHorizontal, Sun, Upload, type LucideIcon } from "lucide-react"
+import { Inbox, Lock, SlidersHorizontal, Sun, Upload, type LucideIcon } from "lucide-react"
 
 import { Icon } from "@/components/telu-ui/icon"
 import { useConfig } from "@/contexts/ConfigContext"
 import { useImportDialog } from "@/contexts/ImportDialogContext"
 import { useRecordingState } from "@/contexts/RecordingStateContext"
-import { getAgendaCounts, localDayBounds } from "@/lib/agenda-service"
+import { getAgendaCounts, localDayBounds, type AgendaCounts } from "@/lib/agenda-service"
 import { onKnowledgeUpdated } from "@/lib/knowledge-service"
 import { MEETINGS_CHANGED_EVENT } from "@/lib/meeting-deletion-service"
 import { cn } from "@/lib/utils"
@@ -25,6 +25,7 @@ interface SidebarNavItemProps {
   current?: boolean
   plain?: boolean
   trailing?: string
+  bumpKey?: number
   accessibleName?: string
   keyShortcuts?: string
 }
@@ -37,6 +38,7 @@ function SidebarNavItem({
   current = false,
   plain = false,
   trailing,
+  bumpKey = 0,
   accessibleName,
   keyShortcuts,
 }: SidebarNavItemProps) {
@@ -46,7 +48,11 @@ function SidebarNavItem({
       <Icon icon={icon} className={plain ? "text-label-2" : "text-accent"} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {trailing && (
-        <span aria-hidden className="shrink-0 text-[12px] tabular-nums text-label-3">
+        <span
+          key={bumpKey}
+          aria-hidden
+          className={cn("inline-block shrink-0 text-[12px] tabular-nums text-label-3", bumpKey > 0 && "animate-bump")}
+        >
           {trailing}
         </span>
       )}
@@ -72,9 +78,9 @@ function SidebarNavItem({
   )
 }
 
-function useTodayCount(): number | null {
+function useAgendaCounts(): AgendaCounts | null {
   const { status } = useRecordingState()
-  const [count, setCount] = useState<number | null>(null)
+  const [counts, setCounts] = useState<AgendaCounts | null>(null)
   const latestRequest = useRef(0)
 
   const refresh = useCallback(() => {
@@ -82,11 +88,11 @@ function useTodayCount(): number | null {
     const { fromUtc, toUtc } = localDayBounds(new Date())
     getAgendaCounts(fromUtc, toUtc)
       .then((counts) => {
-        if (request === latestRequest.current) setCount(counts.dayCount)
+        if (request === latestRequest.current) setCounts(counts)
       })
       .catch((error: unknown) => {
         console.error("Failed to load agenda counts:", error)
-        if (request === latestRequest.current) setCount(null)
+        if (request === latestRequest.current) setCounts(null)
       })
   }, [])
 
@@ -106,7 +112,21 @@ function useTodayCount(): number | null {
     }
   }, [refresh])
 
-  return count
+  return counts
+}
+
+function useBumpKey(value: number | null): number {
+  const previous = useRef(value)
+  const [key, setKey] = useState(0)
+  useEffect(() => {
+    if (previous.current !== null && value !== null && value !== previous.current) setKey((current) => current + 1)
+    previous.current = value
+  }, [value])
+  return key
+}
+
+function itemsLabel(count: number): string {
+  return count === 1 ? "1 item" : `${count} items`
 }
 
 function meetingsLabel(count: number): string {
@@ -115,7 +135,10 @@ function meetingsLabel(count: number): string {
 
 export function Sidebar() {
   const pathname = usePathname()
-  const todayCount = useTodayCount()
+  const counts = useAgendaCounts()
+  const todayCount = counts?.dayCount ?? null
+  const pendingTotal = counts?.pendingTotal ?? 0
+  const reviewBump = useBumpKey(counts ? pendingTotal : null)
   const { betaFeatures } = useConfig()
   const { openImportDialog } = useImportDialog()
   const showTodayCount = todayCount !== null && todayCount > 0
@@ -134,6 +157,15 @@ export function Sidebar() {
           current={pathname === "/"}
           trailing={showTodayCount ? String(todayCount) : undefined}
           accessibleName={showTodayCount ? `Today, ${meetingsLabel(todayCount)}` : undefined}
+        />
+        <SidebarNavItem
+          href="/review"
+          icon={Inbox}
+          label="Review"
+          current={pathname === "/review"}
+          trailing={pendingTotal > 0 ? String(pendingTotal) : undefined}
+          bumpKey={reviewBump}
+          accessibleName={pendingTotal > 0 ? `Review, ${itemsLabel(pendingTotal)}` : undefined}
         />
       </div>
       <div data-tauri-drag-region className="min-h-3 flex-1" />

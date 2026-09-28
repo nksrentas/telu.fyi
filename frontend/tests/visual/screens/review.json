@@ -1,0 +1,154 @@
+[
+  {
+    "name": "review-populated",
+    "path": "/review",
+    "ipc": {
+      "agenda_list_review": [
+        {
+          "id": "r1",
+          "title": "Weekly product sync",
+          "startedAtUtc": "2026-09-27T07:02:00Z",
+          "endedAtUtc": "2026-09-27T07:46:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 30,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 3,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        },
+        {
+          "id": "r2",
+          "title": "Customer call — Acme",
+          "startedAtUtc": "2026-09-27T09:10:00Z",
+          "endedAtUtc": "2026-09-27T09:40:00Z",
+          "lifecycle": "incomplete",
+          "completeness": "incomplete",
+          "gapCount": 2,
+          "evidenceCount": 30,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 1,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "incomplete"
+        },
+        {
+          "id": "r3",
+          "title": "Design critique",
+          "startedAtUtc": "2026-09-26T12:00:00Z",
+          "endedAtUtc": "2026-09-26T12:35:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 30,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        },
+        {
+          "id": "r4",
+          "title": "1:1 with Maria",
+          "startedAtUtc": "2026-09-26T15:00:00Z",
+          "endedAtUtc": "2026-09-26T15:30:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 30,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 2,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        },
+        {
+          "id": "r5",
+          "title": "Quarterly planning with platform, design and research",
+          "startedAtUtc": "2026-09-22T08:00:00Z",
+          "endedAtUtc": "2026-09-22T09:10:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 30,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 2,
+          "acceptedCount": 0,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "to_review"
+        }
+      ],
+      "agenda_counts": {
+        "dayCount": 2,
+        "pendingTotal": 12
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "text=To review"
+      }
+    ]
+  },
+  {
+    "name": "review-empty",
+    "path": "/review",
+    "ipc": {
+      "agenda_list_review": []
+    },
+    "steps": [
+      {
+        "waitFor": "text=All caught up"
+      }
+    ]
+  },
+  {
+    "name": "review-loading",
+    "path": "/review",
+    "ipc": {
+      "agenda_list_review": {
+        "$pending": true
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "[aria-busy=true]"
+      }
+    ]
+  },
+  {
+    "name": "review-error",
+    "path": "/review",
+    "ipc": {
+      "agenda_list_review": {
+        "$error": "database locked"
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "button:has-text(\"Try again\")"
+      }
+    ]
+  },
+  {
+    "name": "sidebar-review-count",
+    "path": "/",
+    "ipc": {
+      "agenda_counts": {
+        "dayCount": 0,
+        "pendingTotal": 12
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "a[aria-label=\"Review, 12 items\"]"
+      }
+    ]
+  }
+]
