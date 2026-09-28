@@ -11,7 +11,8 @@ use crate::summary::processor::{
 use crate::summary::templates::{self, Template};
 use crate::ollama::metadata::ModelMetadataCache;
 use crate::trust::provider_route::{
-    require_available_route, resolve_provider_route, Capability, RouteDestination,
+    require_available_route, resolve_provider_route, Capability, EffectiveRoute,
+    RouteDestination,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -213,6 +214,160 @@ fn extract_cached_english_markdown(
 }
 
 /// Summary service - handles all summary generation logic
+pub struct SummaryDispatch {
+    pub provider: LLMProvider,
+    pub model_name: String,
+    pub api_key: String,
+    pub ollama_endpoint: Option<String>,
+    pub custom_openai_endpoint: Option<String>,
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+    pub route: EffectiveRoute,
+}
+
+struct CustomOpenAIDispatch {
+    endpoint: Option<String>,
+    api_key: Option<String>,
+    max_tokens: Option<u32>,
+    temperature: Option<f32>,
+    top_p: Option<f32>,
+}
+
+pub(crate) async fn resolve_summary_dispatch(
+    pool: &SqlitePool,
+    model_provider: &str,
+    model_name: &str,
+) -> Result<SummaryDispatch, String> {
+    let provider = LLMProvider::from_str(model_provider)?;
+    let standard_api_key = resolve_standard_api_key(pool, &provider, model_provider).await?;
+    let ollama_endpoint = resolve_ollama_endpoint(pool, &provider).await?;
+    let custom = resolve_custom_openai(pool, &provider).await?;
+    let api_key = if provider == LLMProvider::CustomOpenAI {
+        custom.api_key.clone().unwrap_or_default()
+    } else {
+        standard_api_key
+    };
+    let route = resolve_summary_route(
+        &provider,
+        model_provider,
+        model_name,
+        ollama_endpoint.as_deref(),
+        custom.endpoint.as_deref(),
+    )
+    .await;
+    require_available_route(&route).map_err(|route_error| route_error.code)?;
+
+    Ok(SummaryDispatch {
+        provider,
+        model_name: model_name.to_string(),
+        api_key,
+        ollama_endpoint,
+        custom_openai_endpoint: custom.endpoint,
+        max_tokens: custom.max_tokens,
+        temperature: custom.temperature,
+        top_p: custom.top_p,
+        route,
+    })
+}
+
+async fn resolve_standard_api_key(
+    pool: &SqlitePool,
+    provider: &LLMProvider,
+    model_provider: &str,
+) -> Result<String, String> {
+    if matches!(
+        provider,
+        LLMProvider::Ollama | LLMProvider::BuiltInAI | LLMProvider::CustomOpenAI
+    ) {
+        return Ok(String::new());
+    }
+    match SettingsRepository::get_api_key(pool, model_provider).await {
+        Ok(Some(key)) if !key.is_empty() => Ok(key),
+        Ok(None) | Ok(Some(_)) => Err(format!("API key not found for {}", model_provider)),
+        Err(e) => Err(format!(
+            "Failed to retrieve API key for {}: {}",
+            model_provider, e
+        )),
+    }
+}
+
+async fn resolve_ollama_endpoint(
+    pool: &SqlitePool,
+    provider: &LLMProvider,
+) -> Result<Option<String>, String> {
+    if *provider != LLMProvider::Ollama {
+        return Ok(None);
+    }
+    match SettingsRepository::get_model_config(pool).await {
+        Ok(Some(config)) => Ok(config.ollama_endpoint),
+        Ok(None) => Ok(None),
+        Err(_) => Err("PROVIDER_ROUTE_CONFIG_UNAVAILABLE".to_string()),
+    }
+}
+
+async fn resolve_custom_openai(
+    pool: &SqlitePool,
+    provider: &LLMProvider,
+) -> Result<CustomOpenAIDispatch, String> {
+    if *provider != LLMProvider::CustomOpenAI {
+        return Ok(CustomOpenAIDispatch {
+            endpoint: None,
+            api_key: None,
+            max_tokens: None,
+            temperature: None,
+            top_p: None,
+        });
+    }
+    match SettingsRepository::get_custom_openai_config(pool).await {
+        Ok(Some(config)) => {
+            info!("Using configured custom OpenAI endpoint");
+            Ok(CustomOpenAIDispatch {
+                endpoint: Some(config.endpoint),
+                api_key: config.api_key,
+                max_tokens: config.max_tokens.map(|t| t as u32),
+                temperature: config.temperature,
+                top_p: config.top_p,
+            })
+        }
+        Ok(None) => {
+            Err("Custom OpenAI provider selected but no configuration found".to_string())
+        }
+        Err(e) => Err(format!("Failed to retrieve custom OpenAI config: {}", e)),
+    }
+}
+
+async fn resolve_summary_route(
+    provider: &LLMProvider,
+    model_provider: &str,
+    model_name: &str,
+    ollama_endpoint: Option<&str>,
+    custom_openai_endpoint: Option<&str>,
+) -> EffectiveRoute {
+    let destination = match provider {
+        LLMProvider::BuiltInAI => return resolve_provider_route(
+            Capability::Summary,
+            model_provider,
+            model_name,
+            RouteDestination::Device,
+        )
+        .await,
+        LLMProvider::OpenAI => Some("https://api.openai.com"),
+        LLMProvider::Claude => Some("https://api.anthropic.com"),
+        LLMProvider::Groq => Some("https://api.groq.com"),
+        LLMProvider::OpenRouter => Some("https://openrouter.ai"),
+        LLMProvider::Ollama => ollama_endpoint,
+        LLMProvider::CustomOpenAI => custom_openai_endpoint,
+    };
+    resolve_provider_route(
+        Capability::Summary,
+        model_provider,
+        model_name,
+        RouteDestination::Url(destination),
+    )
+    .await
+}
+
 pub struct SummaryService;
 
 impl SummaryService {
@@ -353,116 +508,23 @@ impl SummaryService {
             meeting_id
         );
 
-        // Parse provider
-        let provider = match LLMProvider::from_str(&model_provider) {
-            Ok(p) => p,
-            Err(e) => {
-                Self::fail_and_cleanup(&pool, &meeting_id, started_at, &e).await;
+        let dispatch = match resolve_summary_dispatch(&pool, &model_provider, &model_name).await {
+            Ok(dispatch) => dispatch,
+            Err(code) => {
+                Self::fail_and_cleanup(&pool, &meeting_id, started_at, &code).await;
                 return;
             }
         };
-
-        // Validate and setup api_key, Flexible for Ollama, BuiltInAI, and CustomOpenAI
-        let api_key = if provider == LLMProvider::Ollama || provider == LLMProvider::BuiltInAI || provider == LLMProvider::CustomOpenAI {
-            // These providers don't require API keys from the standard database column
-            String::new()
-        } else {
-            match SettingsRepository::get_api_key(&pool, &model_provider).await {
-                Ok(Some(key)) if !key.is_empty() => key,
-                Ok(None) | Ok(Some(_)) => {
-                    let err_msg = format!("API key not found for {}", &model_provider);
-                    Self::fail_and_cleanup(&pool, &meeting_id, started_at, &err_msg).await;
-                    return;
-                }
-                Err(e) => {
-                    let err_msg = format!("Failed to retrieve API key for {}: {}", &model_provider, e);
-                    Self::fail_and_cleanup(&pool, &meeting_id, started_at, &err_msg).await;
-                    return;
-                }
-            }
-        };
-
-        // Get Ollama endpoint if provider is Ollama
-        let ollama_endpoint = if provider == LLMProvider::Ollama {
-            match SettingsRepository::get_model_config(&pool).await {
-                Ok(Some(config)) => config.ollama_endpoint,
-                Ok(None) => None,
-                Err(_) => {
-                    let err_msg = "PROVIDER_ROUTE_CONFIG_UNAVAILABLE";
-                    Self::fail_and_cleanup(&pool, &meeting_id, started_at, err_msg).await;
-                    return;
-                }
-            }
-        } else {
-            None
-        };
-
-        // Get CustomOpenAI config if provider is CustomOpenAI
-        let (custom_openai_endpoint, custom_openai_api_key, custom_openai_max_tokens, custom_openai_temperature, custom_openai_top_p) =
-            if provider == LLMProvider::CustomOpenAI {
-                match SettingsRepository::get_custom_openai_config(&pool).await {
-                    Ok(Some(config)) => {
-                        info!("✓ Using configured custom OpenAI endpoint");
-                        (
-                            Some(config.endpoint),
-                            config.api_key,
-                            config.max_tokens.map(|t| t as u32),
-                            config.temperature,
-                            config.top_p,
-                        )
-                    }
-                    Ok(None) => {
-                        let err_msg = "Custom OpenAI provider selected but no configuration found";
-                        Self::fail_and_cleanup(&pool, &meeting_id, started_at, err_msg).await;
-                        return;
-                    }
-                    Err(e) => {
-                        let err_msg = format!("Failed to retrieve custom OpenAI config: {}", e);
-                        Self::fail_and_cleanup(&pool, &meeting_id, started_at, &err_msg).await;
-                        return;
-                    }
-                }
-            } else {
-                (None, None, None, None, None)
-            };
-
-        // For CustomOpenAI, use its API key (if any) instead of the empty string
-        let final_api_key = if provider == LLMProvider::CustomOpenAI {
-            custom_openai_api_key.unwrap_or_default()
-        } else {
-            api_key
-        };
-
-        let route_destination = match &provider {
-            LLMProvider::BuiltInAI => None,
-            LLMProvider::OpenAI => Some("https://api.openai.com".to_string()),
-            LLMProvider::Claude => Some("https://api.anthropic.com".to_string()),
-            LLMProvider::Groq => Some("https://api.groq.com".to_string()),
-            LLMProvider::OpenRouter => Some("https://openrouter.ai".to_string()),
-            LLMProvider::Ollama => ollama_endpoint.clone(),
-            LLMProvider::CustomOpenAI => custom_openai_endpoint.clone(),
-        };
-        let summary_route = if provider == LLMProvider::BuiltInAI {
-            resolve_provider_route(
-                Capability::Summary,
-                &model_provider,
-                &model_name,
-                RouteDestination::Device,
-            )
-            .await
-        } else {
-            resolve_provider_route(
-                Capability::Summary,
-                &model_provider,
-                &model_name,
-                RouteDestination::Url(route_destination.as_deref()),
-            )
-            .await
-        };
-        if let Err(route_error) = require_available_route(&summary_route) {
-            Self::fail_and_cleanup(&pool, &meeting_id, started_at, &route_error.code).await;
-            return;
-        }
+        let SummaryDispatch {
+            provider,
+            api_key: final_api_key,
+            ollama_endpoint,
+            custom_openai_endpoint,
+            max_tokens: custom_openai_max_tokens,
+            temperature: custom_openai_temperature,
+            top_p: custom_openai_top_p,
+            ..
+        } = dispatch;
 
         // Dynamically fetch context size based on provider and model
         let token_threshold = if provider == LLMProvider::Ollama {
