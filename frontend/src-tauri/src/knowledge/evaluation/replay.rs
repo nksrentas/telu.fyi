@@ -546,13 +546,14 @@ fn exported_item(item: &KnowledgeItemView) -> PredictedItem {
     }
 }
 
-pub async fn review_outcomes(db_path: &Path) -> Result<BTreeMap<String, ReviewOutcomeRates>, ReplayError> {
-    let pool = read_only_pool(db_path).await?;
-    let rows: Vec<(String, String, bool)> =
-        sqlx::query_as("SELECT item_type, review_state, corrected FROM knowledge_item_current")
-            .fetch_all(&pool)
-            .await
-            .map_err(|_| ReplayError::Storage)?;
+pub async fn review_outcomes(
+    db_path: &Path,
+    meeting_ids: &[String],
+) -> Result<BTreeMap<String, ReviewOutcomeRates>, ReplayError> {
+    if meeting_ids.iter().any(|id| Uuid::parse_str(id).is_err()) {
+        return Err(ReplayError::InvalidMeetingId);
+    }
+    let rows = review_rows(&read_only_pool(db_path).await?, meeting_ids).await?;
     let mut by_type: BTreeMap<String, Vec<(String, bool)>> = BTreeMap::new();
     for (item_type, state, corrected) in rows {
         by_type.entry(item_type).or_default().push((state, corrected));
@@ -571,4 +572,20 @@ pub async fn review_outcomes(db_path: &Path) -> Result<BTreeMap<String, ReviewOu
             (item_type, rates)
         })
         .collect())
+}
+
+async fn review_rows(pool: &SqlitePool, meeting_ids: &[String]) -> Result<Vec<(String, String, bool)>, ReplayError> {
+    if meeting_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let placeholders = vec!["?"; meeting_ids.len()].join(", ");
+    let sql = format!(
+        "SELECT item_type, review_state, corrected FROM knowledge_item_current WHERE meeting_id IN ({placeholders})"
+    );
+    meeting_ids
+        .iter()
+        .fold(sqlx::query_as(&sql), |query, meeting_id| query.bind(meeting_id))
+        .fetch_all(pool)
+        .await
+        .map_err(|_| ReplayError::Storage)
 }

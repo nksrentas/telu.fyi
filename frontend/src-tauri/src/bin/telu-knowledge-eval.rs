@@ -1,12 +1,14 @@
 use app_lib::knowledge::evaluation::replay::{export_from_db, review_outcomes, run_replay, ReplayError};
-use app_lib::knowledge::evaluation::{score, GoldFixture, LabelSet, PredictionSet, ReportEnvelope, ScoreInput, Thresholds};
+use app_lib::knowledge::evaluation::{
+    score, GoldFixture, LabelSet, PredictionSet, ReportEnvelope, ReviewOutcomeRates, ScoreInput, Thresholds,
+};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
@@ -122,7 +124,7 @@ async fn score_command(
     let threshold_bytes = read_bounded(thresholds)?;
     let limits = parse_thresholds(&threshold_bytes)?;
     let review = match db {
-        Some(path) => Some(review_outcomes(&safe_input(path)?).await.map_err(EvalError::Replay)?),
+        Some(path) => Some(scored_review_outcomes(path, &fixtures).await?),
         None => None,
     };
     let envelope = ReportEnvelope {
@@ -138,6 +140,14 @@ async fn score_command(
     write_json(out, "report.json", &report)?;
     print_summary(json!({ "fixtures": fixtures.len(), "gate": report.gate, "failures": report.failures.len() }));
     Ok(())
+}
+
+async fn scored_review_outcomes(
+    db: &Path,
+    fixtures: &[GoldFixture],
+) -> Result<BTreeMap<String, ReviewOutcomeRates>, EvalError> {
+    let meeting_ids: Vec<String> = fixtures.iter().map(|fixture| fixture.fixture_id.clone()).collect();
+    review_outcomes(&safe_input(db)?, &meeting_ids).await.map_err(EvalError::Replay)
 }
 
 async fn run_command(gold_dir: &Path, replay_completions: &Path, out: &Path) -> Result<(), EvalError> {
