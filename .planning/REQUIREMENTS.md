@@ -25,8 +25,8 @@
 
 ### Evidence-Linked Post-Meeting Knowledge
 
-- [ ] **KNOW-01**: A user can derive typed candidate decisions, commitments or action items, open questions, and relevant facts from a completed meeting.
-- [ ] **KNOW-02**: Every candidate item has a stable identity, derivation run, review state, and exact transcript evidence that opens the supporting segment in context.
+- [x] **KNOW-01**: A user can derive typed candidate decisions, commitments or action items, open questions, and relevant facts from a completed meeting.
+- [x] **KNOW-02**: Every candidate item has a stable identity, derivation run, review state, and exact transcript evidence that opens the supporting segment in context.
 - [x] **KNOW-03**: A user can accept, correct, or reject each candidate independently and immediately see its resulting eligibility for future context.
 - [x] **KNOW-04**: Corrections create an auditable revision linked to the original proposal and evidence instead of overwriting history.
 - [x] **KNOW-05**: Rejected or superseded candidates do not reappear as current knowledge after regeneration, preparation, or series projection unless a user explicitly restores them.
@@ -138,8 +138,8 @@
 | PRIV-01 | Phase 1 | Complete |
 | PRIV-02 | Phase 1 | Complete |
 | PRIV-03 | Phase 1 | Complete |
-| KNOW-01 | Phase 2 | Pending |
-| KNOW-02 | Phase 2 | Pending |
+| KNOW-01 | Phase 2 | Complete |
+| KNOW-02 | Phase 2 | Complete |
 | KNOW-03 | Phase 2 | Complete |
 | KNOW-04 | Phase 2 | Complete |
 | KNOW-05 | Phase 2 | Complete |
