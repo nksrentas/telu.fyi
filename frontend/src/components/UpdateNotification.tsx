@@ -24,7 +24,7 @@ export function showUpdateNotification(updateInfo: UpdateInfo, onUpdateClick?: (
         <Download className="h-4 w-4" />
         <div>
           <p className="font-medium">Update Available</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             Version {updateInfo.version} is now available
           </p>
         </div>
@@ -34,7 +34,7 @@ export function showUpdateNotification(updateInfo: UpdateInfo, onUpdateClick?: (
           e.stopPropagation();
           handleClick();
         }}
-        className="text-sm font-medium text-blue-600 hover:text-blue-700 underline"
+        className="text-body font-medium text-accent hover:text-accent-strong underline"
       >
         View Details
       </button>

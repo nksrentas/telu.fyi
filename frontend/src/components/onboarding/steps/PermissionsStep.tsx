@@ -146,19 +146,19 @@ export function PermissionsStep() {
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-3 pt-4">
-          <Button onClick={handleFinish} disabled={!allPermissionsGranted} className="w-full h-11">
+          <Button onClick={handleFinish} disabled={!allPermissionsGranted} variant="primary" size="lg" className="w-full">
             Finish Setup
           </Button>
 
           <button
             onClick={handleSkip}
-            className="text-sm text-neutral-500 hover:text-neutral-700 transition-colors"
+            className="text-callout text-label-2 hover:text-label transition-colors"
           >
             I'll do this later
           </button>
 
           {!allPermissionsGranted && (
-            <p className="text-xs text-center text-muted-foreground">
+            <p className="text-xs text-center text-label-2">
               Recording won't work without permissions. You can grant them later in settings.
             </p>
           )}
