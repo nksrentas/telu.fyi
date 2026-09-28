@@ -46,7 +46,7 @@ patterns-established:
   - "Invariant measurement through the production delete path, never a test-only delete"
   - "Only the fully declared, measured and met complete input asserts GateStatus::Pass in unit tests"
 
-requirements-completed: [KNOW-07]
+requirements-completed: []
 
 coverage:
   - id: D1

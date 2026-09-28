@@ -43,7 +43,7 @@ patterns-established:
   - "comparable_keys(candidate, item) chooses the key slice; is_match applies exact and shared-evidence similarity rules to that slice"
   - "load_match_index keys are de-duplicated with current wording first; superseded_keys = keys minus current"
 
-requirements-completed: [KNOW-05, KNOW-07]
+requirements-completed: [KNOW-05]
 
 coverage:
   - id: D1
