@@ -27,8 +27,10 @@ mock.module('../../src/lib/analytics', () => ({ default: {
 } }));
 let startProcess: () => Promise<{ process_id: string }>;
 let getSummary: (meetingId: string) => Promise<SummaryProcessResponse>;
+let readEvidence: () => Promise<unknown[]> = async () => [];
 const invoke = mock(async (command: string, args?: Record<string, unknown>): Promise<unknown> => {
   if (command === 'api_get_meetings') return [];
+  if (command === 'knowledge_list_evidence') return readEvidence();
   if (command === 'api_get_summary') return getSummary(args!.meetingId as string);
   if (command === 'api_get_meeting_transcripts') return { transcripts: [{ text: 'Meeting transcript', timestamp: '00:00' }], total_count: 1 };
   if (command === 'get_ollama_models') return [{ name: 'test' }];
@@ -75,6 +77,7 @@ beforeEach(() => {
   configuredModel = 'test';
   timers.clear(); notify.mockClear(); trackCompletion.mockClear(); invoke.mockClear();
   getSummary = async () => response();
+  readEvidence = async () => [];
   startProcess = async () => ({ process_id: 'attempt-a' });
   globalThis.setInterval = ((callback: () => Promise<void>) => {
     const id = ++nextTimer; timers.set(id, callback); return id;
@@ -271,5 +274,40 @@ describe('summary state restored when returning to a meeting', () => {
     await tick();
     expect(state.summaryStatus).toBe('completed');
     expect(text()).toContain('Finished summary');
+  });
+});
+
+describe('summary input source', () => {
+  const segment = (sequence: number, text: string, audioStartTime: number) => ({
+    evidenceId: `evidence-${sequence}`, sequence, text, audioStartTime,
+    audioEndTime: audioStartTime + 4, captureCompleteness: 'complete',
+  });
+  const commands = () => invoke.mock.calls.map(([command]) => command);
+  const processedText = () =>
+    invoke.mock.calls.find(([command]) => command === 'api_process_transcript')?.[1]?.text;
+
+  test('finalized evidence feeds the summary in sequence order without reading legacy transcripts', async () => {
+    readEvidence = async () => [segment(2, 'Third line', 20), segment(0, 'First line', 4), segment(1, 'Second line', 12)];
+    await show(response({ status: 'idle', start: null }));
+    await act(async () => state.handleGenerateSummary());
+    expect(processedText()).toBe('[00:04] First line\n[00:12] Second line\n[00:20] Third line');
+    expect(commands()).not.toContain('api_get_meeting_transcripts');
+  });
+
+  test('meetings without evidence fall back to legacy transcripts', async () => {
+    await show(response({ status: 'idle', start: null }));
+    await act(async () => state.handleGenerateSummary());
+    expect(commands()).toContain('api_get_meeting_transcripts');
+    expect(processedText()).toContain('Meeting transcript');
+  });
+
+  test('an evidence read failure surfaces an error instead of summarizing legacy lines', async () => {
+    readEvidence = async () => { throw new Error('Evidence unavailable'); };
+    await show(response({ status: 'idle', start: null }));
+    await act(async () => state.handleGenerateSummary());
+    expect(commands()).not.toContain('api_get_meeting_transcripts');
+    expect(commands()).not.toContain('api_process_transcript');
+    expect(state.summaryStatus).toBe('error');
+    expect(notify).toHaveBeenCalledWith('Failed to fetch transcripts for summary generation');
   });
 });

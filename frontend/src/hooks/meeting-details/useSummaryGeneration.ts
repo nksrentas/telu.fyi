@@ -18,6 +18,41 @@ import {
   readCachedDetectedSummaryLanguage,
 } from '@/lib/summary-language-preferences';
 import { parseSummaryContent, readSummaryMetadata } from '@/lib/summary-content';
+import { listMeetingEvidence, type EvidenceSegmentView } from '@/lib/knowledge-service';
+
+function formatEvidenceTimestamp(seconds: number): string {
+  const totalSeconds = Math.max(0, Math.floor(seconds));
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  return `${minutes}:${(totalSeconds % 60).toString().padStart(2, '0')}`;
+}
+
+function toEvidenceTranscript(segment: EvidenceSegmentView): Transcript {
+  return {
+    id: segment.evidenceId,
+    text: segment.text,
+    timestamp: formatEvidenceTimestamp(segment.audioStartTime),
+    sequence_id: segment.sequence,
+    audio_start_time: segment.audioStartTime,
+    audio_end_time: segment.audioEndTime,
+  };
+}
+
+async function fetchLegacyTranscripts(meetingId: string): Promise<Transcript[]> {
+  const firstPage = await invokeTauri<{ transcripts: Transcript[]; total_count: number }>('api_get_meeting_transcripts', {
+    meetingId,
+    limit: 1,
+    offset: 0,
+  });
+  if (firstPage.total_count === 0) {
+    return [];
+  }
+  const allData = await invokeTauri<{ transcripts: Transcript[]; total_count: number }>('api_get_meeting_transcripts', {
+    meetingId,
+    limit: firstPage.total_count,
+    offset: 0,
+  });
+  return allData.transcripts;
+}
 
 async function resolveSummaryLanguage(
   meetingId: string,
@@ -398,36 +433,15 @@ export function useSummaryGeneration({
     updateMeetingTitle,
   ]);
 
-  // Helper function to fetch ALL transcripts for summary generation
   const fetchAllTranscripts = useCallback(async (meetingId: string): Promise<Transcript[]> => {
     try {
-      console.log('📊 Fetching all transcripts for meeting:', meetingId);
-
-      // First, get total count by fetching first page
-      const firstPage = await invokeTauri('api_get_meeting_transcripts', {
-        meetingId,
-        limit: 1,
-        offset: 0,
-      }) as { transcripts: Transcript[]; total_count: number; has_more: boolean };
-
-      const totalCount = firstPage.total_count;
-      console.log(`📊 Total transcripts in database: ${totalCount}`);
-
-      if (totalCount === 0) {
-        return [];
+      const evidence = await listMeetingEvidence(meetingId);
+      if (evidence.length > 0) {
+        return [...evidence].sort((left, right) => left.sequence - right.sequence).map(toEvidenceTranscript);
       }
-
-      // Fetch all transcripts in one call
-      const allData = await invokeTauri('api_get_meeting_transcripts', {
-        meetingId,
-        limit: totalCount,
-        offset: 0,
-      }) as { transcripts: Transcript[]; total_count: number; has_more: boolean };
-
-      console.log(`✅ Fetched ${allData.transcripts.length} transcripts from database`);
-      return allData.transcripts;
+      return await fetchLegacyTranscripts(meetingId);
     } catch (error) {
-      console.error('❌ Error fetching all transcripts:', error);
+      console.error('Error fetching transcripts for summary generation:', error);
       toast.error('Failed to fetch transcripts for summary generation');
       return [];
     }
