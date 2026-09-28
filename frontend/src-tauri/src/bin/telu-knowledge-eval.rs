@@ -6,7 +6,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
@@ -65,6 +65,8 @@ enum EvalError {
     JsonMalformed,
     OutputFailed,
     ThresholdsInvalid,
+    FixtureInvalid,
+    NoFixtures,
     Replay(ReplayError),
 }
 
@@ -77,6 +79,8 @@ impl EvalError {
             Self::JsonMalformed => "JSON_MALFORMED",
             Self::OutputFailed => "OUTPUT_FAILED",
             Self::ThresholdsInvalid => "THRESHOLDS_INVALID",
+            Self::FixtureInvalid => "FIXTURE_INVALID",
+            Self::NoFixtures => "NO_FIXTURES",
             Self::Replay(error) => error.code(),
         }
     }
@@ -175,14 +179,23 @@ fn load_fixtures(gold_dir: &Path) -> Result<Vec<GoldFixture>, EvalError> {
         .filter(|path| path.extension().is_some_and(|extension| extension == "json"))
         .collect();
     paths.sort();
-    let mut fixtures = Vec::new();
-    for path in paths {
-        let value: Value = read_json(&path)?;
-        if value.get("fixtureId").is_some() {
-            fixtures.push(serde_json::from_value(value).map_err(|_| EvalError::JsonMalformed)?);
-        }
+    let fixtures = paths.iter().map(|path| load_fixture(path)).collect::<Result<Vec<_>, _>>()?;
+    if fixtures.is_empty() {
+        return Err(EvalError::NoFixtures);
+    }
+    let mut seen = HashSet::new();
+    if !fixtures.iter().all(|fixture| seen.insert(fixture.fixture_id.as_str())) {
+        return Err(EvalError::FixtureInvalid);
     }
     Ok(fixtures)
+}
+
+fn load_fixture(path: &Path) -> Result<GoldFixture, EvalError> {
+    let bytes = read_bounded(path).map_err(|error| match error {
+        EvalError::JsonMalformed => EvalError::FixtureInvalid,
+        other => other,
+    })?;
+    serde_json::from_slice(&bytes).map_err(|_| EvalError::FixtureInvalid)
 }
 
 fn safe_input(path: &Path) -> Result<PathBuf, EvalError> {
