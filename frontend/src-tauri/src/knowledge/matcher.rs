@@ -35,7 +35,7 @@ pub fn normalized_key(text: &str) -> String {
 pub fn match_candidate(candidate: &Candidate, existing: &[ExistingItem]) -> MatchOutcome {
     existing
         .iter()
-        .filter(|item| item.item_type == candidate.item_type && is_match(candidate, item))
+        .filter(|item| is_candidate_for(candidate, item) && is_match(candidate, item))
         .min_by(|left, right| {
             state_priority(left.state)
                 .cmp(&state_priority(right.state))
@@ -43,6 +43,10 @@ pub fn match_candidate(candidate: &Candidate, existing: &[ExistingItem]) -> Matc
         })
         .map(outcome_for)
         .unwrap_or(MatchOutcome::New)
+}
+
+fn is_candidate_for(candidate: &Candidate, item: &ExistingItem) -> bool {
+    item.state == ReviewState::Rejected || item.item_type == candidate.item_type
 }
 
 fn is_match(candidate: &Candidate, item: &ExistingItem) -> bool {
@@ -132,16 +136,28 @@ mod tests {
         assert_eq!(match_candidate(&different_shared, &items), MatchOutcome::New);
     }
 
-    #[test]
-    fn match_candidate_never_matches_another_type() {
-        let items = [existing("r", ReviewState::Rejected, &["Ship the beta"], &[])];
-        let question = Candidate {
-            item_type: KnowledgeType::Question,
-            key: normalized_key("Ship the beta"),
-            claim_evidence_ids: Vec::new(),
-        };
+    fn typed(item_type: KnowledgeType, text: &str, evidence: &[&str]) -> Candidate {
+        Candidate {
+            item_type,
+            ..candidate(text, evidence)
+        }
+    }
 
-        assert_eq!(match_candidate(&question, &items), MatchOutcome::New);
+    #[test]
+    fn match_candidate_suppresses_a_rejected_item_under_any_type() {
+        let items = [existing("r", ReviewState::Rejected, &["Ship the beta"], &[])];
+        let similar = [existing("r", ReviewState::Rejected, &["Ship the beta on Friday"], &["e1"])];
+
+        for item_type in [KnowledgeType::Question, KnowledgeType::Commitment, KnowledgeType::Fact] {
+            assert_eq!(
+                match_candidate(&typed(item_type, "Ship the beta", &[]), &items),
+                MatchOutcome::Suppressed("r".to_string())
+            );
+        }
+        assert_eq!(
+            match_candidate(&typed(KnowledgeType::Commitment, "Ship the beta by Friday", &["e1"]), &similar),
+            MatchOutcome::Suppressed("r".to_string())
+        );
     }
 
     #[test]
