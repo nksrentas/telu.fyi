@@ -41,6 +41,11 @@ const knowledge: MeetingKnowledgeView = {
     dueText: null,
     dueSupport: 'not_stated',
     reviewState: 'proposed',
+    eligibility: false,
+    evidenceStatus: 'valid',
+    corrected: false,
+    latestRevisionId: null,
+    unresolved: true,
     createdAtUtc: '2026-09-28T00:00:00Z',
     evidence: [{
       linkId: 'link-1',
@@ -55,12 +60,19 @@ const knowledge: MeetingKnowledgeView = {
       segmentCaptureIncomplete: false,
     }],
   }],
+  rejected: [],
+  pendingCount: 1,
+  acceptedCount: 0,
+  skippedCount: 0,
 };
 
 let currentRoute = route('validated');
 const invoke = mock(async (command: string): Promise<unknown> => {
   if (command === 'get_current_provider_route') return currentRoute;
   if (command === 'knowledge_get_meeting') return knowledge;
+  if (command === 'knowledge_list_runs') return [];
+  if (command === 'validate_provider_route') return currentRoute;
+  if (command === 'knowledge_cancel_extraction') return true;
   throw new Error(`Unexpected command: ${command}`);
 });
 mock.module('@tauri-apps/api/core', () => ({ invoke }));

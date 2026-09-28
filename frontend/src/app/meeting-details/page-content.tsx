@@ -368,7 +368,13 @@ export default function PageContent({
           </div>
         </section>
 
-        <KnowledgeSection meetingId={meeting.id} />
+        <KnowledgeSection
+          meetingId={meeting.id}
+          completeness={meeting.completeness}
+          autoGenerate={shouldAutoGenerate}
+          hasEvidence={hasEvidence}
+          surface={surface}
+        />
       </div>
     </motion.div>
   );

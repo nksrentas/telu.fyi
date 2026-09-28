@@ -334,7 +334,7 @@ function MeetingDetailsContent() {
           await refetchMeetings();
         }}
         surface="page"
-        hasEvidence={(evidenceInfo.count ?? 0) > 0}
+        hasEvidence={evidenceInfo.count !== 0}
         durationSeconds={durationSeconds}
       />
     </MeetingPage>
