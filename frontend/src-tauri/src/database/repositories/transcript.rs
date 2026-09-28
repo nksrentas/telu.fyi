@@ -8,6 +8,15 @@ use uuid::Uuid;
 
 pub struct TranscriptsRepository;
 
+fn like_pattern(query: &str) -> String {
+    let escaped = query
+        .to_lowercase()
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    format!("%{escaped}%")
+}
+
 impl TranscriptsRepository {
     /// Incrementally persists a finalized transcript segment under caller-owned,
     /// stable meeting and evidence identities.
@@ -255,8 +264,6 @@ impl TranscriptsRepository {
         Ok(meeting_id)
     }
 
-    /// Searches for a query string within the transcripts.
-    /// It returns a list of matching transcripts with context.
     pub async fn search_transcripts(
         pool: &SqlitePool,
         query: &str,
@@ -265,32 +272,43 @@ impl TranscriptsRepository {
             return Ok(Vec::new());
         }
 
-        let search_query = format!("%{}%", query.to_lowercase());
-
         let rows = sqlx::query_as::<_, (String, String, String, String)>(
-            "SELECT m.id, m.title, t.transcript, t.timestamp
-             FROM meetings m
-             JOIN transcripts t ON m.id = t.meeting_id
-             WHERE LOWER(t.transcript) LIKE ?",
+            "SELECT id, title, body, position FROM (
+                SELECT m.id AS id, m.title AS title, m.title AS body, '' AS position,
+                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)) AS sort_key
+                FROM meetings m
+                WHERE LOWER(m.title) LIKE ?1 ESCAPE '\\'
+                UNION ALL
+                SELECT m.id, m.title, e.transcript,
+                       printf('%02d:%02d', CAST(e.audio_start_time AS INTEGER) / 60,
+                              CAST(e.audio_start_time AS INTEGER) % 60),
+                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT))
+                FROM meetings m
+                JOIN transcript_evidence e ON e.meeting_id = m.id
+                WHERE LOWER(e.transcript) LIKE ?1 ESCAPE '\\'
+                UNION ALL
+                SELECT m.id, m.title, t.transcript, t.timestamp,
+                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT))
+                FROM meetings m
+                JOIN transcripts t ON t.meeting_id = m.id
+                WHERE LOWER(t.transcript) LIKE ?1 ESCAPE '\\'
+             )
+             ORDER BY sort_key DESC
+             LIMIT 50",
         )
-        .bind(&search_query)
+        .bind(like_pattern(query))
         .fetch_all(pool)
         .await?;
 
-        let results = rows
+        Ok(rows
             .into_iter()
-            .map(|(id, title, transcript, timestamp)| {
-                let match_context = Self::get_match_context(&transcript, query);
-                TranscriptSearchResult {
-                    id,
-                    title,
-                    match_context,
-                    timestamp,
-                }
+            .map(|(id, title, body, timestamp)| TranscriptSearchResult {
+                match_context: Self::get_match_context(&body, query),
+                id,
+                title,
+                timestamp,
             })
-            .collect();
-
-        Ok(results)
+            .collect())
     }
 
     /// Helper function to extract a snippet of text around the first match of a query.
@@ -530,5 +548,76 @@ mod transcript_evidence_repository_tests {
                 "018f5e27-2f68-7e27-9c90-7c72123141c1",
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod transcript_search_tests {
+    use super::*;
+    use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool};
+
+    const MEETING: &str = "018f5e27-2f68-7e27-9c90-7c7212315001";
+
+    async fn titled_meeting(pool: &SqlitePool, id: &str, title: &str) {
+        insert_meeting(pool, id, "complete", "complete").await;
+        sqlx::query("UPDATE meetings SET title = ? WHERE id = ?")
+            .bind(title)
+            .bind(id)
+            .execute(pool)
+            .await
+            .expect("meeting title");
+    }
+
+    #[tokio::test]
+    async fn transcript_search_finds_canonical_meetings_by_evidence_text() {
+        let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Weekly sync").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315101", 0, "We agreed to ship the beta on Friday.").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "Ship the Beta").await.expect("search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, MEETING);
+        assert!(results[0].match_context.to_lowercase().contains("ship the beta"));
+    }
+
+    #[tokio::test]
+    async fn transcript_search_finds_meetings_by_title() {
+        let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Quarterly planning").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "quarterly").await.expect("search");
+
+        assert_eq!(results.iter().map(|result| result.title.as_str()).collect::<Vec<_>>(), vec!["Quarterly planning"]);
+    }
+
+    #[tokio::test]
+    async fn transcript_search_treats_wildcards_literally() {
+        let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Status").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315101", 0, "Progress is 50%_done today.").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315102", 1, "We are 500 done already.").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315103", 2, "Marked 50xxdone yesterday.").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "50%_done").await.expect("search");
+
+        assert_eq!(results.len(), 1);
+        assert!(results[0].match_context.contains("50%_done"));
+    }
+
+    #[tokio::test]
+    async fn transcript_search_ignores_blank_queries_and_caps_results() {
+        let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Standup").await;
+        for sequence in 0..60 {
+            let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123152{sequence:02x}");
+            insert_evidence(&pool, MEETING, &evidence_id, sequence, "alpha release notes").await;
+        }
+
+        let blank = TranscriptsRepository::search_transcripts(&pool, "   ").await.expect("blank search");
+        let capped = TranscriptsRepository::search_transcripts(&pool, "alpha").await.expect("capped search");
+
+        assert!(blank.is_empty());
+        assert_eq!(capped.len(), 50);
     }
 }

@@ -8,7 +8,9 @@ import type { MeetingSummary, SummaryProcessResponse } from '../../src/types';
 const originalAnalytics = { ...await import('../../src/lib/analytics') };
 const originalPreferences = { ...await import('../../src/lib/summary-language-preferences') };
 const originalToast = { ...await import('sonner') };
+const originalCore = { ...await import('@tauri-apps/api/core') };
 afterAll(() => {
+  mock.module('@tauri-apps/api/core', () => originalCore);
   mock.module('../../src/lib/analytics', () => originalAnalytics);
   mock.module('../../src/lib/summary-language-preferences', () => originalPreferences);
   mock.module('sonner', () => originalToast);

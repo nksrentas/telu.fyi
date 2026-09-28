@@ -35,6 +35,7 @@ pub(crate) use perf_trace;
 // Re-export async logging macros for external use (removed due to macro conflicts)
 
 // Declare audio module
+pub mod agenda;
 pub mod analytics;
 pub mod api;
 pub mod audio;
@@ -760,6 +761,9 @@ pub fn run() {
             api::api_test_custom_openai_connection,
             // Summary commands
             summary::commands::api_process_transcript,
+            agenda::commands::agenda_list_day,
+            agenda::commands::agenda_list_review,
+            agenda::commands::agenda_counts,
             knowledge::commands::knowledge_start_extraction,
             knowledge::commands::knowledge_get_meeting,
             knowledge::commands::knowledge_list_evidence,

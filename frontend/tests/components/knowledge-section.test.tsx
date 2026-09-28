@@ -5,9 +5,11 @@ import type { MeetingKnowledgeView } from '../../src/lib/knowledge-service';
 
 const originalToast = { ...await import('sonner') };
 const originalEvent = { ...await import('@tauri-apps/api/event') };
+const originalCore = { ...await import('@tauri-apps/api/core') };
 afterAll(() => {
   mock.module('sonner', () => originalToast);
   mock.module('@tauri-apps/api/event', () => originalEvent);
+  mock.module('@tauri-apps/api/core', () => originalCore);
 });
 
 const notify = mock(() => {});
