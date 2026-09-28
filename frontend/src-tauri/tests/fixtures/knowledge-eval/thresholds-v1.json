@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "invariants": {
+    "exactSpanSupport": 1.0,
+    "resurrection": 0,
+    "deletionResidue": 0
+  },
+  "quality": {
+    "abstention": null,
+    "decision": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null
+    },
+    "commitment": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null
+    },
+    "question": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null
+    },
+    "fact": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null
+    },
+    "overall": {
+      "claimCorrectness": null,
+      "semanticSupport": null,
+      "evidenceCoverage": null,
+      "attribution": null
+    }
+  }
+}
