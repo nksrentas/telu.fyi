@@ -211,8 +211,8 @@ impl KnowledgeRepository {
         meeting_id: &str,
     ) -> Result<Vec<ExistingItem>, KnowledgeError> {
         validate_meeting_id(meeting_id)?;
-        let items: Vec<(String, KnowledgeType, ReviewState, String)> = sqlx::query_as(
-            "SELECT c.item_id, c.item_type, c.review_state, i.text
+        let items: Vec<(String, KnowledgeType, ReviewState, String, String)> = sqlx::query_as(
+            "SELECT c.item_id, c.item_type, c.review_state, c.text, i.text
              FROM knowledge_item_current c
              JOIN knowledge_items i ON i.item_id = c.item_id
              WHERE c.meeting_id = ?
@@ -231,15 +231,17 @@ impl KnowledgeRepository {
         .await?;
         Ok(items
             .into_iter()
-            .map(|(item_id, item_type, state, text)| ExistingItem {
-                keys: std::iter::once(normalized_key(&text))
-                    .chain(revisions.get(&item_id).into_iter().flatten().map(|revision| normalized_key(revision)))
-                    .collect(),
-                superseded_keys: Vec::new(),
-                claim_evidence_ids: claims.get(&item_id).cloned().unwrap_or_default(),
-                item_id,
-                item_type,
-                state,
+            .map(|(item_id, item_type, state, current_text, original_text)| {
+                let item_revisions = revisions.get(&item_id).map(Vec::as_slice).unwrap_or_default();
+                let (keys, superseded_keys) = match_keys(&current_text, &original_text, item_revisions);
+                ExistingItem {
+                    keys,
+                    superseded_keys,
+                    claim_evidence_ids: claims.get(&item_id).cloned().unwrap_or_default(),
+                    item_id,
+                    item_type,
+                    state,
+                }
             })
             .collect())
     }
@@ -394,6 +396,23 @@ async fn item_pairs(
         grouped.entry(item_id).or_insert_with(Vec::new).push(value);
         grouped
     }))
+}
+
+fn match_keys(current_text: &str, original_text: &str, revisions: &[String]) -> (Vec<String>, Vec<String>) {
+    let current = normalized_key(current_text);
+    let all: Vec<String> = [current_text, original_text]
+        .into_iter()
+        .chain(revisions.iter().map(String::as_str))
+        .map(normalized_key)
+        .collect();
+    let keys: Vec<String> = all
+        .iter()
+        .enumerate()
+        .filter(|(position, key)| !all[..*position].contains(key))
+        .map(|(_, key)| key.clone())
+        .collect();
+    let superseded_keys = keys.iter().filter(|key| **key != current).cloned().collect();
+    (keys, superseded_keys)
 }
 
 pub(crate) fn validate_meeting_id(meeting_id: &str) -> Result<(), KnowledgeError> {

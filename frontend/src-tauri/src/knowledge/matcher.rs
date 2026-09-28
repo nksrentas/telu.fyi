@@ -36,7 +36,7 @@ pub fn normalized_key(text: &str) -> String {
 pub fn match_candidate(candidate: &Candidate, existing: &[ExistingItem]) -> MatchOutcome {
     existing
         .iter()
-        .filter(|item| is_candidate_for(candidate, item) && is_match(candidate, item))
+        .filter(|item| is_match(candidate, item, comparable_keys(candidate, item)))
         .min_by(|left, right| {
             state_priority(left.state)
                 .cmp(&state_priority(right.state))
@@ -46,20 +46,23 @@ pub fn match_candidate(candidate: &Candidate, existing: &[ExistingItem]) -> Matc
         .unwrap_or(MatchOutcome::New)
 }
 
-fn is_candidate_for(candidate: &Candidate, item: &ExistingItem) -> bool {
-    item.state == ReviewState::Rejected || item.item_type == candidate.item_type
+fn comparable_keys<'a>(candidate: &Candidate, item: &'a ExistingItem) -> &'a [String] {
+    if item.state == ReviewState::Rejected || item.item_type == candidate.item_type {
+        &item.keys
+    } else {
+        &item.superseded_keys
+    }
 }
 
-fn is_match(candidate: &Candidate, item: &ExistingItem) -> bool {
-    let exact = item.keys.iter().any(|key| *key == candidate.key);
+fn is_match(candidate: &Candidate, item: &ExistingItem, keys: &[String]) -> bool {
+    let exact = keys.iter().any(|key| *key == candidate.key);
     let shares_evidence = item
         .claim_evidence_ids
         .iter()
         .any(|evidence_id| candidate.claim_evidence_ids.contains(evidence_id));
     exact
         || (shares_evidence
-            && item
-                .keys
+            && keys
                 .iter()
                 .any(|key| normalized_levenshtein(key, &candidate.key) >= MATCH_SIMILARITY_THRESHOLD))
 }
