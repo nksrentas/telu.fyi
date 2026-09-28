@@ -208,7 +208,7 @@ pub fn verify_attribute(
         return AttributeSupport::NotStated;
     };
     let normalized_quote = normalize_quote(quote);
-    if normalized_quote.is_empty() || !normalized_quote.contains(&normalized_value) {
+    if normalized_quote.is_empty() || find_whole_token(&normalized_quote, &normalized_value).is_none() {
         return AttributeSupport::NotStated;
     }
     match locate_quote(index, &normalized_quote, segments) {
@@ -225,7 +225,7 @@ fn stated_text(value: &str, normalized_value: &str, spans: &[VerifiedSpan]) -> S
         .iter()
         .find_map(|span| {
             let (normalized, map) = normalize_with_map(&span.quote_text);
-            let byte_start = normalized.find(normalized_value)?;
+            let byte_start = find_whole_token(&normalized, normalized_value)?;
             let char_start = normalized[..byte_start].chars().count();
             let char_end = char_start + normalized_value.chars().count();
             let raw: String = span
@@ -237,6 +237,19 @@ fn stated_text(value: &str, normalized_value: &str, spans: &[VerifiedSpan]) -> S
             Some(raw)
         })
         .unwrap_or_else(|| value.trim().to_string())
+}
+
+fn find_whole_token(haystack: &str, needle: &str) -> Option<usize> {
+    haystack
+        .match_indices(needle)
+        .map(|(at, _)| at)
+        .find(|&at| is_token_boundary(haystack, at, at + needle.len()))
+}
+
+fn is_token_boundary(haystack: &str, start: usize, end: usize) -> bool {
+    let before = haystack[..start].chars().next_back();
+    let after = haystack[end..].chars().next();
+    !before.is_some_and(char::is_alphanumeric) && !after.is_some_and(char::is_alphanumeric)
 }
 
 #[cfg(test)]
