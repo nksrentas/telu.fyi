@@ -144,7 +144,7 @@ Plans:
 **Verification approach:** Use representative held-out transcripts plus insufficient-evidence and degraded-capture cases; test exact evidence navigation and semantic support separately; exercise accept, reject, correct, restore, regenerate, delete, and retry scenarios; audit append-only lineage and future-context eligibility.
 **Exit gate:** Phase 3 may proceed only when item correctness, exact evidence-span support, abstention behavior, correction lineage, regeneration safety, and deletion effects meet the predeclared representative-review thresholds. If provenance or user actions do not deterministically control future eligibility, stop before preparation, live assistance, or series memory can amplify the defect.
 **Principal risks / stop conditions:** Fluent unsupported claims, reconstructed citations, destructive correction, rejected-item resurrection, incomplete evidence, mutable summary blobs, or one score conflating claim correctness with citation support. Stop when evidence lineage is ambiguous or review actions fail to propagate.
-**Plans:** 13/26 plans executed
+**Plans:** 14/26 plans executed
 Plans:
 **Wave 1**
 
@@ -164,7 +164,7 @@ Plans:
 - [x] 02-08-PLAN.md — Re-skin audio, analytics, language, form and warning components.
 - [x] 02-09-PLAN.md — Re-skin onboarding, import and update surfaces.
 - [x] 02-10-PLAN.md — Re-skin summary, transcript, title and progress surfaces.
-- [ ] 02-11-PLAN.md — Re-skin feedback surfaces, completeness surface, recovery sheet and grouped primitives.
+- [x] 02-11-PLAN.md — Re-skin feedback surfaces, completeness surface, recovery sheet and grouped primitives.
 - [ ] 02-22-PLAN.md — Evidence-first summary input and the evidence transcript drawer (highlight, virtualization, legacy fallback).
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -290,7 +290,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6. Each phase's e
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Baseline Observability, Identity, and Trust Boundaries | 19/19 | Complete    | 2026-09-26 |
-| 2. Evidence-Linked Post-Meeting Knowledge | 13/26 | In Progress|  |
+| 2. Evidence-Linked Post-Meeting Knowledge | 14/26 | In Progress|  |
 | 3. Bounded Sourced Preparation | 0/TBD | Not started | - |
 | 4. Cancellable Live-Loop Validation | 0/TBD | Not started | - |
 | 5. Recurring-Series Memory | 0/TBD | Not started | - |
