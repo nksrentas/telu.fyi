@@ -5,14 +5,12 @@ import { cn } from "@/lib/utils"
 import { Separator } from "@/components/ui/separator"
 
 const buttonGroupVariants = cva(
-  "flex w-fit items-stretch has-[>[data-slot=button-group]]:gap-2 [&>*]:focus-visible:relative [&>*]:focus-visible:z-10 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1",
+  "inline-flex h-[34px] w-fit items-center rounded-full bg-glass-strong p-[3px] shadow-[0_0_0_0.5px_var(--glass-edge),inset_0_0.5px_0_var(--glass-rim),0_2px_10px_rgba(23,25,31,0.06)] backdrop-blur-[16px] backdrop-saturate-[1.6] has-[>[data-slot=button-group]]:gap-2 [&>*]:focus-visible:relative [&>*]:focus-visible:z-10 [&>[data-slot=button]]:relative [&>[data-slot=button]]:h-7 [&>[data-slot=button]]:bg-transparent [&>[data-slot=button]:hover]:bg-fill-2 [&>[data-slot=button]+[data-slot=button]]:before:absolute [&>[data-slot=button]+[data-slot=button]]:before:-left-px [&>[data-slot=button]+[data-slot=button]]:before:top-1/2 [&>[data-slot=button]+[data-slot=button]]:before:h-4 [&>[data-slot=button]+[data-slot=button]]:before:w-[0.5px] [&>[data-slot=button]+[data-slot=button]]:before:-translate-y-1/2 [&>[data-slot=button]+[data-slot=button]]:before:bg-hairline [&>[data-slot=button]+[data-slot=button]]:before:content-[''] [&>[data-slot=select-trigger]:not([class*='w-'])]:w-fit [&>input]:flex-1",
   {
     variants: {
       orientation: {
-        horizontal:
-          "[&>*:not(:first-child)]:rounded-l-none [&>*:not(:first-child)]:border-l-0 [&>*:not(:last-child)]:rounded-r-none",
-        vertical:
-          "flex-col [&>*:not(:first-child)]:rounded-t-none [&>*:not(:first-child)]:border-t-0 [&>*:not(:last-child)]:rounded-b-none",
+        horizontal: "flex-row",
+        vertical: "h-auto flex-col rounded-[14px]",
       },
     },
     defaultVariants: {
@@ -49,7 +47,7 @@ function ButtonGroupText({
   return (
     <Comp
       className={cn(
-        "bg-muted shadow-xs flex items-center gap-2 rounded-md border px-4 text-sm font-medium [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none",
+        "flex items-center gap-2 rounded-full px-3 text-body font-medium text-label-2 [&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none",
         className
       )}
       {...props}
@@ -67,7 +65,7 @@ function ButtonGroupSeparator({
       data-slot="button-group-separator"
       orientation={orientation}
       className={cn(
-        "bg-input relative !m-0 self-stretch data-[orientation=vertical]:h-auto",
+        "relative !mx-0.5 !my-0 self-center bg-hairline data-[orientation=vertical]:h-4 data-[orientation=vertical]:w-[0.5px]",
         className
       )}
       {...props}

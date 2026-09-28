@@ -1,5 +1,6 @@
 import { toast } from 'sonner';
 import Analytics from '@/lib/analytics';
+import { Button } from '@/components/ui/button';
 
 /**
  * Shows the recording notification toast with compliance message.
@@ -22,20 +23,23 @@ export async function showRecordingNotification(): Promise<void> {
       const toastId = toast.info('🔴 Recording Started', {
         description: (
           <div className="space-y-3 min-w-[280px]">
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-body font-medium text-label">
               Inform all participants this meeting is being recorded.
             </p>
-            <label className="flex items-center gap-2 text-xs cursor-pointer hover:bg-blue-100 p-2 rounded transition-colors">
+            <label className="flex items-center gap-2 text-xs cursor-default hover:bg-fill p-2 rounded-md transition-colors">
               <input
                 type="checkbox"
                 onChange={(e) => {
                   dontShowAgain = e.target.checked;
                 }}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                className="rounded accent-accent"
               />
-              <span className="select-none text-gray-700">Don't show this again</span>
+              <span className="select-none text-label">Don't show this again</span>
             </label>
-            <button
+            <Button
+              size="sm"
+              variant="tinted"
+              className="w-full"
               onClick={async () => {
                 if (dontShowAgain) {
                   const { Store } = await import('@tauri-apps/plugin-store');
@@ -46,10 +50,9 @@ export async function showRecordingNotification(): Promise<void> {
                 Analytics.trackButtonClick('recording_notification_acknowledged', 'toast');
                 toast.dismiss(toastId);
               }}
-              className="w-full px-3 py-1.5 bg-gray-900 text-white text-xs rounded hover:bg-gray-800 transition-colors font-medium"
             >
               I've Notified Participants
-            </button>
+            </Button>
           </div>
         ),
         duration: 10000,

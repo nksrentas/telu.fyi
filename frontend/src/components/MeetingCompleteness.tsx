@@ -50,26 +50,26 @@ function statusPresentation(
       return {
         label: 'Complete',
         icon: CheckCircle2,
-        className: 'border-primary/25 bg-primary/10 text-primary',
+        className: 'bg-fill-2 text-label-2',
       };
     case 'recovered_with_gaps':
       return {
         label: `Recovered with gaps · ${gapLabel(gapCount)}`,
         icon: RotateCcw,
-        className: 'border-primary/25 bg-primary/10 text-foreground',
+        className: 'bg-amber-soft text-amber',
       };
     case 'completion_not_verified':
       return {
         label: 'Completion not verified',
         icon: CircleHelp,
-        className: 'border-border bg-muted text-muted-foreground',
+        className: 'bg-fill-2 text-label-2',
       };
     case 'pending':
     case 'incomplete':
       return {
         label: `Incomplete · ${gapLabel(gapCount)}`,
         icon: AlertTriangle,
-        className: 'border-destructive/25 bg-destructive/10 text-foreground',
+        className: 'bg-amber-soft text-amber',
       };
   }
 }
@@ -112,12 +112,12 @@ function Status({
     <span
       aria-label={label}
       className={cn(
-        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium leading-none',
+        'inline-flex min-h-5 max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium leading-tight',
         statusClassName,
         className,
       )}
     >
-      <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <Icon className="size-3 shrink-0" aria-hidden="true" />
       <span className="whitespace-normal">{label}</span>
     </span>
   );
@@ -128,9 +128,9 @@ export function MeetingGapList({ gaps }: { gaps: MeetingGap[] }) {
 
   if (orderedGaps.length === 0) {
     return (
-      <div className="rounded-lg border bg-muted/40 p-4">
-        <h3 className="text-sm font-semibold">No recorded gaps</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <div className="rounded-[10px] bg-fill p-4">
+        <h3 className="text-body font-semibold">No recorded gaps</h3>
+        <p className="mt-1 text-body text-label-2">
           Telu has no recorded audio or transcript gaps for this meeting. The meeting status above remains authoritative.
         </p>
       </div>
@@ -140,17 +140,17 @@ export function MeetingGapList({ gaps }: { gaps: MeetingGap[] }) {
   return (
     <ol className="space-y-3">
       {orderedGaps.map(gap => (
-        <li key={gap.gap_id} className="rounded-lg border bg-card p-4 text-sm">
+        <li key={gap.gap_id} className="rounded-[10px] bg-surface-sunken p-4 text-body">
           <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[7rem_1fr]">
-            <dt className="font-medium text-muted-foreground">Gap type</dt>
+            <dt className="font-medium text-label-2">Gap type</dt>
             <dd>{formatFact(gap.gap_kind)}</dd>
-            <dt className="font-medium text-muted-foreground">Source</dt>
+            <dt className="font-medium text-label-2">Source</dt>
             <dd>{formatFact(gap.source)}</dd>
-            <dt className="font-medium text-muted-foreground">Time range</dt>
+            <dt className="font-medium text-label-2">Time range</dt>
             <dd className="tabular-nums">
               {formatTimestamp(gap.audio_start_ms)}–{formatTimestamp(gap.audio_end_ms)}
             </dd>
-            <dt className="font-medium text-muted-foreground">Reason</dt>
+            <dt className="font-medium text-label-2">Reason</dt>
             <dd>{formatFact(gap.reason_code)}</dd>
           </dl>
         </li>
@@ -191,7 +191,7 @@ export function MeetingCompleteness({
     <div className={cn('space-y-3', className)} data-meeting-lifecycle={lifecycle}>
       {showStatus && <Status completeness={completeness} gapCount={gapCount} />}
       {!isComplete && (
-        <Alert className="border-border bg-card text-card-foreground">
+        <Alert className="bg-surface-sunken text-label">
           {completeness === 'recovered_with_gaps' ? (
             <RotateCcw className="h-4 w-4" aria-hidden="true" />
           ) : completeness === 'completion_not_verified' ? (
@@ -200,7 +200,7 @@ export function MeetingCompleteness({
             <AlertTriangle className="h-4 w-4" aria-hidden="true" />
           )}
           <AlertTitle>{statusPresentation(completeness, gapCount).label}</AlertTitle>
-          <AlertDescription className="space-y-3 text-muted-foreground">
+          <AlertDescription className="space-y-3 text-label-2">
             <p>{copy}</p>
             <Button type="button" variant="outline" size="sm" onClick={() => setIsReviewOpen(true)}>
               Review gaps

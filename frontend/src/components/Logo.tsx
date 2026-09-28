@@ -17,7 +17,7 @@ const Logo = React.forwardRef<HTMLButtonElement, LogoProps>(
             <button
               ref={ref}
               type="button"
-              className="flex items-center justify-center mb-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
+              className="flex items-center justify-center mb-2 cursor-default bg-transparent border-none p-0 hover:opacity-80 transition-opacity"
               aria-label="About Telu"
             >
               <Image
@@ -35,7 +35,7 @@ const Logo = React.forwardRef<HTMLButtonElement, LogoProps>(
             <button
               ref={ref}
               type="button"
-              className="w-full text-lg text-center border rounded-full bg-blue-50 border-white font-semibold text-gray-700 mb-2 block items-center cursor-pointer hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="w-full text-title3 text-center rounded-full bg-fill-2 text-label mb-2 block items-center cursor-default hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               aria-label="About Telu"
             >
               <span>telu</span>

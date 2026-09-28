@@ -161,28 +161,28 @@ export function TranscriptRecovery({
           if (!open && !isRecovering && !isDeleting) onClose();
         }}
       >
-        <DialogContent className="flex h-[80vh] max-w-4xl flex-col p-0">
-          <DialogHeader className="px-6 pt-6">
-            <DialogTitle className="text-2xl">Recover interrupted meetings</DialogTitle>
+        <DialogContent className="flex h-[80vh] max-w-[520px] flex-col p-0">
+          <DialogHeader className="px-[22px] pt-[22px]">
+            <DialogTitle>Recover interrupted meetings</DialogTitle>
             <DialogDescription>
               Reconcile final transcript evidence with its original meeting. Recorded gaps remain visible.
             </DialogDescription>
           </DialogHeader>
 
           {recoverableMeetings.length === 0 ? (
-            <div className="flex flex-1 items-center justify-center px-6 pb-6 text-center">
+            <div className="flex flex-1 items-center justify-center px-[22px] pb-[22px] text-center">
               <div className="max-w-md space-y-2">
-                <h3 className="text-sm font-semibold">No interrupted meetings</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-body font-semibold">No interrupted meetings</h3>
+                <p className="text-body text-label-2">
                   There are no interrupted recordings available to recover on this device.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-4 pb-4 min-[900px]:flex-row min-[900px]:px-6 min-[900px]:pb-6">
-              <div className="flex min-h-0 flex-col min-[900px]:w-1/3">
-                <h3 className="mb-2 text-sm font-semibold">Interrupted meetings</h3>
-                <ScrollArea className="min-h-32 flex-1 rounded-lg border">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden px-[22px] pb-4">
+              <div className="flex min-h-0 flex-col">
+                <h3 className="mb-2 text-body font-semibold">Interrupted meetings</h3>
+                <ScrollArea className="min-h-32 flex-1 rounded-[10px] bg-surface-sunken">
                   <div className="space-y-2 p-2">
                     {recoverableMeetings.map(meeting => (
                       <button
@@ -192,15 +192,15 @@ export function TranscriptRecovery({
                         disabled={isRecovering || isDeleting}
                         aria-pressed={selectedMeetingId === meeting.meetingId}
                         className={cn(
-                          'w-full rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                          'w-full rounded-lg p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                           selectedMeetingId === meeting.meetingId
-                            ? 'border-primary bg-primary/10'
-                            : 'border-transparent hover:bg-muted',
+                            ? 'bg-surface shadow-card ring-2 ring-accent'
+                            : 'hover:bg-fill',
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0 flex-1">
-                            <p className="line-clamp-2 text-sm font-semibold">{meeting.title}</p>
+                            <p className="line-clamp-2 text-body font-semibold">{meeting.title}</p>
                             <MeetingCompleteness
                               className="mt-2"
                               lifecycle={meeting.lifecycle}
@@ -208,22 +208,22 @@ export function TranscriptRecovery({
                               gapCount={meeting.gapCount}
                               variant="compact"
                             />
-                            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            <p className="mt-1 flex items-center gap-1 text-xs text-label-2">
                               <Clock className="h-3 w-3" aria-hidden="true" />
                               {formatDistanceToNow(new Date(meeting.lastUpdated), { addSuffix: true })}
                             </p>
-                            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            <p className="mt-1 flex items-center gap-1 text-xs text-label-2">
                               <FileText className="h-3 w-3" aria-hidden="true" />
                               {meeting.transcriptCount} final {meeting.transcriptCount === 1 ? 'segment' : 'segments'}
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="mt-1 text-xs text-label-2">
                               {meeting.folderPath ? 'Audio available' : 'No audio available'}
                             </p>
                           </div>
                           {meeting.folderPath ? (
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-label-2" aria-hidden="true" />
                           ) : (
-                            <AlertCircle className="h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
+                            <AlertCircle className="h-4 w-4 shrink-0 text-coral-ink" aria-hidden="true" />
                           )}
                         </div>
                       </button>
@@ -233,11 +233,11 @@ export function TranscriptRecovery({
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col">
-                <h3 className="mb-2 text-sm font-semibold">Preview</h3>
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border">
+                <h3 className="mb-2 text-body font-semibold">Preview</h3>
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[10px] bg-surface-sunken">
                   {selectedMeeting ? (
                     <>
-                      <div className="border-b bg-muted/50 p-4">
+                      <div className="border-b border-separator p-4">
                         <h4 className="line-clamp-2 font-semibold">{selectedMeeting.title}</h4>
                         <MeetingCompleteness
                           className="mt-2"
@@ -246,10 +246,10 @@ export function TranscriptRecovery({
                           gapCount={selectedMeeting.gapCount}
                           variant="compact"
                         />
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1 text-body text-label-2">
                           Started {new Date(selectedMeeting.startTime).toLocaleString()}
                         </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-body">
                           <span>{selectedMeeting.transcriptCount} final {selectedMeeting.transcriptCount === 1 ? 'segment' : 'segments'}</span>
                           <span>{selectedMeeting.folderPath ? 'Audio available' : 'No audio available'}</span>
                         </div>
@@ -257,7 +257,7 @@ export function TranscriptRecovery({
 
                       <ScrollArea className="min-h-0 flex-1 p-4">
                         {isLoadingPreview ? (
-                          <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground" role="status">
+                          <div className="flex h-full items-center justify-center gap-2 text-body text-label-2" role="status">
                             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                             Loading final evidence…
                           </div>
@@ -269,13 +269,13 @@ export function TranscriptRecovery({
                               </AlertDescription>
                             </Alert>
                             {previewTranscripts.map(transcript => (
-                              <div key={String(transcript.id)} className="text-sm">
+                              <div key={String(transcript.id)} className="text-body">
                                 <span className="break-words">{transcript.text}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <div className="flex h-full items-center justify-center text-center text-sm text-muted-foreground">
+                          <div className="flex h-full items-center justify-center text-center text-body text-label-2">
                             No final transcript evidence is available. Recovery can still preserve the meeting and its recorded gaps.
                           </div>
                         )}
@@ -288,8 +288,8 @@ export function TranscriptRecovery({
                       )}
 
                       {authoritativeResult && (
-                        <div className="space-y-3 border-t p-4" role="status" aria-live="polite">
-                          <p className="text-sm font-semibold">
+                        <div className="space-y-3 border-t border-separator p-4" role="status" aria-live="polite">
+                          <p className="text-body font-semibold">
                             {gapCount === 0
                               ? 'Meeting recovered. No recorded gaps remain.'
                               : `Meeting recovered with ${gapCount} ${gapCount === 1 ? 'gap' : 'gaps'}.`}
@@ -301,7 +301,7 @@ export function TranscriptRecovery({
                             variant="compact"
                           />
                           {showGaps && (
-                            <div className="max-h-64 overflow-y-auto rounded-md border p-3">
+                            <div className="max-h-64 overflow-y-auto rounded-lg bg-surface p-3">
                               <MeetingGapList gaps={authoritativeResult.gaps} />
                             </div>
                           )}
@@ -309,7 +309,7 @@ export function TranscriptRecovery({
                       )}
                     </>
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    <div className="flex h-full items-center justify-center text-body text-label-2">
                       Select a meeting to preview.
                     </div>
                   )}
@@ -318,7 +318,7 @@ export function TranscriptRecovery({
             </div>
           )}
 
-          <DialogFooter className="gap-2 px-4 pb-4 min-[900px]:px-6 min-[900px]:pb-6 sm:space-x-0">
+          <DialogFooter className="flex-wrap gap-2 px-[22px] pb-[22px]">
             {authoritativeResult ? (
               <>
                 <Button variant="outline" onClick={viewMeeting}>View meeting</Button>
@@ -327,7 +327,7 @@ export function TranscriptRecovery({
                     Review gaps
                   </Button>
                 )}
-                <Button onClick={onClose}>Close recovery</Button>
+                <Button variant="primary" onClick={onClose}>Close recovery</Button>
               </>
             ) : (
               <>
@@ -347,6 +347,7 @@ export function TranscriptRecovery({
                   Delete meeting
                 </Button>
                 <Button
+                  variant="primary"
                   onClick={() => void handleRecover()}
                   disabled={!selectedMeetingId || isRecovering || isDeleting}
                 >
@@ -373,7 +374,7 @@ export function TranscriptRecovery({
               Delete “{selectedMeeting?.title ?? 'Unknown meeting'}”? Its local recovery data will be removed. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2 sm:space-x-0">
+          <DialogFooter className="gap-2">
             <Button
               variant="outline"
               onClick={() => setDeleteConfirmationOpen(false)}
