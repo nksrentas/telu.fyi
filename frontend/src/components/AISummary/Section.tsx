@@ -5,6 +5,7 @@ import { BlockComponent } from './Block';
 import { EditableTitle } from '../EditableTitle';
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { PRESET } from '@/lib/motion';
 
 interface SectionProps {
   section: SectionType;
@@ -58,9 +59,9 @@ export const Section: React.FC<SectionProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      transition={PRESET.listIn}
       className="mb-8"
     >
       <div className="flex items-center justify-between mb-4">
@@ -75,7 +76,7 @@ export const Section: React.FC<SectionProps> = ({
         {onSectionDelete && (
           <button
             onClick={() => onSectionDelete(sectionKey)}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-label-3 hover:text-label-2"
           >
             Delete
           </button>

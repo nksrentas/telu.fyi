@@ -221,7 +221,7 @@ export const BlockComponent: React.FC<BlockProps> = ({
   return (
     <div 
       className={`group relative min-h-[24px] flex items-start rounded transition-all duration-150 ease-in-out
-        ${isSelected ? 'bg-blue-50 ring-1 ring-blue-200 shadow-sm' : 'hover:bg-gray-50'}`}
+        ${isSelected ? 'bg-accent-softer' : 'hover:bg-fill'}`}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
       onMouseUp={onMouseUp}
@@ -244,11 +244,11 @@ export const BlockComponent: React.FC<BlockProps> = ({
           onContextMenu={onContextMenu}
           rows={1}
           className={`
-            w-full resize-none overflow-hidden bg-transparent border-none p-0 focus:outline-none focus:ring-0
-            transition-all duration-150 ease-in-out
-            ${block.color === 'gray' ? 'text-gray-500' : ''}
-            ${block.type === 'heading1' ? 'text-xl font-bold' : ''}
-            ${block.type === 'heading2' ? 'text-lg font-semibold' : ''}
+            w-full resize-none overflow-hidden bg-transparent border-none p-0 text-[13.5px] leading-[1.55] text-label focus:outline-none focus:ring-0
+            transition-colors duration-150 ease-in-out
+            ${block.color === 'gray' ? 'text-label-2' : ''}
+            ${block.type === 'heading1' ? 'text-title2' : ''}
+            ${block.type === 'heading2' ? 'text-title3' : ''}
           `}
           placeholder="Type '/' for commands..."
         />
@@ -256,25 +256,24 @@ export const BlockComponent: React.FC<BlockProps> = ({
         {showCommands && (
           <div 
             ref={commandsRef}
-            className="absolute left-0 top-full mt-1 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50
-                       animate-in fade-in slide-in-from-top-2 duration-150"
+            className="absolute left-0 top-full z-50 mt-1 w-64 rounded-[12px] bg-glass-strong p-[5px] text-label shadow-float backdrop-blur-[26px] backdrop-saturate-[1.8]"
           >
             {filteredCommands.map((cmd, index) => (
               <button
                 key={cmd.id}
                 className={`
-                  w-full text-left px-3 py-2 flex items-center space-x-3 hover:bg-gray-50
-                  ${index === selectedCommandIndex ? 'bg-gray-50' : ''}
+                  w-full text-left px-3 py-2 flex items-center space-x-3 rounded-[6px] hover:bg-fill
+                  ${index === selectedCommandIndex ? 'bg-fill-2' : ''}
                 `}
                 onClick={() => handleCommandSelect(cmd)}
                 onMouseEnter={() => setSelectedCommandIndex(index)}
               >
-                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-gray-600">
+                <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-fill rounded text-label-2">
                   {cmd.icon}
                 </span>
                 <div className="flex-1">
                   <div className="font-medium">{cmd.label}</div>
-                  <div className="text-sm text-gray-500">{cmd.description}</div>
+                  <div className="text-callout text-label-2">{cmd.description}</div>
                 </div>
               </button>
             ))}

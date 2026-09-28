@@ -24,7 +24,7 @@ export function SummaryUpdaterButtonGroup({
       <Button
         variant="outline"
         size="sm"
-        className={`${isDirty ? 'bg-green-200' : ""}`}
+        className={`${isDirty ? 'bg-fill' : ""}`}
         title={isSaving ? "Saving" : "Save Changes"}
         onClick={() => {
           Analytics.trackButtonClick('save_changes', 'meeting_details');
@@ -54,7 +54,6 @@ export function SummaryUpdaterButtonGroup({
           Analytics.trackButtonClick('copy_summary', 'meeting_details');
           onCopy();
         }}
-        className="cursor-pointer"
       >
         <Copy />
         <span className="hidden @[40rem]:inline">Copy</span>
