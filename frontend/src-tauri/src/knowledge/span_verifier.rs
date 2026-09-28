@@ -6,6 +6,8 @@ pub const QUOTE_MIN_WORDS: usize = 3;
 pub const QUOTE_MIN_CHARS: usize = 12;
 pub const MAX_SPAN_SEGMENTS: usize = 2;
 pub const MAX_ATTRIBUTE_CHARS: usize = 80;
+pub const MIN_ATTRIBUTE_CHARS: usize = 2;
+const NON_ATTRIBUTE_VALUES: [&str; 4] = ["i", "we", "you", "they"];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LabeledSegment {
@@ -148,7 +150,7 @@ fn match_across(covered: &[&LabeledSegment], normalized_quote: &str) -> Option<V
         .collect::<Vec<_>>()
         .join(" ");
     let (normalized, map) = normalize_with_map(&joined);
-    let byte_start = normalized.find(normalized_quote)?;
+    let byte_start = find_whole_token(&normalized, normalized_quote)?;
     let char_start = normalized[..byte_start].chars().count();
     let char_end = char_start + normalized_quote.chars().count();
     let raw_start = map[char_start];
@@ -199,51 +201,76 @@ pub fn verify_attribute(
     label: &str,
     quote: &str,
     segments: &LabeledSegments,
-    _claim_evidence_ids: &[String],
+    claim_evidence_ids: &[String],
 ) -> AttributeSupport {
     let normalized_value = normalize_quote(value);
-    if normalized_value.is_empty() || value.trim().chars().count() > MAX_ATTRIBUTE_CHARS {
+    if !is_attributable(&normalized_value) || value.trim().chars().count() > MAX_ATTRIBUTE_CHARS {
         return AttributeSupport::NotStated;
     }
     let Some(index) = segments.position(label) else {
         return AttributeSupport::NotStated;
     };
     let normalized_quote = normalize_quote(quote);
-    if normalized_quote.is_empty() || find_whole_token(&normalized_quote, &normalized_value).is_none() {
+    if find_whole_token(&normalized_quote, &normalized_value).is_none() {
         return AttributeSupport::NotStated;
     }
-    match locate_quote(index, &normalized_quote, segments) {
-        Some(spans) => AttributeSupport::Stated {
-            text: stated_text(value, &normalized_value, &spans),
-            spans,
-        },
+    let Some(spans) = locate_quote(index, &normalized_quote, segments) else {
+        return AttributeSupport::NotStated;
+    };
+    if !is_tied_to_claim(&spans, claim_evidence_ids, segments) {
+        return AttributeSupport::NotStated;
+    }
+    match stated_text(&normalized_value, &spans) {
+        Some(text) => AttributeSupport::Stated { text, spans },
         None => AttributeSupport::NotStated,
     }
 }
 
-fn stated_text(value: &str, normalized_value: &str, spans: &[VerifiedSpan]) -> String {
+fn is_attributable(normalized_value: &str) -> bool {
+    normalized_value.chars().count() >= MIN_ATTRIBUTE_CHARS
+        && !NON_ATTRIBUTE_VALUES.contains(&normalized_value)
+}
+
+fn is_tied_to_claim(spans: &[VerifiedSpan], claim_evidence_ids: &[String], segments: &LabeledSegments) -> bool {
+    let all = segments.as_slice();
+    let following = all
+        .iter()
+        .rposition(|segment| claim_evidence_ids.contains(&segment.evidence_id))
+        .and_then(|last| all.get(last + 1))
+        .map(|segment| &segment.evidence_id);
+    spans.iter().any(|span| {
+        claim_evidence_ids.contains(&span.evidence_id) || following == Some(&span.evidence_id)
+    })
+}
+
+fn stated_text(normalized_value: &str, spans: &[VerifiedSpan]) -> Option<String> {
     spans
         .iter()
-        .find_map(|span| {
-            let (normalized, map) = normalize_with_map(&span.quote_text);
-            let byte_start = find_whole_token(&normalized, normalized_value)?;
-            let char_start = normalized[..byte_start].chars().count();
-            let char_end = char_start + normalized_value.chars().count();
-            let raw: String = span
-                .quote_text
-                .chars()
-                .skip(map[char_start])
-                .take(map[char_end - 1] + 1 - map[char_start])
-                .collect();
-            Some(raw)
-        })
-        .unwrap_or_else(|| value.trim().to_string())
+        .find_map(|span| whole_token_slice(&span.quote_text, normalized_value))
+        .filter(|raw| raw.chars().count() <= MAX_ATTRIBUTE_CHARS)
+}
+
+fn whole_token_slice(raw: &str, normalized_value: &str) -> Option<String> {
+    let (normalized, map) = normalize_with_map(raw);
+    let byte_start = find_whole_token(&normalized, normalized_value)?;
+    let char_start = normalized[..byte_start].chars().count();
+    let char_end = char_start + normalized_value.chars().count();
+    Some(
+        raw.chars()
+            .skip(map[char_start])
+            .take(map[char_end - 1] + 1 - map[char_start])
+            .collect(),
+    )
 }
 
 fn find_whole_token(haystack: &str, needle: &str) -> Option<usize> {
+    if needle.is_empty() {
+        return None;
+    }
     haystack
-        .match_indices(needle)
+        .char_indices()
         .map(|(at, _)| at)
+        .filter(|&at| haystack[at..].starts_with(needle))
         .find(|&at| is_token_boundary(haystack, at, at + needle.len()))
 }
 
