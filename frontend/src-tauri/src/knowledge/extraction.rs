@@ -243,6 +243,7 @@ fn place(candidates: &mut ExtractionOutcome, verified: NewItem) {
                 item_type: verified.item_type,
                 state: ReviewState::Proposed,
                 keys: vec![candidate.key],
+                superseded_keys: Vec::new(),
                 claim_evidence_ids: candidate.claim_evidence_ids,
             });
             candidates.items.push(verified);

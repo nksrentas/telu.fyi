@@ -235,6 +235,7 @@ impl KnowledgeRepository {
                 keys: std::iter::once(normalized_key(&text))
                     .chain(revisions.get(&item_id).into_iter().flatten().map(|revision| normalized_key(revision)))
                     .collect(),
+                superseded_keys: Vec::new(),
                 claim_evidence_ids: claims.get(&item_id).cloned().unwrap_or_default(),
                 item_id,
                 item_type,

@@ -10,6 +10,7 @@ pub struct ExistingItem {
     pub item_type: KnowledgeType,
     pub state: ReviewState,
     pub keys: Vec<String>,
+    pub superseded_keys: Vec<String>,
     pub claim_evidence_ids: Vec<String>,
 }
 
@@ -89,6 +90,7 @@ mod tests {
             item_type: KnowledgeType::Decision,
             state,
             keys: keys.iter().map(|key| normalized_key(key)).collect(),
+            superseded_keys: Vec::new(),
             claim_evidence_ids: evidence.iter().map(|id| id.to_string()).collect(),
         }
     }
@@ -158,6 +160,40 @@ mod tests {
             match_candidate(&typed(KnowledgeType::Commitment, "Ship the beta by Friday", &["e1"]), &similar),
             MatchOutcome::Suppressed("r".to_string())
         );
+    }
+
+    fn with_superseded(item: ExistingItem, superseded: &[&str]) -> ExistingItem {
+        ExistingItem {
+            superseded_keys: superseded.iter().map(|key| normalized_key(key)).collect(),
+            ..item
+        }
+    }
+
+    #[test]
+    fn match_candidate_matches_corrected_away_wording_under_any_type() {
+        let keys = ["Hire three engineers", "Hire two engineers"];
+        let accepted = [with_superseded(existing("a", ReviewState::Accepted, &keys, &[]), &["Hire two engineers"])];
+        let rejected = [with_superseded(existing("r", ReviewState::Rejected, &keys, &[]), &["Hire two engineers"])];
+        let corrected_away = typed(KnowledgeType::Fact, "Hire two engineers", &[]);
+        let current = typed(KnowledgeType::Fact, "Hire three engineers", &[]);
+
+        assert_eq!(match_candidate(&corrected_away, &accepted), MatchOutcome::Reconfirmed("a".to_string()));
+        assert_eq!(match_candidate(&current, &accepted), MatchOutcome::New);
+        assert_eq!(match_candidate(&corrected_away, &rejected), MatchOutcome::Suppressed("r".to_string()));
+        assert_eq!(match_candidate(&current, &rejected), MatchOutcome::Suppressed("r".to_string()));
+    }
+
+    #[test]
+    fn match_candidate_keeps_type_for_current_wording_of_accepted_and_proposed_items() {
+        let accepted = [existing("a", ReviewState::Accepted, &["Ship the beta"], &[])];
+        let proposed = [existing("p", ReviewState::Proposed, &["Ship the beta"], &[])];
+        let commitment = typed(KnowledgeType::Commitment, "Ship the beta", &[]);
+        let decision = candidate("Ship the beta", &[]);
+
+        assert_eq!(match_candidate(&commitment, &accepted), MatchOutcome::New);
+        assert_eq!(match_candidate(&commitment, &proposed), MatchOutcome::New);
+        assert_eq!(match_candidate(&decision, &accepted), MatchOutcome::Reconfirmed("a".to_string()));
+        assert_eq!(match_candidate(&decision, &proposed), MatchOutcome::Duplicate("p".to_string()));
     }
 
     #[test]

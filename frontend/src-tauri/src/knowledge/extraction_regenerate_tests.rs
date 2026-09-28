@@ -212,6 +212,43 @@ async fn knowledge_regenerate_suppresses_a_rejected_item_under_every_other_type(
 }
 
 #[tokio::test]
+async fn knowledge_regenerate_never_resurrects_corrected_away_wording_under_another_type() {
+    let (pool, evidence) = reviewed_meeting().await;
+    let regenerate_run = "018f5e27-2f68-7e27-9c90-7c7212314808";
+
+    let outcome = run(
+        &pool,
+        &evidence,
+        regenerate_run,
+        &[typed_candidate("fact", "Hire two engineers", "S3", "hire two engineers soon")],
+    )
+    .await;
+
+    assert_eq!((outcome.counts.proposed, outcome.counts.reconfirmed), (0, 1));
+    assert_eq!(reasons(&pool, regenerate_run).await, vec!["reconfirmed_accepted"]);
+    assert!(items_of_run(&pool, regenerate_run).await.is_empty());
+}
+
+#[tokio::test]
+async fn load_match_index_separates_current_from_corrected_away_wording() {
+    let (pool, _) = reviewed_meeting().await;
+    let (corrected_id, accepted_id) = (
+        item_id(&pool, "Hire two engineers").await,
+        item_id(&pool, "Ship the beta on Friday").await,
+    );
+
+    let index = KnowledgeRepository::load_match_index(&pool, MEETING_ID)
+        .await
+        .expect("match index");
+    let entry = |wanted: &str| index.iter().find(|item| item.item_id == wanted).expect("indexed item").clone();
+    let (corrected, accepted) = (entry(&corrected_id), entry(&accepted_id));
+
+    assert_eq!(corrected.keys, vec!["hire three engineers", "hire two engineers"]);
+    assert_eq!(corrected.superseded_keys, vec!["hire two engineers"]);
+    assert!(accepted.superseded_keys.is_empty());
+}
+
+#[tokio::test]
 async fn knowledge_regenerate_keeps_rejected_items_out_of_review_and_eligibility() {
     let (pool, evidence) = reviewed_meeting().await;
     run(&pool, &evidence, "018f5e27-2f68-7e27-9c90-7c7212314802", &regenerate_candidates()).await;
