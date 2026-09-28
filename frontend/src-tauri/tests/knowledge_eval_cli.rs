@@ -17,6 +17,10 @@ fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/knowledge-eval")
 }
 
+fn gold_dir() -> PathBuf {
+    fixtures().join("gold")
+}
+
 fn run(args: &[&str]) -> Output {
     Command::new(runner()).args(args).output().expect("run telu-knowledge-eval")
 }
@@ -29,7 +33,7 @@ fn replay_predictions(out: &Path) -> PathBuf {
     let output = run(&[
         "run",
         "--gold-dir",
-        fixtures().to_str().unwrap(),
+        gold_dir().to_str().unwrap(),
         "--replay-completions",
         fixtures().join("completions-sample.json").to_str().unwrap(),
         "--out",
@@ -40,11 +44,10 @@ fn replay_predictions(out: &Path) -> PathBuf {
 }
 
 fn fixture_texts() -> Vec<String> {
-    fs::read_dir(fixtures())
-        .expect("fixture dir")
+    fs::read_dir(gold_dir())
+        .expect("gold dir")
         .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-        .filter_map(|path| serde_json::from_str::<Value>(&text(&path)).ok())
-        .filter(|value| value.get("fixtureId").is_some())
+        .map(|path| serde_json::from_str::<Value>(&text(&path)).expect("gold fixture"))
         .flat_map(|value| {
             let segments = value["segments"].as_array().cloned().unwrap_or_default();
             let gold = value["gold"].as_array().cloned().unwrap_or_default();
@@ -66,7 +69,7 @@ fn score_writes_a_content_free_report_tied_to_the_thresholds_file() {
     let output = run(&[
         "score",
         "--gold-dir",
-        fixtures().to_str().unwrap(),
+        gold_dir().to_str().unwrap(),
         "--predictions",
         predictions.to_str().unwrap(),
         "--labels",
@@ -90,11 +93,11 @@ fn score_writes_a_content_free_report_tied_to_the_thresholds_file() {
     }
 }
 
-fn score_with_thresholds(predictions: &Path, thresholds: &Path, out: &Path) -> Output {
+fn score_with(gold: &Path, predictions: &Path, thresholds: &Path, out: &Path) -> Output {
     run(&[
         "score",
         "--gold-dir",
-        fixtures().to_str().unwrap(),
+        gold.to_str().unwrap(),
         "--predictions",
         predictions.to_str().unwrap(),
         "--labels",
@@ -124,11 +127,59 @@ fn score_rejects_a_thresholds_file_that_is_not_v2() {
     ];
 
     for (index, thresholds) in candidates.iter().enumerate() {
-        let output = score_with_thresholds(&predictions, thresholds, &temp.path().join(format!("out-{index}")));
+        let output = score_with(&gold_dir(), &predictions, thresholds, &temp.path().join(format!("out-{index}")));
 
         assert!(!output.status.success(), "thresholds candidate {index} was accepted");
         assert!(String::from_utf8_lossy(&output.stderr).contains("THRESHOLDS_INVALID"), "candidate {index}");
     }
+}
+
+fn gold_copy(directory: &Path, extra: &[(&str, PathBuf)]) -> PathBuf {
+    fs::create_dir_all(directory).expect("gold copy dir");
+    for (name, source) in extra {
+        fs::copy(source, directory.join(name)).expect("gold copy file");
+    }
+    directory.to_path_buf()
+}
+
+fn stderr_of(output: &Output) -> String {
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+#[test]
+fn score_rejects_a_gold_dir_that_is_not_only_fixtures() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let predictions = replay_predictions(&temp.path().join("run"));
+    let thresholds = fixtures().join("thresholds-test.json");
+    let fixture = |name: &str| gold_dir().join(name);
+    let mixed = gold_copy(
+        &temp.path().join("mixed"),
+        &[
+            ("representative-standup.json", fixture("representative-standup.json")),
+            ("insufficient-evidence.json", fixture("insufficient-evidence.json")),
+            ("degraded-capture.json", fixture("degraded-capture.json")),
+            ("labels-sample.json", fixtures().join("labels-sample.json")),
+        ],
+    );
+    let repeated = gold_copy(
+        &temp.path().join("repeated"),
+        &[
+            ("first.json", fixture("representative-standup.json")),
+            ("second.json", fixture("representative-standup.json")),
+        ],
+    );
+    let empty = gold_copy(&temp.path().join("empty"), &[]);
+
+    let mixed_output = score_with(&mixed, &predictions, &thresholds, &temp.path().join("out-mixed"));
+    let repeated_output = score_with(&repeated, &predictions, &thresholds, &temp.path().join("out-repeated"));
+    let empty_output = score_with(&empty, &predictions, &thresholds, &temp.path().join("out-empty"));
+
+    assert!(!mixed_output.status.success());
+    assert!(stderr_of(&mixed_output).contains("FIXTURE_INVALID"));
+    assert!(!repeated_output.status.success());
+    assert!(stderr_of(&repeated_output).contains("FIXTURE_INVALID"));
+    assert!(!empty_output.status.success());
+    assert!(stderr_of(&empty_output).contains("NO_FIXTURES"));
 }
 
 #[test]
@@ -143,7 +194,7 @@ fn score_rejects_inputs_over_32_mib() {
     let output = run(&[
         "score",
         "--gold-dir",
-        fixtures().to_str().unwrap(),
+        gold_dir().to_str().unwrap(),
         "--predictions",
         oversized.to_str().unwrap(),
         "--labels",
