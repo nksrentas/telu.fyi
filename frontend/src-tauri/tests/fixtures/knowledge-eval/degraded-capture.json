@@ -1,0 +1,13 @@
+{
+  "fixtureId": "degraded-capture",
+  "category": "degraded_capture",
+  "segments": [
+    { "id": "dc-1", "start": 0.0, "end": 5.0, "text": "We agreed to freeze the API on Monday.", "captureCompleteness": "incomplete" },
+    { "id": "dc-2", "start": 5.0, "end": 9.0, "text": "Tom will draft the migration guide.", "captureCompleteness": "incomplete" }
+  ],
+  "gold": [
+    { "goldId": "dc-g1", "type": "decision", "text": "Freeze the API on Monday", "evidenceSegmentIds": ["dc-1"], "owner": null, "due": null },
+    { "goldId": "dc-g2", "type": "commitment", "text": "Tom drafts the migration guide", "evidenceSegmentIds": ["dc-2"], "owner": "Tom", "due": null }
+  ],
+  "expectAbstain": false
+}

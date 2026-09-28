@@ -1,0 +1,44 @@
+{
+  "note": "Test-only values used by tests/knowledge_eval_cli.rs. Not the KNOW-07 gate file.",
+  "version": 1,
+  "invariants": {
+    "exactSpanSupport": 1.0,
+    "resurrection": 0,
+    "deletionResidue": 0
+  },
+  "quality": {
+    "abstention": {
+      "insufficientEvidence": 0.5
+    },
+    "decision": {
+      "claimCorrectness": 0.5,
+      "semanticSupport": 0.5,
+      "evidenceCoverage": 0.5,
+      "attribution": null
+    },
+    "commitment": {
+      "claimCorrectness": 0.5,
+      "semanticSupport": 0.5,
+      "evidenceCoverage": 0.5,
+      "attribution": null
+    },
+    "question": {
+      "claimCorrectness": 0.5,
+      "semanticSupport": 0.5,
+      "evidenceCoverage": 0.5,
+      "attribution": null
+    },
+    "fact": {
+      "claimCorrectness": 0.5,
+      "semanticSupport": 0.5,
+      "evidenceCoverage": 0.5,
+      "attribution": null
+    },
+    "overall": {
+      "claimCorrectness": 0.5,
+      "semanticSupport": 0.5,
+      "evidenceCoverage": 0.5,
+      "attribution": null
+    }
+  }
+}

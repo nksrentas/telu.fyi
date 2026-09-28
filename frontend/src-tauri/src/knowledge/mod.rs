@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod evaluation;
 pub mod extraction;
 pub mod matcher;
 pub mod models;

@@ -1,0 +1,18 @@
+{
+  "fixtureId": "representative-standup",
+  "category": "representative",
+  "segments": [
+    { "id": "rs-1", "start": 0.0, "end": 4.0, "text": "Good morning, let's start the standup.", "captureCompleteness": "complete" },
+    { "id": "rs-2", "start": 4.0, "end": 9.0, "text": "We decided to ship the beta on Friday.", "captureCompleteness": "complete" },
+    { "id": "rs-3", "start": 9.0, "end": 15.0, "text": "Maria will update the release notes by Thursday.", "captureCompleteness": "complete" },
+    { "id": "rs-4", "start": 15.0, "end": 19.0, "text": "Is the pricing page ready for review?", "captureCompleteness": "complete" },
+    { "id": "rs-5", "start": 19.0, "end": 24.0, "text": "The staging database was migrated yesterday.", "captureCompleteness": "complete" }
+  ],
+  "gold": [
+    { "goldId": "rs-g1", "type": "decision", "text": "Ship the beta on Friday", "evidenceSegmentIds": ["rs-2"], "owner": null, "due": null },
+    { "goldId": "rs-g2", "type": "commitment", "text": "Maria updates the release notes by Thursday", "evidenceSegmentIds": ["rs-3"], "owner": "Maria", "due": "by Thursday" },
+    { "goldId": "rs-g3", "type": "question", "text": "Is the pricing page ready for review", "evidenceSegmentIds": ["rs-4"], "owner": null, "due": null },
+    { "goldId": "rs-g4", "type": "fact", "text": "The staging database was migrated yesterday", "evidenceSegmentIds": ["rs-5"], "owner": null, "due": null }
+  ],
+  "expectAbstain": false
+}

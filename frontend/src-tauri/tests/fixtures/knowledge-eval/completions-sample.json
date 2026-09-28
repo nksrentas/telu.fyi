@@ -1,0 +1,11 @@
+{
+  "representative-standup": [
+    "<think>checking segments</think>\n```json\n{\"items\": [{\"type\": \"decision\", \"text\": \"Ship the beta on Friday\", \"evidence\": [{\"segment\": \"S2\", \"quote\": \"decided to ship the beta on Friday\"}], \"owner\": null, \"due\": null}, {\"type\": \"commitment\", \"text\": \"Maria updates the release notes by Thursday\", \"evidence\": [{\"segment\": \"S3\", \"quote\": \"Maria will update the release notes by Thursday\"}], \"owner\": {\"value\": \"Maria\", \"segment\": \"S3\", \"quote\": \"Maria will update the release notes\"}, \"due\": {\"value\": \"by Thursday\", \"segment\": \"S3\", \"quote\": \"update the release notes by Thursday\"}}, {\"type\": \"question\", \"text\": \"Is the pricing page ready for review\", \"evidence\": [{\"segment\": \"S4\", \"quote\": \"Is the pricing page ready for review\"}], \"owner\": null, \"due\": null}, {\"type\": \"fact\", \"text\": \"The staging database was migrated yesterday\", \"evidence\": [{\"segment\": \"S5\", \"quote\": \"The staging database was migrated yesterday\"}], \"owner\": null, \"due\": null}, {\"type\": \"decision\", \"text\": \"Ship the beta on Friday\", \"evidence\": [{\"segment\": \"S2\", \"quote\": \"ship the beta on Friday\"}], \"owner\": null, \"due\": null}, {\"type\": \"fact\", \"text\": \"The budget doubled\", \"evidence\": [{\"segment\": \"S5\", \"quote\": \"the budget doubled this quarter\"}], \"owner\": null, \"due\": null}]}\n```"
+  ],
+  "insufficient-evidence": [
+    "{\"items\": []}"
+  ],
+  "degraded-capture": [
+    "{\"items\": [{\"type\": \"decision\", \"text\": \"Freeze the API on Monday\", \"evidence\": [{\"segment\": \"S1\", \"quote\": \"agreed to freeze the API on Monday\"}], \"owner\": null, \"due\": null}, {\"type\": \"commitment\", \"text\": \"Tom drafts the migration guide\", \"evidence\": [{\"segment\": \"S2\", \"quote\": \"Tom will draft the migration guide\"}], \"owner\": {\"value\": \"Tom\", \"segment\": \"S2\", \"quote\": \"Tom will draft the migration guide\"}, \"due\": null}]}"
+  ]
+}

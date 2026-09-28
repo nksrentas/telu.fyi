@@ -1,0 +1,11 @@
+{
+  "fixtureId": "insufficient-evidence",
+  "category": "insufficient_evidence",
+  "segments": [
+    { "id": "ie-1", "start": 0.0, "end": 2.0, "text": "Yeah, sounds good.", "captureCompleteness": "complete" },
+    { "id": "ie-2", "start": 2.0, "end": 5.0, "text": "Okay, let's see how it goes.", "captureCompleteness": "complete" },
+    { "id": "ie-3", "start": 5.0, "end": 7.0, "text": "Alright, thanks everyone.", "captureCompleteness": "complete" }
+  ],
+  "gold": [],
+  "expectAbstain": true
+}

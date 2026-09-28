@@ -4,7 +4,7 @@ use crate::knowledge::models::{
     AbstentionReason, KnowledgeError, ReviewState, RunStatus, SuppressionReason, TriggerKind,
 };
 use crate::knowledge::parse::{parse_extraction, ParsedAttribute, ParsedExtraction, ParsedItem};
-use crate::knowledge::prompt::{chunk_windows, label_segments, ChunkWindow, EXTRACTION_SYSTEM_PROMPT};
+use crate::knowledge::prompt::{chunk_windows, label_segments, EXTRACTION_SYSTEM_PROMPT};
 use crate::knowledge::repository::{
     KnowledgeRepository, NewAbstention, NewItem, NewSuppression, RunCounts,
 };
@@ -35,17 +35,19 @@ pub struct RunOutcome {
     pub failure_code: Option<&'static str>,
 }
 
-#[derive(Default)]
-struct Candidates {
-    items: Vec<NewItem>,
-    abstentions: Vec<NewAbstention>,
-    suppressions: Vec<NewSuppression>,
+#[derive(Debug, Default)]
+pub struct ExtractionOutcome {
+    pub items: Vec<NewItem>,
+    pub abstentions: Vec<NewAbstention>,
+    pub suppressions: Vec<NewSuppression>,
+    pub malformed_windows: usize,
+    pub window_count: usize,
     index: Vec<ExistingItem>,
     in_run: HashSet<String>,
-    malformed_windows: usize,
 }
 
-enum WindowStop {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowStop {
     Cancelled,
     ProviderError,
 }
@@ -145,7 +147,6 @@ where
     F: FnMut(String, String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
-    let windows = chunk_windows(&label_segments(evidence), budget_tokens);
     let index = match KnowledgeRepository::load_match_index(pool, meeting_id).await {
         Ok(index) => index,
         Err(error) => {
@@ -153,18 +154,19 @@ where
             return Err(error);
         }
     };
-    let collected = collect_candidates(&windows, index, cancel, &mut complete).await;
+    let collected =
+        extract_from_segments(&label_segments(evidence), budget_tokens, index, cancel, &mut complete).await;
     let (candidates, outcome) = match collected {
         Ok(candidates) => {
-            let outcome = completed_outcome(&candidates, windows.len());
+            let outcome = completed_outcome(&candidates);
             (candidates, outcome)
         }
-        Err(stop) => (Candidates::default(), stopped_outcome(stop)),
+        Err(stop) => (ExtractionOutcome::default(), stopped_outcome(stop)),
     };
     info!(
         meeting_id,
         run_id,
-        windows = windows.len(),
+        windows = candidates.window_count,
         malformed_windows = candidates.malformed_windows,
         status = outcome.status.as_str(),
         proposed = outcome.counts.proposed,
@@ -174,21 +176,24 @@ where
     finish(pool, meeting_id, run_id, &candidates, outcome).await
 }
 
-async fn collect_candidates<F, Fut>(
-    windows: &[ChunkWindow],
+pub async fn extract_from_segments<F, Fut>(
+    segments: &LabeledSegments,
+    budget_tokens: usize,
     index: Vec<ExistingItem>,
     cancel: &CancellationToken,
     complete: &mut F,
-) -> Result<Candidates, WindowStop>
+) -> Result<ExtractionOutcome, WindowStop>
 where
     F: FnMut(String, String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
-    let mut candidates = Candidates {
+    let windows = chunk_windows(segments, budget_tokens);
+    let mut candidates = ExtractionOutcome {
         index,
-        ..Candidates::default()
+        window_count: windows.len(),
+        ..ExtractionOutcome::default()
     };
-    for window in windows {
+    for window in &windows {
         if cancel.is_cancelled() {
             return Err(WindowStop::Cancelled);
         }
@@ -214,7 +219,7 @@ fn stop_reason(cancel: &CancellationToken) -> WindowStop {
     }
 }
 
-fn absorb(candidates: &mut Candidates, parsed: ParsedExtraction, segments: &LabeledSegments) {
+fn absorb(candidates: &mut ExtractionOutcome, parsed: ParsedExtraction, segments: &LabeledSegments) {
     candidates.abstentions.extend(parsed.rejected);
     for item in parsed.items {
         match verify_item(item, segments) {
@@ -224,7 +229,7 @@ fn absorb(candidates: &mut Candidates, parsed: ParsedExtraction, segments: &Labe
     }
 }
 
-fn place(candidates: &mut Candidates, verified: NewItem) {
+fn place(candidates: &mut ExtractionOutcome, verified: NewItem) {
     let candidate = Candidate {
         item_type: verified.item_type,
         key: verified.normalized_key.clone(),
@@ -308,8 +313,8 @@ fn attribute_support(attribute: Option<&ParsedAttribute>, segments: &LabeledSegm
         .unwrap_or(AttributeSupport::NotStated)
 }
 
-fn completed_outcome(candidates: &Candidates, window_count: usize) -> RunOutcome {
-    if window_count > 0 && candidates.malformed_windows == window_count {
+fn completed_outcome(candidates: &ExtractionOutcome) -> RunOutcome {
+    if candidates.window_count > 0 && candidates.malformed_windows == candidates.window_count {
         return RunOutcome {
             status: RunStatus::Failed,
             counts: RunCounts::default(),
@@ -352,13 +357,13 @@ async fn finish(
     pool: &SqlitePool,
     meeting_id: &str,
     run_id: &str,
-    candidates: &Candidates,
+    candidates: &ExtractionOutcome,
     outcome: RunOutcome,
 ) -> Result<RunOutcome, KnowledgeError> {
     let persisted = if outcome.status == RunStatus::Succeeded {
         persist_outcome(pool, meeting_id, run_id, candidates, outcome).await
     } else {
-        persist_outcome(pool, meeting_id, run_id, &Candidates::default(), outcome).await
+        persist_outcome(pool, meeting_id, run_id, &ExtractionOutcome::default(), outcome).await
     };
     match persisted {
         Ok(()) => Ok(outcome),
@@ -381,7 +386,7 @@ async fn persist_outcome(
     pool: &SqlitePool,
     meeting_id: &str,
     run_id: &str,
-    candidates: &Candidates,
+    candidates: &ExtractionOutcome,
     outcome: RunOutcome,
 ) -> Result<(), KnowledgeError> {
     let mut transaction = pool.begin().await.map_err(|error| {
@@ -693,6 +698,35 @@ mod tests {
             Ok(Some("MEETING_DELETED"))
         );
         assert_eq!(count(&pool, "knowledge_items").await, 0);
+    }
+
+    #[tokio::test]
+    async fn knowledge_extract_from_segments_matches_what_run_extraction_persists() {
+        let (pool, evidence) = meeting_with_evidence().await;
+        let reply = r#"{"items":[
+            {"type":"decision","text":"Ship the beta on Friday","evidence":[{"segment":"S2","quote":"ship the beta on Friday"}]},
+            {"type":"fact","text":"Budget doubled","evidence":[{"segment":"S2","quote":"the budget doubled"}]}
+        ]}"#;
+        let mut replay = |_: String, _: String| async move { Ok(reply.to_string()) };
+
+        let pure = extract_from_segments(&label_segments(&evidence), LARGE_BUDGET, Vec::new(), &CancellationToken::new(), &mut replay)
+            .await
+            .expect("pure extraction");
+        run_with_replies(&pool, &evidence, LARGE_BUDGET, vec![reply]).await;
+        let persisted_texts: Vec<String> = sqlx::query_scalar("SELECT text FROM knowledge_items ORDER BY text")
+            .fetch_all(&pool)
+            .await
+            .expect("persisted items");
+        let persisted_reasons: Vec<String> = sqlx::query_scalar("SELECT reason_code FROM knowledge_abstentions ORDER BY reason_code")
+            .fetch_all(&pool)
+            .await
+            .expect("persisted abstentions");
+
+        assert_eq!(pure.items.iter().map(|item| item.text.clone()).collect::<Vec<_>>(), persisted_texts);
+        assert_eq!(
+            pure.abstentions.iter().map(|abstention| abstention.reason.as_str().to_string()).collect::<Vec<_>>(),
+            persisted_reasons
+        );
     }
 
     #[test]

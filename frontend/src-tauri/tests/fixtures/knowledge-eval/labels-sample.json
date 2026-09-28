@@ -1,0 +1,44 @@
+{
+  "representative-standup#1": {
+    "matchesGoldId": "rs-g1",
+    "claimCorrect": true,
+    "quoteSupportsClaim": true,
+    "ownerCorrect": true,
+    "dueCorrect": null
+  },
+  "representative-standup#2": {
+    "matchesGoldId": "rs-g2",
+    "claimCorrect": true,
+    "quoteSupportsClaim": true,
+    "ownerCorrect": true,
+    "dueCorrect": true
+  },
+  "representative-standup#3": {
+    "matchesGoldId": "rs-g3",
+    "claimCorrect": true,
+    "quoteSupportsClaim": true,
+    "ownerCorrect": null,
+    "dueCorrect": null
+  },
+  "representative-standup#4": {
+    "matchesGoldId": "rs-g4",
+    "claimCorrect": true,
+    "quoteSupportsClaim": false,
+    "ownerCorrect": null,
+    "dueCorrect": null
+  },
+  "degraded-capture#1": {
+    "matchesGoldId": "dc-g1",
+    "claimCorrect": true,
+    "quoteSupportsClaim": true,
+    "ownerCorrect": null,
+    "dueCorrect": null
+  },
+  "degraded-capture#2": {
+    "matchesGoldId": "dc-g2",
+    "claimCorrect": true,
+    "quoteSupportsClaim": true,
+    "ownerCorrect": true,
+    "dueCorrect": null
+  }
+}
