@@ -27,10 +27,10 @@
 
 - [ ] **KNOW-01**: A user can derive typed candidate decisions, commitments or action items, open questions, and relevant facts from a completed meeting.
 - [ ] **KNOW-02**: Every candidate item has a stable identity, derivation run, review state, and exact transcript evidence that opens the supporting segment in context.
-- [ ] **KNOW-03**: A user can accept, correct, or reject each candidate independently and immediately see its resulting eligibility for future context.
-- [ ] **KNOW-04**: Corrections create an auditable revision linked to the original proposal and evidence instead of overwriting history.
-- [ ] **KNOW-05**: Rejected or superseded candidates do not reappear as current knowledge after regeneration, preparation, or series projection unless a user explicitly restores them.
-- [ ] **KNOW-06**: Telu abstains or exposes unresolved fields when available transcript evidence does not adequately support a candidate item.
+- [x] **KNOW-03**: A user can accept, correct, or reject each candidate independently and immediately see its resulting eligibility for future context.
+- [x] **KNOW-04**: Corrections create an auditable revision linked to the original proposal and evidence instead of overwriting history.
+- [x] **KNOW-05**: Rejected or superseded candidates do not reappear as current knowledge after regeneration, preparation, or series projection unless a user explicitly restores them.
+- [x] **KNOW-06**: Telu abstains or exposes unresolved fields when available transcript evidence does not adequately support a candidate item.
 - [ ] **KNOW-07**: A maintainer can evaluate extraction quality by item type, evidence coverage, exact source-span correctness, attribution, duplication, and user review outcome on representative meetings.
 - [x] **KNOW-08**: Deleting a meeting or transcript visibly removes or invalidates dependent candidate knowledge and evidence without leaving a claim that appears fully supported.
 
@@ -140,10 +140,10 @@
 | PRIV-03 | Phase 1 | Complete |
 | KNOW-01 | Phase 2 | Pending |
 | KNOW-02 | Phase 2 | Pending |
-| KNOW-03 | Phase 2 | Pending |
-| KNOW-04 | Phase 2 | Pending |
-| KNOW-05 | Phase 2 | Pending |
-| KNOW-06 | Phase 2 | Pending |
+| KNOW-03 | Phase 2 | Complete |
+| KNOW-04 | Phase 2 | Complete |
+| KNOW-05 | Phase 2 | Complete |
+| KNOW-06 | Phase 2 | Complete |
 | KNOW-07 | Phase 2 | Pending |
 | KNOW-08 | Phase 2 | Complete |
 | DOC-01 | Phase 3 | Pending |
