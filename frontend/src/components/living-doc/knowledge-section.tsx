@@ -30,15 +30,14 @@ import type { MeetingCompleteness } from '@/types';
 import { RunNotice } from './run-notice';
 import { RunDetailsPopover, alreadyDecided } from './run-details-popover';
 import {
-  AbstentionLine,
   EmptyResult,
   ExplicitStartCard,
   FailedCard,
   KNOWLEDGE_COPY,
-  KnowledgeItemList,
   NoEvidenceCard,
   RunningRow,
 } from './knowledge-run-states';
+import { ReviewBlock } from './review-block';
 
 const INITIAL_ROUTE_STATE: ProviderRouteViewState = { status: 'loading', route: null, failure: null };
 const GAP_COMPLETENESS: MeetingCompleteness[] = ['incomplete', 'recovered_with_gaps'];
@@ -226,6 +225,7 @@ export function KnowledgeSection({
   const autoRequested = useLatch(autoGenerate);
   const latestRun = knowledge?.latestRun ?? null;
   const items = knowledge?.items ?? [];
+  const hasReviewItems = items.length > 0 || (knowledge?.rejected.length ?? 0) > 0;
 
   useEffect(() => {
     setNoEvidence(!hasEvidence);
@@ -283,7 +283,7 @@ export function KnowledgeSection({
     }
     if (running || autoPending) return <RunningRow onStop={running ? () => void cancelKnowledgeExtraction(meetingId) : undefined} />;
     if (latestRun?.status === 'failed') return <FailedCard run={latestRun} notice={notice(startButton('Try again', 'user'))} />;
-    if (latestRun?.status === 'succeeded' && items.length === 0) return <EmptyResult run={latestRun} />;
+    if (latestRun?.status === 'succeeded' && !hasReviewItems) return <EmptyResult run={latestRun} />;
     if (latestRun && latestRun.status !== 'cancelled') return null;
     if (items.length > 0 && latestRun) return null;
     return (
@@ -299,7 +299,7 @@ export function KnowledgeSection({
       id="knowledge"
       aria-labelledby="knowledge-heading"
       data-surface={surface}
-      className="scroll-mt-[72px] space-y-3"
+      className="@container scroll-mt-[72px] space-y-3"
     >
       <ProviderBoundary
         capability="summary"
@@ -325,10 +325,13 @@ export function KnowledgeSection({
         </>
       )}
       {statusBlock()}
-      {!noEvidence && latestRun?.status === 'succeeded' && items.length > 0 && latestRun.skippedCount > 0 && (
-        <AbstentionLine skipped={latestRun.skippedCount} />
+      {!noEvidence && knowledge && hasReviewItems && (
+        <ReviewBlock
+          meetingId={meetingId}
+          knowledge={knowledge}
+          onChange={(update) => setKnowledge((current) => (current ? update(current) : current))}
+        />
       )}
-      {!noEvidence && items.length > 0 && <KnowledgeItemList items={items} />}
     </section>
   );
 }

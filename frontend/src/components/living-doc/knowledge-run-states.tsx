@@ -1,14 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { CircleX, Info } from 'lucide-react';
+import { CircleX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/telu-ui/empty-state';
 import { Icon } from '@/components/telu-ui/icon';
-import { KnowledgeType } from '@/components/telu-ui/knowledge-type';
+import { AbstentionLine, REVIEW_COPY } from './review-head';
 import { Spinner } from '@/components/telu-ui/indicators';
-import type { KnowledgeItemView, KnowledgeRunView } from '@/lib/knowledge-service';
+import type { KnowledgeRunView } from '@/lib/knowledge-service';
 
 export const KNOWLEDGE_COPY = {
   notRunHeading: 'No knowledge yet',
@@ -26,14 +25,8 @@ export const KNOWLEDGE_COPY = {
   running: 'Reading the transcript…',
   malformed: "Telu couldn't use the model's answer. Your transcript is unchanged.",
   generic: "Telu couldn't finish reading this meeting. Your transcript is unchanged.",
-  abstentionTooltip: 'Telu only shows items it can quote word for word from this transcript.',
+  abstentionTooltip: REVIEW_COPY.abstentionTooltip,
 };
-
-export function abstentionLine(skipped: number): string {
-  return skipped === 1
-    ? '1 possible item skipped — not enough evidence'
-    : `${skipped} possible items skipped — not enough evidence`;
-}
 
 export function failureCopy(code: string | null): string {
   return code === 'MALFORMED_OUTPUT' || code === 'PARTIAL_MALFORMED_OUTPUT' ? KNOWLEDGE_COPY.malformed : KNOWLEDGE_COPY.generic;
@@ -89,22 +82,6 @@ export function FailedCard({ run, notice }: { run: KnowledgeRunView; notice: Rea
   );
 }
 
-export function AbstentionLine({ skipped }: { skipped: number }) {
-  return (
-    <p className="m-0 flex items-center gap-1.5 text-[12px] text-label-3">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span tabIndex={0} aria-label={KNOWLEDGE_COPY.abstentionTooltip} className="inline-flex">
-            <Icon icon={Info} size={13} />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>{KNOWLEDGE_COPY.abstentionTooltip}</TooltipContent>
-      </Tooltip>
-      <span>{abstentionLine(skipped)}</span>
-    </p>
-  );
-}
-
 export function EmptyResult({ run }: { run: KnowledgeRunView }) {
   const abstained = run.skippedCount > 0;
   return (
@@ -120,30 +97,5 @@ export function EmptyResult({ run }: { run: KnowledgeRunView }) {
         </div>
       )}
     </div>
-  );
-}
-
-function KnowledgeItem({ item }: { item: KnowledgeItemView }) {
-  const quote = item.evidence[0]?.quoteText;
-  return (
-    <li className="space-y-1.5 rounded-card bg-surface-sunken px-3.5 py-3">
-      <KnowledgeType type={item.itemType} />
-      <p className="selectable m-0 text-[13px] text-label">{item.text}</p>
-      {quote && (
-        <blockquote className="selectable m-0 border-l-2 border-accent-soft pl-2.5 text-[13px] text-label-2">
-          {quote}
-        </blockquote>
-      )}
-    </li>
-  );
-}
-
-export function KnowledgeItemList({ items }: { items: KnowledgeItemView[] }) {
-  return (
-    <ul className="m-0 list-none space-y-2 p-0">
-      {items.map((item) => (
-        <KnowledgeItem key={item.itemId} item={item} />
-      ))}
-    </ul>
   );
 }

@@ -1,0 +1,2804 @@
+[
+  {
+    "name": "knowledge-pending-list",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 4,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Maria sends the launch checklist to design",
+            "ownerText": "Maria",
+            "ownerSupport": "stated",
+            "dueText": "by Wednesday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000003",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "question",
+            "text": "Do we need a second QA pass before the beta?",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000003",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000004",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "fact",
+            "text": "The beta group has 240 people",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000004",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 4,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=Accept all"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-accepted-corrected",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 3,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000005",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Keep the pricing page as it is",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "accepted",
+            "eligibility": true,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000005",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000006",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Jon updates the rate-limit plan before Thursday",
+            "ownerText": "Jon",
+            "ownerSupport": "user",
+            "dueText": "before Thursday",
+            "dueSupport": "user",
+            "reviewState": "accepted",
+            "eligibility": true,
+            "evidenceStatus": "valid",
+            "corrected": true,
+            "latestRevisionId": "0197a1b2-0005-7000-8000-000000000001",
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000006",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 1,
+        "acceptedCount": 2,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=✓ Accepted · eligible"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-unresolved-chips",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 2,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000007",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Someone follows up with legal on the DPA",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "accepted",
+            "eligibility": true,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000007",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000003",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "question",
+            "text": "Do we need a second QA pass before the beta?",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000003",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 1,
+        "acceptedCount": 1,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=Owner not stated"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-evidence-changed",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 2,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000008",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Drop the Android beta for now",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "accepted",
+            "eligibility": false,
+            "evidenceStatus": "changed",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000008",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000009",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "fact",
+            "text": "Support tickets doubled last week",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "missing",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": []
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 1,
+        "acceptedCount": 1,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=Evidence changed — not eligible"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-rejected-expanded",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 4,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Maria sends the launch checklist to design",
+            "ownerText": "Maria",
+            "ownerSupport": "stated",
+            "dueText": "by Wednesday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000010",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "question",
+            "text": "Should we rename the product?",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "rejected",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000010",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000011",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "fact",
+            "text": "The office is closed on Monday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "rejected",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000011",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "pendingCount": 2,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "click": "button:has-text(\"Rejected (2)\")"
+      },
+      {
+        "waitFor": "text=Restore"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-abstention-line",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 2,
+          "skippedCount": 3,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Maria sends the launch checklist to design",
+            "ownerText": "Maria",
+            "ownerSupport": "stated",
+            "dueText": "by Wednesday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 2,
+        "acceptedCount": 0,
+        "skippedCount": 3
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=3 possible items skipped — not enough evidence"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-gap-partial",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "incomplete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 1,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000012",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000012",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": true
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 1,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      },
+      "api_get_meeting_metadata": {
+        "id": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "title": "Weekly product sync",
+        "created_at": "2026-09-27T09:00:00Z",
+        "updated_at": "2026-09-27T09:44:00Z",
+        "folder_path": "/Users/demo/Movies/Telu/Weekly product sync",
+        "lifecycle": "complete",
+        "completeness": "incomplete",
+        "completeness_reason": "capture_gap",
+        "gap_count": 2,
+        "gaps": []
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "click": "button[aria-label^=\"Source:\"]"
+      },
+      {
+        "waitFor": "text=Captured with gaps around this line"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-overflow-45",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 1,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000000",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 0 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000000",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 1 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 2 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000003",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 3 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000003",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000004",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 4 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000004",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000005",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 5 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000005",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000006",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 6 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000006",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000007",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 7 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000007",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000008",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 8 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000008",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000009",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 9 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000009",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000010",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 10 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000010",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000011",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 11 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000011",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000012",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 12 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000012",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000013",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 13 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000013",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000014",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 14 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000014",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000015",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 15 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000015",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000016",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 16 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000016",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000017",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 17 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000017",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000018",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 18 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000018",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000019",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 19 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000019",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000020",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 20 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000020",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000021",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 21 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000021",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000022",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 22 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000022",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000023",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 23 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000023",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000024",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 24 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000024",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000025",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 25 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000025",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000026",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 26 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000026",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000027",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 27 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000027",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000028",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 28 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000028",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000029",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 29 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000029",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000030",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 30 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000030",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000031",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 31 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000031",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000032",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 32 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000032",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000033",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 33 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000033",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000034",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 34 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000034",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000035",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 35 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000035",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000036",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 36 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000036",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000037",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 37 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000037",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000038",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 38 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000038",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000039",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 39 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000039",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000040",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 40 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000040",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000041",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 41 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000041",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000042",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 42 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000042",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000043",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 43 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000043",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-900000000044",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Follow-up item 44 from the planning thread",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-900000000044",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 45,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=Follow-up item 44 from the planning thread"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-evidence-popover-open",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 2,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Ship the beta on Friday",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": "Friday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": true,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000002",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Maria sends the launch checklist to design",
+            "ownerText": "Maria",
+            "ownerSupport": "stated",
+            "dueText": "by Wednesday",
+            "dueSupport": "stated",
+            "reviewState": "proposed",
+            "eligibility": false,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 2,
+        "acceptedCount": 0,
+        "skippedCount": 0
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "click": "button[aria-label^=\"Source:\"]"
+      },
+      {
+        "waitFor": "text=Open transcript"
+      }
+    ]
+  },
+  {
+    "name": "knowledge-history-popover-open",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+        "latestRun": {
+          "runId": "0197a1b2-0002-7000-8000-000000000001",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "triggerKind": "user",
+          "status": "succeeded",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "knowledge-extract-v2",
+          "inputEvidenceCount": 2,
+          "proposedCount": 2,
+          "skippedCount": 0,
+          "suppressedCount": 0,
+          "reconfirmedCount": 0,
+          "duplicateCount": 0,
+          "failureCode": null,
+          "startedAtUtc": "2026-09-27T09:46:00Z",
+          "finishedAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "items": [
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000006",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "commitment",
+            "text": "Jon updates the rate-limit plan before Thursday",
+            "ownerText": "Jon",
+            "ownerSupport": "user",
+            "dueText": "before Thursday",
+            "dueSupport": "user",
+            "reviewState": "accepted",
+            "eligibility": true,
+            "evidenceStatus": "valid",
+            "corrected": true,
+            "latestRevisionId": "0197a1b2-0005-7000-8000-000000000001",
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000006",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          },
+          {
+            "itemId": "0197a1b2-0003-7000-8000-000000000005",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+            "itemType": "decision",
+            "text": "Keep the pricing page as it is",
+            "ownerText": null,
+            "ownerSupport": "not_stated",
+            "dueText": null,
+            "dueSupport": "not_stated",
+            "reviewState": "accepted",
+            "eligibility": true,
+            "evidenceStatus": "valid",
+            "corrected": false,
+            "latestRevisionId": null,
+            "unresolved": false,
+            "createdAtUtc": "2026-09-27T09:46:40Z",
+            "evidence": [
+              {
+                "linkId": "0197a1b2-0004-7000-8000-000000000005",
+                "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+                "role": "claim",
+                "quoteText": "ship the beta on Friday",
+                "rawStart": 14,
+                "rawEnd": 37,
+                "sequence": 1,
+                "audioStartTime": 12.0,
+                "audioEndTime": 15.8,
+                "segmentCaptureIncomplete": false
+              }
+            ]
+          }
+        ],
+        "rejected": [],
+        "pendingCount": 0,
+        "acceptedCount": 2,
+        "skippedCount": 0
+      },
+      "knowledge_item_history": {
+        "itemId": "0197a1b2-0003-7000-8000-000000000006",
+        "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+        "runStartedAtUtc": "2026-09-27T09:46:00Z",
+        "original": {
+          "text": "Jon updates the plan",
+          "ownerText": null,
+          "dueText": null,
+          "createdAtUtc": "2026-09-27T09:46:40Z"
+        },
+        "revisions": [
+          {
+            "revisionId": "0197a1b2-0005-7000-8000-000000000001",
+            "basedOnRevisionId": null,
+            "text": "Jon updates the rate-limit plan before Thursday",
+            "ownerText": "Jon",
+            "dueText": "before Thursday",
+            "createdAtUtc": "2026-09-27T09:52:00Z"
+          }
+        ],
+        "reviews": [],
+        "evidence": [
+          {
+            "linkId": "0197a1b2-0004-7000-8000-000000000006",
+            "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+            "role": "claim",
+            "quoteText": "ship the beta on Friday",
+            "rawStart": 14,
+            "rawEnd": 37,
+            "sequence": 1,
+            "audioStartTime": 12.0,
+            "audioEndTime": 15.8,
+            "segmentCaptureIncomplete": false
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "click": "button:has-text(\"Corrected\")"
+      },
+      {
+        "waitFor": "text=Proposed by Telu"
+      }
+    ]
+  }
+]

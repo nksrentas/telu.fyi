@@ -41,6 +41,8 @@ mock.module('../../src/components/ui/dropdown-menu', () => ({
 mock.module('../../src/components/ui/popover', () => ({
   Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
   PopoverAnchor: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverArrow: () => null,
   PopoverContent: ({ children }: { children: ReactNode }) => <div data-popover="">{children}</div>,
 }));
 
@@ -63,6 +65,8 @@ beforeAll(() => {
       unregisterCallback: (id: number) => callbacks.delete(id),
     },
     __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener: () => {} },
+    addEventListener: () => {},
+    removeEventListener: () => {},
   };
 });
 

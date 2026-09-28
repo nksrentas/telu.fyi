@@ -1,4 +1,5 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from 'bun:test';
+import type { ReactNode } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import type { EffectiveRoute } from '../../src/services/providerRouteService';
 import type { MeetingKnowledgeView } from '../../src/lib/knowledge-service';
@@ -6,11 +7,26 @@ import type { MeetingKnowledgeView } from '../../src/lib/knowledge-service';
 const originalToast = { ...await import('sonner') };
 const originalEvent = { ...await import('@tauri-apps/api/event') };
 const originalCore = { ...await import('@tauri-apps/api/core') };
+const originalPopover = { ...await import('../../src/components/ui/popover') };
+const globalWithWindow = globalThis as typeof globalThis & { window?: Record<string, unknown> };
+const originalWindow = globalWithWindow.window;
+beforeAll(() => {
+  globalWithWindow.window = { addEventListener: () => {}, removeEventListener: () => {} };
+});
 afterAll(() => {
+  globalWithWindow.window = originalWindow;
   mock.module('sonner', () => originalToast);
   mock.module('@tauri-apps/api/event', () => originalEvent);
   mock.module('@tauri-apps/api/core', () => originalCore);
+  mock.module('../../src/components/ui/popover', () => originalPopover);
 });
+mock.module('../../src/components/ui/popover', () => ({
+  Popover: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverAnchor: ({ children }: { children: ReactNode }) => <>{children}</>,
+  PopoverArrow: () => null,
+  PopoverContent: ({ children }: { children: ReactNode }) => <div data-popover="">{children}</div>,
+}));
 
 const notify = mock(() => {});
 mock.module('sonner', () => ({ toast: { info: notify, error: notify, success: notify, warning: notify } }));
@@ -99,13 +115,15 @@ describe('KnowledgeSection', () => {
     currentRoute = route('validated');
   });
 
-  test('renders candidate text and its quote as plain text', async () => {
+  test('renders the candidate row text and its evidence quote as plain text', async () => {
     const renderer = await renderSection();
 
-    const quote = renderer.root.findByType('blockquote');
-    expect(textOf(quote)).toBe('<b>ship the beta on Friday</b>');
-    expect(quote.children).toEqual(['<b>ship the beta on Friday</b>']);
-    expect(renderer.root.findAll((node) => node.type === 'p' && textOf(node) === 'Ship the beta on Friday')).toHaveLength(1);
+    const row = renderer.root.find((node) => node.props['data-item-id'] === 'item-1');
+    expect(row.findAll((node) => node.type === 'p' && textOf(node) === 'Ship the beta on Friday')).toHaveLength(1);
+    const quote = renderer.root.find((node) => node.props['data-popover'] === '').findByType('blockquote');
+    expect(textOf(quote)).toBe('“<b>ship the beta on Friday</b>”');
+    expect(quote.children).toContain('<b>ship the beta on Friday</b>');
+    expect(renderer.root.findAll((node) => node.type === 'b')).toHaveLength(0);
     expect(findKnowledgeButton(renderer).props.disabled).toBe(false);
   });
 
