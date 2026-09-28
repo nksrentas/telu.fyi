@@ -134,6 +134,58 @@ fn score_rejects_a_thresholds_file_that_is_not_v2() {
     }
 }
 
+fn score_labeled(predictions: &Path, out: &Path, kind_args: &[&str]) -> Output {
+    let gold = gold_dir();
+    let labels = fixtures().join("labels-sample.json");
+    let thresholds = fixtures().join("thresholds-v2.json");
+    let base = [
+        "score",
+        "--gold-dir",
+        gold.to_str().unwrap(),
+        "--predictions",
+        predictions.to_str().unwrap(),
+        "--labels",
+        labels.to_str().unwrap(),
+        "--thresholds",
+        thresholds.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ];
+    run(&[&base[..], kind_args].concat())
+}
+
+fn report_at(out: &Path) -> Value {
+    serde_json::from_str(&text(&out.join("report.json"))).expect("report json")
+}
+
+#[test]
+fn score_labels_the_report_with_its_evaluation_kind() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let predictions = replay_predictions(&temp.path().join("run"));
+
+    for kind in ["synthetic", "real_meeting_pilot", "representative"] {
+        let out = temp.path().join(kind);
+        let output = score_labeled(&predictions, &out, &["--kind", kind]);
+
+        assert!(output.status.success(), "score --kind {kind} failed: {}", stderr_of(&output));
+        let report = report_at(&out);
+        assert_eq!(report["evaluationKind"], kind);
+        assert_eq!(report["schemaVersion"], 1);
+    }
+
+    let unlabeled = temp.path().join("unlabeled");
+    let output = score_labeled(&predictions, &unlabeled, &[]);
+    assert!(output.status.success(), "score without --kind failed: {}", stderr_of(&output));
+    let report = report_at(&unlabeled);
+    assert!(report.get("evaluationKind").is_none());
+    assert_eq!(report["schemaVersion"], 1);
+
+    let rejected = temp.path().join("rejected");
+    let output = score_labeled(&predictions, &rejected, &["--kind", "pilot"]);
+    assert!(!output.status.success(), "score accepted --kind pilot");
+    assert!(!rejected.join("report.json").exists());
+}
+
 fn gold_copy(directory: &Path, extra: &[(&str, PathBuf)]) -> PathBuf {
     fs::create_dir_all(directory).expect("gold copy dir");
     for (name, source) in extra {

@@ -61,6 +61,7 @@ function declaredThresholds(minimum = 0.9, maxDuplication = 0.1) {
 
 const cleanReport = () => ({
   schemaVersion: 1,
+  evaluationKind: 'representative',
   thresholdsSha256: SHA,
   gate: 'pass',
   failures: [],
@@ -164,6 +165,19 @@ test('a pass gate is not enough', () => {
   ];
   for (const [report, reason] of expectations) {
     assert.deepEqual(reasonsFor(declared, report), [reason], JSON.stringify(report));
+  }
+});
+
+test('a report that is not labeled representative is not the representative evaluation', () => {
+  const declared = declaredThresholds();
+  assert.deepEqual(reasonsFor(declared), []);
+  const mislabeled = [
+    setIn(cleanReport(), ['evaluationKind'], 'real_meeting_pilot'),
+    setIn(cleanReport(), ['evaluationKind'], 'synthetic'),
+    removeIn(cleanReport(), ['evaluationKind']),
+  ];
+  for (const report of mislabeled) {
+    assert.deepEqual(reasonsFor(declared, report), ['representative_kind_mismatch'], JSON.stringify(report));
   }
 });
 
