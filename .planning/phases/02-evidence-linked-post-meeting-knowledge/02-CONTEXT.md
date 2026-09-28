@@ -34,6 +34,7 @@ Out of scope: calendar detection and calendar-backed tabs (Upcoming, Found in Ca
   - a match to a rejected or superseded item is suppressed, recorded and never shown unless the user restores it (KNOW-05);
   - a match to an accepted item is linked as "reconfirmed" and not shown again;
   - an unmatched candidate appears as a new proposed candidate.
+  - Amended 2026-09-28 (gap closure 02-27, user-accepted): rejected and corrected-away wording is matched regardless of type (KNOW-05); type stays a match key only for the reconfirmed/duplicate outcomes against the current wording of accepted and proposed items. Consequence for D-12: a correctly-typed re-emission of a wrongly-typed rejected item is also suppressed; Restore returns it with its original type.
 
 ### Trust Rules
 - **D-12:** Corrections create append-only revisions and never update in place. The correctable fields are text, owner and due date. Type isn't correctable; a wrong type is rejected instead. — **Reversibility:** one-way — revision lineage is a persisted audit contract (KNOW-04).
