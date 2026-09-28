@@ -264,10 +264,20 @@ pub struct InvariantResults {
     pub deletion_residue: Option<u64>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EvaluationKind {
+    Synthetic,
+    RealMeetingPilot,
+    Representative,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EvaluationReport {
     pub schema_version: u16,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evaluation_kind: Option<EvaluationKind>,
     pub generated_at_utc: String,
     pub prompt_version: String,
     pub thresholds_sha256: String,
@@ -578,6 +588,7 @@ pub fn score(input: &ScoreInput<'_>, envelope: ReportEnvelope) -> EvaluationRepo
         .unwrap_or_else(|| ratio(0, 0));
     let mut report = EvaluationReport {
         schema_version: REPORT_SCHEMA_VERSION,
+        evaluation_kind: None,
         generated_at_utc: envelope.generated_at_utc,
         prompt_version: input.predictions.prompt_version.clone(),
         thresholds_sha256: envelope.thresholds_sha256,

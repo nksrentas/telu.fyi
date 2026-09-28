@@ -1,6 +1,7 @@
 use app_lib::knowledge::evaluation::replay::{export_from_db, review_outcomes, run_replay, ReplayError};
 use app_lib::knowledge::evaluation::{
-    score, GoldFixture, LabelSet, PredictionSet, ReportEnvelope, ReviewOutcomeRates, ScoreInput, Thresholds,
+    score, EvaluationKind, EvaluationReport, GoldFixture, LabelSet, PredictionSet, ReportEnvelope, ReviewOutcomeRates,
+    ScoreInput, Thresholds,
 };
 use chrono::Utc;
 use clap::{Parser, Subcommand};
@@ -40,6 +41,8 @@ enum Command {
         db: Option<PathBuf>,
         #[arg(long)]
         commit: Option<String>,
+        #[arg(long, value_parser = parse_kind)]
+        kind: Option<EvaluationKind>,
     },
     Run {
         #[arg(long)]
@@ -101,27 +104,43 @@ fn main() {
 
 async fn execute(command: Command) -> Result<(), EvalError> {
     match command {
-        Command::Score { gold_dir, predictions, labels, thresholds, out, db, commit } => {
-            score_command(&gold_dir, &predictions, &labels, &thresholds, &out, db.as_deref(), commit).await
+        Command::Score { gold_dir, predictions, labels, thresholds, out, db, commit, kind } => {
+            let files = ScoreFiles {
+                gold_dir: &gold_dir,
+                predictions: &predictions,
+                labels: &labels,
+                thresholds: &thresholds,
+            };
+            score_command(&files, &out, db.as_deref(), commit, kind).await
         }
         Command::Run { gold_dir, replay_completions, out } => run_command(&gold_dir, &replay_completions, &out).await,
         Command::Export { db, meetings, out } => export_command(&db, &meetings, &out).await,
     }
 }
 
+struct ScoreFiles<'a> {
+    gold_dir: &'a Path,
+    predictions: &'a Path,
+    labels: &'a Path,
+    thresholds: &'a Path,
+}
+
+fn parse_kind(value: &str) -> Result<EvaluationKind, String> {
+    serde_json::from_value(Value::String(value.to_string()))
+        .map_err(|_| format!("unknown kind '{value}': expected synthetic, real_meeting_pilot or representative"))
+}
+
 async fn score_command(
-    gold_dir: &Path,
-    predictions: &Path,
-    labels: &Path,
-    thresholds: &Path,
+    files: &ScoreFiles<'_>,
     out: &Path,
     db: Option<&Path>,
     commit: Option<String>,
+    kind: Option<EvaluationKind>,
 ) -> Result<(), EvalError> {
-    let fixtures = load_fixtures(gold_dir)?;
-    let predictions: PredictionSet = read_json(predictions)?;
-    let labels: LabelSet = read_json(labels)?;
-    let threshold_bytes = read_bounded(thresholds)?;
+    let fixtures = load_fixtures(files.gold_dir)?;
+    let predictions: PredictionSet = read_json(files.predictions)?;
+    let labels: LabelSet = read_json(files.labels)?;
+    let threshold_bytes = read_bounded(files.thresholds)?;
     let limits = parse_thresholds(&threshold_bytes)?;
     let review = match db {
         Some(path) => Some(scored_review_outcomes(path, &fixtures).await?),
@@ -133,10 +152,13 @@ async fn score_command(
         git_commit: commit.unwrap_or_else(git_commit),
         review_outcomes: review,
     };
-    let report = score(
-        &ScoreInput { fixtures: &fixtures, predictions: &predictions, labels: &labels, thresholds: &limits },
-        envelope,
-    );
+    let report = EvaluationReport {
+        evaluation_kind: kind,
+        ..score(
+            &ScoreInput { fixtures: &fixtures, predictions: &predictions, labels: &labels, thresholds: &limits },
+            envelope,
+        )
+    };
     write_json(out, "report.json", &report)?;
     print_summary(json!({ "fixtures": fixtures.len(), "gate": report.gate, "failures": report.failures.len() }));
     Ok(())

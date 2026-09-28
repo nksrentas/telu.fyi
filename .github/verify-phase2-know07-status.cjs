@@ -10,6 +10,7 @@ const REPRESENTATIVE_REPORT_PATH = `${EVAL_DIR}/representative-report.json`;
 
 const THRESHOLDS_VERSION = 2;
 const REPORT_SCHEMA_VERSION = 1;
+const REPRESENTATIVE_KIND = 'representative';
 const SCOPES = ['decision', 'commitment', 'question', 'fact', 'overall'];
 const MIN_METRICS = ['claimCorrectness', 'semanticSupport', 'evidenceCoverage', 'attribution', 'minReviewAccepted'];
 const MAX_METRICS = ['maxDuplication'];
@@ -103,6 +104,7 @@ function reportReasons(report, thresholdsSha256) {
     [typeof report.thresholdsSha256 === 'string' && report.thresholdsSha256 === thresholdsSha256, 'representative_thresholds_mismatch'],
     [gatePassed(report), 'representative_gate_not_pass'],
     [invariantsMet(report.invariants), 'representative_invariants_not_met'],
+    [report.evaluationKind === REPRESENTATIVE_KIND, 'representative_kind_mismatch'],
   ];
   return checks.filter(([met]) => !met).map(([, reason]) => reason);
 }
@@ -136,6 +138,7 @@ module.exports = {
   STATUS_PATH,
   THRESHOLDS_VERSION,
   REPORT_SCHEMA_VERSION,
+  REPRESENTATIVE_KIND,
   SCOPES,
   MIN_METRICS,
   MAX_METRICS,
