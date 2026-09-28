@@ -144,7 +144,7 @@ Plans:
 **Verification approach:** Use representative held-out transcripts plus insufficient-evidence and degraded-capture cases; test exact evidence navigation and semantic support separately; exercise accept, reject, correct, restore, regenerate, delete, and retry scenarios; audit append-only lineage and future-context eligibility.
 **Exit gate:** Phase 3 may proceed only when item correctness, exact evidence-span support, abstention behavior, correction lineage, regeneration safety, and deletion effects meet the predeclared representative-review thresholds. If provenance or user actions do not deterministically control future eligibility, stop before preparation, live assistance, or series memory can amplify the defect.
 **Principal risks / stop conditions:** Fluent unsupported claims, reconstructed citations, destructive correction, rejected-item resurrection, incomplete evidence, mutable summary blobs, or one score conflating claim correctness with citation support. Stop when evidence lineage is ambiguous or review actions fail to propagate.
-**Plans:** 26/26 plans executed
+**Plans:** 26/33 plans executed
 Plans:
 **Wave 1**
 
@@ -195,6 +195,30 @@ Plans:
 **Wave 8** *(blocked on Wave 7 completion)*
 
 - [x] 02-21-PLAN.md — Side peek, search, context menu and the phase UI gate with the after gallery.
+
+**Gap closure (from 02-VERIFICATION.md)**
+
+**Gap wave 1**
+
+- [ ] 02-27-PLAN.md — KNOW-05: suppress rejected and corrected-away wording regardless of type; make the eval resurrection measure non-tautological.
+- [ ] 02-28-PLAN.md — KNOW-07: harden the derived status (CR-80) and add thresholds-v2 with duplication and review-outcome slots.
+
+**Gap wave 2** *(blocked on gap wave 1 completion)*
+
+- [ ] 02-29-PLAN.md — KNOW-06: whole-token, verbatim, claim-tied owner/due attribution and whole-token claim quotes.
+- [ ] 02-30-PLAN.md — KNOW-07: measure deletion residue, fail unmeasured invariants and dropped inputs, null leaf means undeclared.
+
+**Gap wave 3** *(blocked on gap wave 2 completion)*
+
+- [ ] 02-31-PLAN.md — KNOW-07: strict CLI inputs, review outcomes scoped to scored meetings, synthetic report re-bound to thresholds-v2.
+
+**Gap wave 4** *(blocked on gap wave 3 completion)*
+
+- [ ] 02-32-PLAN.md — KNOW-07: user declares the quality thresholds (decision checkpoint), committed alone before scoring.
+
+**Gap wave 5** *(blocked on gap wave 4 completion)*
+
+- [ ] 02-33-PLAN.md — KNOW-07: user runs the representative-meeting evaluation; commit the content-free report and the derived status.
 
 **UI hint:** yes
 
