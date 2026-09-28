@@ -1187,11 +1187,56 @@ fn i64_to_u64(label: &str, value: i64) -> Result<u64, SqlxError> {
         .map_err(|_| SqlxError::Protocol(format!("{label} cannot be negative")))
 }
 
+#[derive(Debug, Clone, Copy)]
+enum DeleteScope {
+    Meeting,
+    EvaluationRun,
+    EvaluationRunOrMeeting,
+}
+
+const MEETING_SCOPED_DELETE_ORDER: &[(&str, DeleteScope)] = &[
+    ("knowledge_suppressions", DeleteScope::Meeting),
+    ("knowledge_reviews", DeleteScope::Meeting),
+    ("knowledge_revisions", DeleteScope::Meeting),
+    ("knowledge_evidence_links", DeleteScope::Meeting),
+    ("knowledge_abstentions", DeleteScope::Meeting),
+    ("knowledge_items", DeleteScope::Meeting),
+    ("knowledge_runs", DeleteScope::Meeting),
+    ("meeting_notes", DeleteScope::Meeting),
+    ("meeting_finalization_gaps", DeleteScope::Meeting),
+    ("meeting_finalizations", DeleteScope::Meeting),
+    ("evaluation_error_records", DeleteScope::EvaluationRun),
+    ("evaluation_evidence_commits", DeleteScope::EvaluationRun),
+    ("evaluation_gap_records", DeleteScope::EvaluationRun),
+    ("evaluation_outbound_records", DeleteScope::EvaluationRunOrMeeting),
+    ("evaluation_queue_records", DeleteScope::EvaluationRun),
+    ("evaluation_resource_records", DeleteScope::EvaluationRun),
+    ("evaluation_route_records", DeleteScope::EvaluationRunOrMeeting),
+    ("evaluation_run_summaries", DeleteScope::EvaluationRun),
+    ("evaluation_stage_records", DeleteScope::EvaluationRunOrMeeting),
+    ("evaluation_terminal_records", DeleteScope::EvaluationRunOrMeeting),
+    ("evaluation_runs", DeleteScope::Meeting),
+    ("transcript_evidence", DeleteScope::Meeting),
+    ("transcript_chunks", DeleteScope::Meeting),
+    ("summary_processes", DeleteScope::Meeting),
+    ("transcripts", DeleteScope::Meeting),
+];
+
+fn scoped_delete_statement(table: &str, scope: DeleteScope) -> String {
+    let evaluation_runs = "SELECT run_id FROM evaluation_runs WHERE meeting_id = ?1";
+    match scope {
+        DeleteScope::Meeting => format!("DELETE FROM {table} WHERE meeting_id = ?1"),
+        DeleteScope::EvaluationRun => format!("DELETE FROM {table} WHERE run_id IN ({evaluation_runs})"),
+        DeleteScope::EvaluationRunOrMeeting => {
+            format!("DELETE FROM {table} WHERE meeting_id = ?1 OR run_id IN ({evaluation_runs})")
+        }
+    }
+}
+
 async fn delete_meeting_with_transaction(
     transaction: &mut SqliteConnection,
     meeting_id: &str,
 ) -> Result<bool, SqlxError> {
-    // Check if meeting exists
     let meeting_exists: Option<(i64,)> = sqlx::query_as("SELECT 1 FROM meetings WHERE id = ?")
         .bind(meeting_id)
         .fetch_optional(&mut *transaction)
@@ -1202,30 +1247,22 @@ async fn delete_meeting_with_transaction(
         return Ok(false);
     }
 
-    // Delete from related tables in proper order
-    // 1. Delete from transcript_chunks
-    sqlx::query("DELETE FROM transcript_chunks WHERE meeting_id = ?")
-        .bind(meeting_id)
-        .execute(&mut *transaction)
-        .await?;
+    let mut affected = Vec::with_capacity(MEETING_SCOPED_DELETE_ORDER.len());
+    for (table, scope) in MEETING_SCOPED_DELETE_ORDER {
+        let result = sqlx::query(&scoped_delete_statement(table, *scope))
+            .bind(meeting_id)
+            .execute(&mut *transaction)
+            .await?;
+        if result.rows_affected() > 0 {
+            affected.push(format!("{table}={}", result.rows_affected()));
+        }
+    }
 
-    // 2. Delete from summary_processes
-    sqlx::query("DELETE FROM summary_processes WHERE meeting_id = ?")
-        .bind(meeting_id)
-        .execute(&mut *transaction)
-        .await?;
-
-    // 3. Delete from transcripts
-    sqlx::query("DELETE FROM transcripts WHERE meeting_id = ?")
-        .bind(meeting_id)
-        .execute(&mut *transaction)
-        .await?;
-
-    // 4. Finally, delete the meeting
     let result = sqlx::query("DELETE FROM meetings WHERE id = ?")
         .bind(meeting_id)
         .execute(&mut *transaction)
         .await?;
+    info!("Deleted meeting {} rows: [{}]", meeting_id, affected.join(", "));
 
     Ok(result.rows_affected() > 0)
 }

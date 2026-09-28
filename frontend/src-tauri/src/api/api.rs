@@ -769,6 +769,9 @@ pub async fn api_delete_meeting<R: Runtime>(
     );
 
     let pool = state.db_manager.pool();
+    if crate::knowledge::extraction::cancel_active_extraction(&meeting_id) {
+        log_info!("Cancelled active knowledge extraction before deleting meeting {}", meeting_id);
+    }
 
     match MeetingsRepository::delete_meeting(pool, &meeting_id).await {
         Ok(true) => {
