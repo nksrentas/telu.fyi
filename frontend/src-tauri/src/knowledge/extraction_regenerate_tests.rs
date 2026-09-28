@@ -27,7 +27,11 @@ async fn meeting() -> (SqlitePool, Vec<TranscriptEvidence>) {
 }
 
 fn candidate(text: &str, segment: &str, quote: &str) -> String {
-    format!(r#"{{"type":"decision","text":"{text}","evidence":[{{"segment":"{segment}","quote":"{quote}"}}]}}"#)
+    typed_candidate("decision", text, segment, quote)
+}
+
+fn typed_candidate(item_type: &str, text: &str, segment: &str, quote: &str) -> String {
+    format!(r#"{{"type":"{item_type}","text":"{text}","evidence":[{{"segment":"{segment}","quote":"{quote}"}}]}}"#)
 }
 
 async fn run(pool: &SqlitePool, evidence: &[TranscriptEvidence], run_id: &str, items: &[String]) -> RunOutcome {
@@ -141,6 +145,70 @@ async fn knowledge_regenerate_never_resurrects_rejected_or_corrected_wording() {
         .await
         .expect("new items");
     assert_eq!(new_texts, vec!["Move standup to ten"]);
+}
+
+async fn items_of_run(pool: &SqlitePool, run_id: &str) -> Vec<String> {
+    sqlx::query_scalar("SELECT text FROM knowledge_items WHERE origin_run_id = ?")
+        .bind(run_id)
+        .fetch_all(pool)
+        .await
+        .expect("items of run")
+}
+
+#[tokio::test]
+async fn knowledge_regenerate_never_resurrects_a_rejected_item_under_another_type() {
+    let (pool, evidence) = reviewed_meeting().await;
+    let regenerate_run = "018f5e27-2f68-7e27-9c90-7c7212314806";
+
+    let outcome = run(
+        &pool,
+        &evidence,
+        regenerate_run,
+        &[typed_candidate("commitment", "Cancel the offsite", "S2", "cancel the offsite this year")],
+    )
+    .await;
+    let view = KnowledgeRepository::meeting_view(&pool, MEETING_ID)
+        .await
+        .expect("meeting view");
+    let eligible = KnowledgeRepository::list_eligible_items(&pool, MEETING_ID)
+        .await
+        .expect("eligible items");
+
+    assert_eq!(
+        outcome.counts,
+        RunCounts {
+            proposed: 0,
+            skipped: 0,
+            suppressed: 1,
+            reconfirmed: 0,
+            duplicate: 0,
+        }
+    );
+    assert_eq!(reasons(&pool, regenerate_run).await, vec!["matched_rejected"]);
+    assert!(items_of_run(&pool, regenerate_run).await.is_empty());
+    assert!(view.items.iter().all(|item| item.text != "Cancel the offsite"));
+    assert!(eligible
+        .iter()
+        .all(|item| normalized_key(&item.text) != "cancel the offsite"));
+}
+
+#[tokio::test]
+async fn knowledge_regenerate_suppresses_a_rejected_item_under_every_other_type() {
+    let (pool, evidence) = reviewed_meeting().await;
+    let regenerate_run = "018f5e27-2f68-7e27-9c90-7c7212314807";
+    let retyped: Vec<String> = ["commitment", "question", "fact"]
+        .iter()
+        .map(|item_type| typed_candidate(item_type, "Cancel the offsite", "S2", "cancel the offsite this year"))
+        .collect();
+
+    let outcome = run(&pool, &evidence, regenerate_run, &retyped).await;
+
+    assert_eq!((outcome.counts.proposed, outcome.counts.suppressed), (0, 3));
+    assert_eq!(
+        reasons(&pool, regenerate_run).await,
+        vec!["matched_rejected", "matched_rejected", "matched_rejected"]
+    );
+    assert!(items_of_run(&pool, regenerate_run).await.is_empty());
 }
 
 #[tokio::test]

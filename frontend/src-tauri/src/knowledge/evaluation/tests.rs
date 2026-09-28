@@ -232,3 +232,48 @@ fn score_marks_empty_denominators_not_measurable_and_null_thresholds_undeclared(
     assert_eq!(fact.evidence_coverage.status, MetricStatus::NotMeasurable);
     assert_eq!(report.gate, GateStatus::Undeclared);
 }
+
+#[test]
+fn count_resurrected_counts_a_rejected_key_under_any_type() {
+    let rejected = ["Ship the beta on Friday"];
+
+    assert_eq!(replay::count_resurrected(&rejected, &["SHIP THE BETA ON FRIDAY."]), 1);
+    assert_eq!(replay::count_resurrected(&rejected, &["Order new laptops"]), 0);
+    assert_eq!(replay::count_resurrected(&rejected, &[]), 0);
+}
+
+fn release_fixture() -> GoldFixture {
+    GoldFixture {
+        fixture_id: "release".to_string(),
+        category: FixtureCategory::Representative,
+        segments: vec![
+            segment("r1", "We decided to ship the beta on Friday."),
+            segment("r2", "Maria will update the release notes."),
+            segment("r3", "The staging database was migrated yesterday."),
+        ],
+        gold: Vec::new(),
+        expect_abstain: false,
+    }
+}
+
+fn release_reply() -> String {
+    serde_json::json!({
+        "items": [
+            { "type": "decision", "text": "Ship the beta on Friday", "evidence": [{ "segment": "S1", "quote": "ship the beta on Friday" }], "owner": null, "due": null },
+            { "type": "commitment", "text": "Maria will update the release notes", "evidence": [{ "segment": "S2", "quote": "Maria will update the release notes" }], "owner": null, "due": null },
+            { "type": "fact", "text": "The staging database was migrated yesterday", "evidence": [{ "segment": "S3", "quote": "The staging database was migrated yesterday" }], "owner": null, "due": null },
+        ]
+    })
+    .to_string()
+}
+
+#[tokio::test]
+async fn run_replay_reports_zero_resurrection_when_rejected_items_return_under_other_types() {
+    let fixtures = [release_fixture()];
+    let completions = HashMap::from([("release".to_string(), vec![release_reply()])]);
+
+    let predictions = replay::run_replay(&fixtures, &completions).await.expect("replay");
+
+    assert_eq!(predictions.fixtures[0].items.len(), 3);
+    assert_eq!(predictions.resurrection_count, Some(0));
+}

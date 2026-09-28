@@ -6,15 +6,19 @@ use crate::database::models::{CaptureCompleteness, DateTimeUtc, TranscriptEviden
 use crate::database::repositories::transcript::TranscriptsRepository;
 use crate::knowledge::extraction::{extract_from_segments, input_fingerprint, run_extraction, ExtractionOutcome};
 use crate::knowledge::matcher::normalized_key;
-use crate::knowledge::models::{KnowledgeItemView, KnowledgeType, ReviewAction, SuppressionReason, TriggerKind};
+use crate::knowledge::models::{
+    EvidenceRole, KnowledgeItemView, KnowledgeType, ReviewAction, SuppressionReason, TriggerKind,
+};
 use crate::knowledge::prompt::PROMPT_VERSION;
 use crate::knowledge::repository::{KnowledgeRepository, NewRun};
 use crate::knowledge::review::append_review;
 use crate::knowledge::span_verifier::{AttributeSupport, LabeledSegment, LabeledSegments, VerifiedSpan};
 use chrono::Utc;
+use serde_json::{json, Value};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::future::Future;
 use std::path::Path;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
@@ -165,24 +169,75 @@ async fn measure_resurrection(fixture: &GoldFixture, replies: &[String]) -> Resu
     let evidence = TranscriptsRepository::list_evidence_by_meeting(&pool, &meeting_id)
         .await
         .map_err(|_| ReplayError::Storage)?;
-    let first_run = replay_run(&pool, &meeting_id, &evidence, replies, TriggerKind::User).await?;
+    let first_run = replay_run(&pool, &meeting_id, &evidence, TriggerKind::User, replayer(replies)).await?;
     let rejected = items_of_run(&pool, &meeting_id, &first_run).await?;
-    for item in &rejected {
-        append_review(&pool, &meeting_id, &item.item_id, ReviewAction::Reject)
+    reject_all(&pool, &meeting_id, &rejected).await?;
+    let reply = regenerate_reply(&rejected, fixture);
+    let second_run =
+        replay_run(&pool, &meeting_id, &evidence, TriggerKind::Regenerate, repeat_replayer(reply)).await?;
+    let regenerated = items_of_run(&pool, &meeting_id, &second_run).await?;
+    Ok(count_resurrected(&texts(&rejected), &texts(&regenerated)))
+}
+
+async fn reject_all(pool: &SqlitePool, meeting_id: &str, items: &[KnowledgeItemView]) -> Result<(), ReplayError> {
+    for item in items {
+        append_review(pool, meeting_id, &item.item_id, ReviewAction::Reject)
             .await
             .map_err(|_| ReplayError::Storage)?;
     }
-    let second_run = replay_run(&pool, &meeting_id, &evidence, replies, TriggerKind::Regenerate).await?;
-    let resurrected = items_of_run(&pool, &meeting_id, &second_run)
-        .await?
+    Ok(())
+}
+
+fn texts(items: &[KnowledgeItemView]) -> Vec<&str> {
+    items.iter().map(|item| item.text.as_str()).collect()
+}
+
+pub(super) fn count_resurrected(rejected: &[&str], regenerated: &[&str]) -> u64 {
+    let rejected_keys: HashSet<String> = rejected.iter().map(|text| normalized_key(text)).collect();
+    regenerated
         .iter()
-        .filter(|item| {
-            rejected.iter().any(|old| {
-                old.item_type == item.item_type && normalized_key(&old.text) == normalized_key(&item.text)
+        .filter(|text| rejected_keys.contains(&normalized_key(text)))
+        .count() as u64
+}
+
+fn regenerate_reply(items: &[KnowledgeItemView], fixture: &GoldFixture) -> String {
+    let entries: Vec<Value> = items
+        .iter()
+        .filter_map(|item| claim_evidence(item, fixture).map(|evidence| (item, evidence)))
+        .flat_map(|(item, evidence)| {
+            [item.item_type, rotate_type(item.item_type)].map(|item_type| {
+                json!({
+                    "type": item_type.as_str(),
+                    "text": format!("{}.", item.text.to_uppercase()),
+                    "evidence": [evidence.clone()],
+                    "owner": null,
+                    "due": null,
+                })
             })
         })
-        .count();
-    Ok(resurrected as u64)
+        .collect();
+    json!({ "items": entries }).to_string()
+}
+
+fn claim_evidence(item: &KnowledgeItemView, fixture: &GoldFixture) -> Option<Value> {
+    let claims: Vec<_> = item.evidence.iter().filter(|link| link.role == EvidenceRole::Claim).collect();
+    let first = claims.first()?;
+    let position = fixture.segments.iter().position(|segment| segment.id == first.evidence_id)?;
+    let quote = claims.iter().map(|link| link.quote_text.as_str()).collect::<Vec<_>>().join(" ");
+    Some(json!({ "segment": format!("S{}", position + 1), "quote": quote }))
+}
+
+fn rotate_type(item_type: KnowledgeType) -> KnowledgeType {
+    match item_type {
+        KnowledgeType::Decision => KnowledgeType::Commitment,
+        KnowledgeType::Commitment => KnowledgeType::Question,
+        KnowledgeType::Question => KnowledgeType::Fact,
+        KnowledgeType::Fact => KnowledgeType::Decision,
+    }
+}
+
+fn repeat_replayer(reply: String) -> impl FnMut(String, String) -> std::future::Ready<Result<String, String>> {
+    move |_, _| std::future::ready(Ok(reply.clone()))
 }
 
 async fn replay_pool() -> Result<SqlitePool, ReplayError> {
@@ -259,13 +314,17 @@ async fn insert_segment(pool: &SqlitePool, meeting_id: &str, sequence: i64, segm
     .map_err(|_| ReplayError::InvalidFixture)
 }
 
-async fn replay_run(
+async fn replay_run<F, Fut>(
     pool: &SqlitePool,
     meeting_id: &str,
     evidence: &[TranscriptEvidence],
-    replies: &[String],
     trigger: TriggerKind,
-) -> Result<String, ReplayError> {
+    complete: F,
+) -> Result<String, ReplayError>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
     let run_id = Uuid::new_v4().to_string();
     KnowledgeRepository::insert_running_run(
         pool,
@@ -285,7 +344,7 @@ async fn replay_run(
     )
     .await
     .map_err(|_| ReplayError::Storage)?;
-    run_extraction(pool, meeting_id, &run_id, evidence, REPLAY_BUDGET_TOKENS, &CancellationToken::new(), replayer(replies))
+    run_extraction(pool, meeting_id, &run_id, evidence, REPLAY_BUDGET_TOKENS, &CancellationToken::new(), complete)
         .await
         .map_err(|_| ReplayError::Storage)?;
     Ok(run_id)
