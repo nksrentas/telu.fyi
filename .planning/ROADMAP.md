@@ -144,7 +144,7 @@ Plans:
 **Verification approach:** Use representative held-out transcripts plus insufficient-evidence and degraded-capture cases; test exact evidence navigation and semantic support separately; exercise accept, reject, correct, restore, regenerate, delete, and retry scenarios; audit append-only lineage and future-context eligibility.
 **Exit gate:** Phase 3 may proceed only when item correctness, exact evidence-span support, abstention behavior, correction lineage, regeneration safety, and deletion effects meet the predeclared representative-review thresholds. If provenance or user actions do not deterministically control future eligibility, stop before preparation, live assistance, or series memory can amplify the defect.
 **Principal risks / stop conditions:** Fluent unsupported claims, reconstructed citations, destructive correction, rejected-item resurrection, incomplete evidence, mutable summary blobs, or one score conflating claim correctness with citation support. Stop when evidence lineage is ambiguous or review actions fail to propagate.
-**Plans:** 32/33 plans executed
+**Plans:** 32/37 plans executed
 Plans:
 **Wave 1**
 
@@ -219,6 +219,13 @@ Plans:
 **Gap wave 5** *(blocked on gap wave 4 completion)*
 
 - [ ] 02-33-PLAN.md — KNOW-07: user runs the representative-meeting evaluation; commit the content-free report and the derived status. **HALTED 2026-09-28** at the Task 1 precondition (thresholds undeclared per 02-32 keep-open); see 02-33-SUMMARY.md.
+
+**Gap closure, round 2** *(re-verification of SC5 / KNOW-07; user decision 2026-09-28: real-meeting pilot first; 02-34 to 02-37 carry the 02-32 declaration and the 02-33 evaluation, whose SUMMARYs stay unchanged; none depends on the halted 02-33)*
+
+- [ ] 02-34-PLAN.md — KNOW-07: `score --kind` labels every report; the status module counts only a representative-labeled report held out from the real-meeting pilot.
+- [ ] 02-35-PLAN.md — KNOW-07: user runs the real-meeting pilot (orientation only) against the undeclared thresholds; commit the content-free pilot report alone. *(blocked on 02-34)*
+- [ ] 02-36-PLAN.md — KNOW-07: user declares the quality thresholds after the pilot (decision checkpoint), committed alone before scoring. *(blocked on 02-35)*
+- [ ] 02-37-PLAN.md — KNOW-07: user runs the held-out representative evaluation; commit the content-free report and the derived status. Supersedes the halted 02-33. *(blocked on 02-36)*
 
 **UI hint:** yes
 
