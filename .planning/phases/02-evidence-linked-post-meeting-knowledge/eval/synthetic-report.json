@@ -1,0 +1,303 @@
+{
+  "schemaVersion": 1,
+  "generatedAtUtc": "2026-09-28T11:49:21.891302+00:00",
+  "promptVersion": "knowledge-extract-v2",
+  "thresholdsSha256": "6af4ebe924cb0e57c3b2fe987fd0ad7d1acff152b1c0ad18f7b92f9b0c515f50",
+  "gitCommit": "61f30f7c0f149aa0965637202d31213753e4fe94",
+  "fixtures": [
+    "degraded-capture",
+    "insufficient-evidence",
+    "representative-standup"
+  ],
+  "metrics": [
+    {
+      "scope": "decision",
+      "claimCorrectness": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "semanticSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "rawGrounding": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "evidenceCoverage": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "attribution": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "duplication": {
+        "value": 0.5,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 2
+      }
+    },
+    {
+      "scope": "commitment",
+      "claimCorrectness": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "semanticSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "rawGrounding": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "evidenceCoverage": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 2
+      },
+      "attribution": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 3,
+        "denominator": 3
+      },
+      "duplication": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 2
+      }
+    },
+    {
+      "scope": "question",
+      "claimCorrectness": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "semanticSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "rawGrounding": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "evidenceCoverage": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "attribution": {
+        "value": null,
+        "status": "not_measurable",
+        "numerator": 0,
+        "denominator": 0
+      },
+      "duplication": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 1
+      }
+    },
+    {
+      "scope": "fact",
+      "claimCorrectness": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "semanticSupport": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 1
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "rawGrounding": {
+        "value": 0.5,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 2
+      },
+      "evidenceCoverage": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 1
+      },
+      "attribution": {
+        "value": null,
+        "status": "not_measurable",
+        "numerator": 0,
+        "denominator": 0
+      },
+      "duplication": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 1
+      }
+    },
+    {
+      "scope": "overall",
+      "claimCorrectness": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 6,
+        "denominator": 6
+      },
+      "semanticSupport": {
+        "value": 0.8333333333333334,
+        "status": "measured",
+        "numerator": 5,
+        "denominator": 6
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 6,
+        "denominator": 6
+      },
+      "rawGrounding": {
+        "value": 0.8571428571428571,
+        "status": "measured",
+        "numerator": 6,
+        "denominator": 7
+      },
+      "evidenceCoverage": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 6,
+        "denominator": 6
+      },
+      "attribution": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 4,
+        "denominator": 4
+      },
+      "duplication": {
+        "value": 0.16666666666666666,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 6
+      }
+    }
+  ],
+  "degradedCapture": {
+    "scope": "overall",
+    "claimCorrectness": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 2,
+      "denominator": 2
+    },
+    "semanticSupport": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 2,
+      "denominator": 2
+    },
+    "exactSpanSupport": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 2,
+      "denominator": 2
+    },
+    "rawGrounding": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 2,
+      "denominator": 2
+    },
+    "evidenceCoverage": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 2,
+      "denominator": 2
+    },
+    "attribution": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 1,
+      "denominator": 1
+    },
+    "duplication": {
+      "value": 0.0,
+      "status": "measured",
+      "numerator": 0,
+      "denominator": 2
+    }
+  },
+  "abstention": {
+    "value": 1.0,
+    "status": "measured",
+    "numerator": 1,
+    "denominator": 1
+  },
+  "reviewOutcomes": null,
+  "invariants": {
+    "exactSpanSupport": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 6,
+      "denominator": 6
+    },
+    "resurrection": 0,
+    "deletionResidue": null
+  },
+  "gate": "undeclared",
+  "failures": []
+}
