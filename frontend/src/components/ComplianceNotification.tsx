@@ -71,18 +71,18 @@ export const ComplianceNotification: React.FC<ComplianceNotificationProps> = ({
         width: `${position.width}px`,
       }}
     >
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+      <div className="rounded-[14px] bg-glass-strong p-3 shadow-float backdrop-blur-[34px] backdrop-saturate-[1.8]">
         {/* Header with close button */}
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
-            <h3 className="text-xs font-semibold text-gray-900">
+            <AlertTriangle className="h-3 w-3 text-amber flex-shrink-0" />
+            <h3 className="text-xs font-semibold text-label">
               Recording Notice
             </h3>
           </div>
           <button
             onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-0.5 rounded hover:bg-gray-100"
+            className="text-label-3 hover:text-label-2 transition-colors p-0.5 rounded hover:bg-fill"
           >
             <X className="h-3 w-3" />
           </button>
@@ -90,11 +90,11 @@ export const ComplianceNotification: React.FC<ComplianceNotificationProps> = ({
 
         {/* Content */}
         <div className="mb-2">
-          <p className="text-xs text-gray-600 mb-1">
+          <p className="text-xs text-label-2 mb-1">
             Inform participants about recording.
           </p>
-          <div className="bg-amber-50 border border-amber-200 rounded p-1">
-            <p className="text-xs text-amber-800 font-medium">
+          <div className="rounded-md bg-amber-soft p-1">
+            <p className="text-xs text-label font-medium">
               US compliance required
             </p>
           </div>
@@ -106,14 +106,15 @@ export const ComplianceNotification: React.FC<ComplianceNotificationProps> = ({
             variant="outline"
             size="sm"
             onClick={handleClose}
-            className="text-xs px-2 py-0.5 h-6 flex-1"
+            className="flex-1"
           >
             Later
           </Button>
           <Button
             size="sm"
+            variant="primary"
             onClick={handleAcknowledge}
-            className="text-xs px-2 py-0.5 h-6 bg-green-600 hover:bg-green-700 flex-1"
+            className="flex-1"
           >
             <CheckCircle className="h-2 w-2 mr-1" />
             Done
