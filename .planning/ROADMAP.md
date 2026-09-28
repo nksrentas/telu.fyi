@@ -218,7 +218,7 @@ Plans:
 
 **Gap wave 5** *(blocked on gap wave 4 completion)*
 
-- [ ] 02-33-PLAN.md — KNOW-07: user runs the representative-meeting evaluation; commit the content-free report and the derived status.
+- [ ] 02-33-PLAN.md — KNOW-07: user runs the representative-meeting evaluation; commit the content-free report and the derived status. **HALTED 2026-09-28** at the Task 1 precondition (thresholds undeclared per 02-32 keep-open); see 02-33-SUMMARY.md.
 
 **UI hint:** yes
 
