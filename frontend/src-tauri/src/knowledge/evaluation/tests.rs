@@ -123,6 +123,8 @@ fn thresholds(fact: Option<ScopeThresholds>) -> Thresholds {
         semantic_support: Some(0.0),
         evidence_coverage: Some(0.0),
         attribution: None,
+        max_duplication: None,
+        min_review_accepted: None,
     };
     Thresholds {
         version: 1,
@@ -132,7 +134,7 @@ fn thresholds(fact: Option<ScopeThresholds>) -> Thresholds {
             deletion_residue: 0,
         },
         quality: QualityThresholds {
-            abstention: Some(AbstentionThreshold { insufficient_evidence: 0.0 }),
+            abstention: Some(AbstentionThreshold { insufficient_evidence: Some(0.0) }),
             scopes: SCOPES
                 .iter()
                 .map(|scope| (scope.to_string(), if *scope == "fact" { fact } else { Some(declared) }))
@@ -195,7 +197,7 @@ fn score_fails_the_invariant_gate_when_a_quote_no_longer_slices_its_segment() {
 }
 
 #[test]
-fn score_ignores_adjacent_evidence_and_passes_metrics_equal_to_their_threshold() {
+fn score_ignores_adjacent_evidence_and_meets_a_minimum_equal_to_its_threshold() {
     let fixtures = fixtures();
     let mut items = standard_items();
     items[2] = predicted("p3", KnowledgeType::Question, "s2", 0, 5, "Maria");
@@ -209,6 +211,8 @@ fn score_ignores_adjacent_evidence_and_passes_metrics_equal_to_their_threshold()
             semantic_support: None,
             evidence_coverage: None,
             attribution: None,
+            max_duplication: None,
+            min_review_accepted: None,
         }),
     );
 
@@ -216,11 +220,11 @@ fn score_ignores_adjacent_evidence_and_passes_metrics_equal_to_their_threshold()
 
     assert_eq!(scope(&report, "question").evidence_coverage.value, Some(0.0));
     assert_eq!(scope(&report, "overall").claim_correctness.value, Some(2.0 / 3.0));
-    assert_eq!(report.gate, GateStatus::Pass);
+    assert!(!report.failures.contains(&"overall.claimCorrectness".to_string()));
 }
 
 #[test]
-fn score_marks_empty_denominators_not_measurable_and_null_thresholds_undeclared() {
+fn score_marks_empty_denominators_not_measurable() {
     let fixtures = fixtures();
     let set = predictions(standard_items());
     let labels = labels();
@@ -232,7 +236,6 @@ fn score_marks_empty_denominators_not_measurable_and_null_thresholds_undeclared(
     assert_eq!(fact.claim_correctness.value, None);
     assert_eq!(fact.claim_correctness.status, MetricStatus::NotMeasurable);
     assert_eq!(fact.evidence_coverage.status, MetricStatus::NotMeasurable);
-    assert_eq!(report.gate, GateStatus::Undeclared);
 }
 
 #[test]
@@ -454,4 +457,342 @@ fn score_fails_when_deletion_residue_is_above_zero() {
     assert_eq!(report.invariants.deletion_residue, Some(2));
     assert_eq!(report.gate, GateStatus::Fail);
     assert!(report.failures.contains(&"invariants.deletionResidue".to_string()));
+}
+
+struct Complete {
+    fixtures: Vec<GoldFixture>,
+    predictions: PredictionSet,
+    labels: LabelSet,
+    review: BTreeMap<String, ReviewOutcomeRates>,
+}
+
+fn representative(index: usize) -> GoldFixture {
+    GoldFixture { fixture_id: format!("standup-{index}"), ..fixture() }
+}
+
+fn degraded() -> GoldFixture {
+    GoldFixture {
+        fixture_id: "degraded".to_string(),
+        category: FixtureCategory::DegradedCapture,
+        segments: vec![GoldSegment {
+            capture_completeness: "incomplete".to_string(),
+            ..segment("d1", "The staging database was migrated yesterday.")
+        }],
+        gold: vec![gold("g4", KnowledgeType::Fact, &["d1"])],
+        expect_abstain: false,
+    }
+}
+
+fn fixture_items(fixture_id: &str) -> Vec<PredictedItem> {
+    let id = |index: usize| format!("{fixture_id}#{index}");
+    if fixture_id == "degraded" {
+        return vec![predicted(&id(1), KnowledgeType::Fact, "d1", 0, 43, "The staging database was migrated yesterday")];
+    }
+    vec![
+        predicted(&id(1), KnowledgeType::Decision, "s1", 8, 31, "ship the beta on Friday"),
+        predicted(&id(2), KnowledgeType::Commitment, "s2", 0, 28, "Maria owns the release notes"),
+        predicted(&id(3), KnowledgeType::Question, "s3", 0, 22, "Is the budget approved"),
+    ]
+}
+
+fn fixture_predictions_for(fixture: &GoldFixture) -> FixturePredictions {
+    let items = match fixture.category {
+        FixtureCategory::InsufficientEvidence => Vec::new(),
+        _ => fixture_items(&fixture.fixture_id),
+    };
+    let duplicates = if fixture.fixture_id == "standup-1" { vec![KnowledgeType::Decision] } else { Vec::new() };
+    FixturePredictions { fixture_id: fixture.fixture_id.clone(), items, abstentions: Vec::new(), duplicates }
+}
+
+fn review_rates() -> ReviewOutcomeRates {
+    ReviewOutcomeRates { accepted: ratio(2, 4), corrected: ratio(1, 4), rejected: ratio(1, 4), pending: ratio(0, 4) }
+}
+
+fn complete_input() -> Complete {
+    let fixtures: Vec<GoldFixture> =
+        (1..=5).map(representative).chain([insufficient(), degraded()]).collect();
+    let fixture_sets: Vec<FixturePredictions> = fixtures.iter().map(fixture_predictions_for).collect();
+    let labels = fixture_sets
+        .iter()
+        .flat_map(|set| set.items.iter())
+        .map(|item| (item.pred_id.clone(), label(true, true, Some(true), Some(true))))
+        .collect();
+    Complete {
+        fixtures,
+        predictions: PredictionSet { fixtures: fixture_sets, ..predictions(Vec::new()) },
+        labels,
+        review: ["decision", "commitment", "question", "fact"]
+            .into_iter()
+            .map(|item_type| (item_type.to_string(), review_rates()))
+            .collect(),
+    }
+}
+
+fn uniform_scope(value: f64) -> ScopeThresholds {
+    ScopeThresholds {
+        claim_correctness: Some(value),
+        semantic_support: Some(value),
+        evidence_coverage: Some(value),
+        attribution: Some(value),
+        max_duplication: Some(value),
+        min_review_accepted: Some(value),
+    }
+}
+
+fn declared(value: f64) -> Thresholds {
+    Thresholds {
+        version: THRESHOLDS_VERSION,
+        invariants: InvariantThresholds { exact_span_support: 1.0, resurrection: 0, deletion_residue: 0 },
+        quality: QualityThresholds {
+            abstention: Some(AbstentionThreshold { insufficient_evidence: Some(value) }),
+            scopes: SCOPES.iter().map(|scope| (scope.to_string(), Some(uniform_scope(value)))).collect(),
+        },
+    }
+}
+
+fn with_scope(limits: &Thresholds, name: &str, replacement: Option<ScopeThresholds>) -> Thresholds {
+    let scopes = limits
+        .quality
+        .scopes
+        .iter()
+        .map(|(scope, current)| (scope.clone(), if scope == name { replacement } else { *current }))
+        .chain((!limits.quality.scopes.contains_key(name)).then(|| (name.to_string(), replacement)))
+        .collect();
+    Thresholds { quality: QualityThresholds { scopes, ..limits.quality.clone() }, ..limits.clone() }
+}
+
+fn edit_scope(limits: &Thresholds, name: &str, edit: impl Fn(ScopeThresholds) -> ScopeThresholds) -> Thresholds {
+    let current = limits.quality.scopes.get(name).copied().flatten().unwrap_or_default();
+    with_scope(limits, name, Some(edit(current)))
+}
+
+fn with_abstention(limits: &Thresholds, abstention: Option<AbstentionThreshold>) -> Thresholds {
+    Thresholds { quality: QualityThresholds { abstention, ..limits.quality.clone() }, ..limits.clone() }
+}
+
+fn score_complete(complete: &Complete, limits: &Thresholds, review: bool) -> EvaluationReport {
+    let input = ScoreInput {
+        fixtures: &complete.fixtures,
+        predictions: &complete.predictions,
+        labels: &complete.labels,
+        thresholds: limits,
+    };
+    let review_outcomes = review.then(|| complete.review.clone());
+    score(&input, ReportEnvelope { review_outcomes, ..envelope() })
+}
+
+fn without_fixture(complete: Complete, fixture_id: &str, drop_gold: bool, drop_predictions: bool) -> Complete {
+    Complete {
+        fixtures: complete.fixtures.into_iter().filter(|fixture| !drop_gold || fixture.fixture_id != fixture_id).collect(),
+        predictions: PredictionSet {
+            fixtures: complete
+                .predictions
+                .fixtures
+                .into_iter()
+                .filter(|set| !drop_predictions || set.fixture_id != fixture_id)
+                .collect(),
+            ..complete.predictions
+        },
+        ..complete
+    }
+}
+
+#[test]
+fn thresholds_v2_file_parses_and_validates() {
+    let parsed: Thresholds =
+        serde_json::from_str(include_str!("../../../tests/fixtures/knowledge-eval/thresholds-v2.json")).expect("v2");
+
+    assert_eq!(parsed.version, 2);
+    assert_eq!(parsed.validate(), Ok(()));
+    assert!(SCOPES.iter().all(|scope| parsed.quality.scopes.contains_key(*scope)));
+}
+
+#[test]
+fn thresholds_validate_rejects_other_versions_changed_invariants_unknown_scopes_and_out_of_range_values() {
+    let base = declared(0.5);
+    let invariants = |exact: f64, resurrection: u64, residue: u64| Thresholds {
+        invariants: InvariantThresholds { exact_span_support: exact, resurrection, deletion_residue: residue },
+        ..base.clone()
+    };
+    let claim = |value: f64| edit_scope(&base, "decision", |scope| ScopeThresholds { claim_correctness: Some(value), ..scope });
+    let duplication = |value: f64| edit_scope(&base, "overall", |scope| ScopeThresholds { max_duplication: Some(value), ..scope });
+
+    assert_eq!(base.validate(), Ok(()));
+    assert_eq!(Thresholds { version: 1, ..base.clone() }.validate(), Err(ThresholdsError::UnsupportedVersion));
+    for changed in [invariants(0.99, 0, 0), invariants(1.0, 1, 0), invariants(1.0, 0, 1)] {
+        assert_eq!(changed.validate(), Err(ThresholdsError::InvariantsChanged));
+    }
+    assert_eq!(with_scope(&base, "decisoin", Some(uniform_scope(0.5))).validate(), Err(ThresholdsError::UnknownScope));
+    for out_of_range in [claim(0.0), claim(1.2), duplication(1.0), duplication(-0.1)] {
+        assert_eq!(out_of_range.validate(), Err(ThresholdsError::OutOfRange));
+    }
+    assert_eq!(claim(1.0).validate(), Ok(()));
+    assert_eq!(duplication(0.0).validate(), Ok(()));
+}
+
+#[test]
+fn score_is_undeclared_never_pass_when_any_leaf_is_null() {
+    let complete = complete_input();
+    let base = declared(0.5);
+    let variants = [
+        edit_scope(&base, "decision", |scope| ScopeThresholds { claim_correctness: None, ..scope }),
+        edit_scope(&base, "commitment", |scope| ScopeThresholds { max_duplication: None, ..scope }),
+        edit_scope(&base, "question", |scope| ScopeThresholds { min_review_accepted: None, ..scope }),
+        with_abstention(&base, Some(AbstentionThreshold { insufficient_evidence: None })),
+        with_scope(&base, "fact", None),
+        Thresholds {
+            quality: QualityThresholds {
+                scopes: base.quality.scopes.iter().filter(|(scope, _)| *scope != "overall").map(|(k, v)| (k.clone(), *v)).collect(),
+                ..base.quality.clone()
+            },
+            ..base.clone()
+        },
+    ];
+
+    for (index, limits) in variants.iter().enumerate() {
+        let report = score_complete(&complete, limits, true);
+        assert_eq!(report.gate, GateStatus::Undeclared, "variant {index}");
+        assert!(report.failures.is_empty(), "variant {index}: {:?}", report.failures);
+    }
+}
+
+#[test]
+fn score_passes_when_every_leaf_is_declared_measured_and_met_including_values_equal_to_thresholds() {
+    let complete = complete_input();
+    let exact = |duplication: f64| ScopeThresholds { max_duplication: Some(duplication), min_review_accepted: Some(0.75), ..uniform_scope(1.0) };
+    let limits = Thresholds {
+        quality: QualityThresholds {
+            abstention: Some(AbstentionThreshold { insufficient_evidence: Some(1.0) }),
+            scopes: SCOPES
+                .iter()
+                .map(|scope| {
+                    let duplication = match *scope {
+                        "decision" => 1.0 / 5.0,
+                        "overall" => 1.0 / 16.0,
+                        _ => 0.0,
+                    };
+                    (scope.to_string(), Some(exact(duplication)))
+                })
+                .collect(),
+        },
+        ..declared(1.0)
+    };
+
+    let report = score_complete(&complete, &limits, true);
+
+    assert_eq!(limits.validate(), Ok(()));
+    assert_eq!(scope(&report, "overall").duplication.value, Some(1.0 / 16.0));
+    assert_eq!(report.failures, Vec::<String>::new());
+    assert_eq!(report.gate, GateStatus::Pass);
+}
+
+#[test]
+fn score_fails_when_duplication_exceeds_its_declared_maximum() {
+    let complete = complete_input();
+    let limits = edit_scope(&declared(0.5), "overall", |scope| ScopeThresholds { max_duplication: Some(0.05), ..scope });
+
+    let report = score_complete(&complete, &limits, true);
+
+    assert_eq!(report.failures, vec!["overall.maxDuplication".to_string()]);
+    assert_eq!(report.gate, GateStatus::Fail);
+}
+
+#[test]
+fn score_fails_review_thresholds_without_review_outcomes() {
+    let report = score_complete(&complete_input(), &declared(0.5), false);
+
+    let expected: Vec<String> = SCOPES.iter().map(|scope| format!("{scope}.minReviewAccepted")).collect();
+    assert_eq!(report.failures, expected);
+    assert_eq!(report.gate, GateStatus::Fail);
+}
+
+#[test]
+fn score_counts_a_fixture_without_predictions_as_uncovered_and_not_abstained() {
+    let no_vague = score_complete(&without_fixture(complete_input(), "vague", false, true), &declared(0.5), true);
+    let no_standup = score_complete(&without_fixture(complete_input(), "standup-5", false, true), &declared(0.5), true);
+
+    assert_eq!((no_vague.abstention.numerator, no_vague.abstention.denominator), (0, 1));
+    let coverage = scope(&no_standup, "overall").evidence_coverage;
+    assert_eq!((coverage.numerator, coverage.denominator), (13, 16));
+    for report in [no_vague, no_standup] {
+        assert!(report.failures.contains(&"inputs.predictionsMismatch".to_string()), "{:?}", report.failures);
+        assert_eq!(report.gate, GateStatus::Fail);
+    }
+}
+
+#[test]
+fn score_fails_when_predictions_name_an_unknown_or_duplicated_fixture() {
+    let extra = |set: FixturePredictions| {
+        let complete = complete_input();
+        let fixtures = complete.predictions.fixtures.iter().cloned().chain([set]).collect();
+        Complete { predictions: PredictionSet { fixtures, ..complete.predictions.clone() }, ..complete }
+    };
+    let unknown = extra(FixturePredictions { fixture_id: "ghost".to_string(), ..FixturePredictions::default() });
+    let duplicated = extra(fixture_predictions_for(&representative(1)));
+
+    for complete in [unknown, duplicated] {
+        let report = score_complete(&complete, &declared(0.5), true);
+        assert_eq!(report.failures, vec!["inputs.predictionsMismatch".to_string()]);
+        assert_eq!(report.gate, GateStatus::Fail);
+    }
+}
+
+#[test]
+fn score_fails_below_the_minimum_fixture_counts_per_category() {
+    let failures_without = |fixture_id: &str| {
+        score_complete(&without_fixture(complete_input(), fixture_id, true, true), &declared(0.5), true).failures
+    };
+    let fixtures = fixtures();
+    let set = predictions(standard_items());
+    let labels = labels();
+    let limits = declared(0.5);
+    let legacy = score(&ScoreInput { fixtures: &fixtures, predictions: &set, labels: &labels, thresholds: &limits }, envelope());
+
+    assert_eq!(failures_without("standup-5"), vec!["inputs.representativeFixtures".to_string()]);
+    assert_eq!(failures_without("vague"), vec!["inputs.insufficientEvidenceFixtures".to_string()]);
+    assert_eq!(failures_without("degraded"), vec!["inputs.degradedCaptureFixtures".to_string()]);
+    assert!(legacy.failures.contains(&"inputs.representativeFixtures".to_string()));
+    assert!(legacy.failures.contains(&"inputs.degradedCaptureFixtures".to_string()));
+    assert_eq!(legacy.gate, GateStatus::Fail);
+}
+
+#[test]
+fn score_lists_failures_in_a_fixed_order() {
+    let reduced = without_fixture(complete_input(), "standup-5", true, true);
+    let vague_item = PredictedItem { owner: Some("Maria".to_string()), ..predicted("vague#1", KnowledgeType::Fact, "v1", 0, 4, "Yeah") };
+    let fixture_sets = reduced
+        .predictions
+        .fixtures
+        .iter()
+        .map(|set| if set.fixture_id == "vague" { FixturePredictions { items: vec![vague_item.clone()], ..set.clone() } } else { set.clone() })
+        .collect();
+    let complete = Complete {
+        predictions: PredictionSet { fixtures: fixture_sets, deletion_residue_count: Some(1), ..reduced.predictions.clone() },
+        labels: reduced.labels.iter().map(|(k, v)| (k.clone(), v.clone())).chain([("vague#1".to_string(), label(true, true, Some(true), Some(true)))]).collect(),
+        ..reduced
+    };
+    let limits = edit_scope(
+        &edit_scope(&declared(0.5), "decision", |scope| ScopeThresholds { max_duplication: Some(0.1), min_review_accepted: Some(0.9), ..scope }),
+        "overall",
+        |scope| ScopeThresholds { max_duplication: Some(0.01), ..scope },
+    );
+
+    let report = score_complete(&complete, &limits, true);
+
+    assert_eq!(
+        report.failures,
+        [
+            "invariants.deletionResidue",
+            "inputs.representativeFixtures",
+            "decision.maxDuplication",
+            "decision.minReviewAccepted",
+            "overall.maxDuplication",
+            "abstention.insufficientEvidence",
+        ]
+        .map(str::to_string)
+        .to_vec()
+    );
+    assert!(report.failures.iter().all(|failure| failure.len() <= 80
+        && failure.chars().all(|c| c.is_ascii_alphanumeric() || "_.:+#-".contains(c))));
+    assert_eq!(report.gate, GateStatus::Fail);
 }
