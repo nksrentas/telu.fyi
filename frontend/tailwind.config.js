@@ -1,93 +1,91 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-    darkMode: ['class'],
-    content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  darkMode: ['class'],
+  future: { hoverOnlyWhenSupported: true },
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}'],
+  safelist: ['dark'],
   theme: {
-  	extend: {
-  		fontFamily: {
-  			sans: [
-  				'var(--font-source-sans-3)'
-  			]
-  		},
-  		colors: {
-  			background: 'hsl(var(--background))',
-  			foreground: 'hsl(var(--foreground))',
-  			border: 'hsl(var(--border))',
-  			input: 'hsl(var(--input))',
-  			ring: 'hsl(var(--ring))',
-  			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
-  			},
-  			secondary: {
-  				DEFAULT: 'hsl(var(--secondary))',
-  				foreground: 'hsl(var(--secondary-foreground))'
-  			},
-  			tertiary: '#64748b',
-  			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
-  			},
-  			popover: {
-  				DEFAULT: 'hsl(var(--popover))',
-  				foreground: 'hsl(var(--popover-foreground))'
-  			},
-  			muted: {
-  				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
-  			},
-  			accent: {
-  				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))'
-  			},
-  			destructive: {
-  				DEFAULT: 'hsl(var(--destructive))',
-  				foreground: 'hsl(var(--destructive-foreground))'
-  			},
-  			chart: {
-  				'1': 'hsl(var(--chart-1))',
-  				'2': 'hsl(var(--chart-2))',
-  				'3': 'hsl(var(--chart-3))',
-  				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
-  			}
-  		},
-  		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
-  		},
-  		keyframes: {
-  			'accordion-down': {
-  				from: {
-  					height: '0'
-  				},
-  				to: {
-  					height: 'var(--radix-accordion-content-height)'
-  				}
-  			},
-  			'accordion-up': {
-  				from: {
-  					height: 'var(--radix-accordion-content-height)'
-  				},
-  				to: {
-  					height: '0'
-  				}
-  			}
-  		},
-  		animation: {
-  			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
-  		}
-  	}
+    extend: {
+      fontFamily: {
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"Helvetica Neue"', 'system-ui', 'sans-serif'],
+        display: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Helvetica Neue"', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', '"SF Mono"', 'Menlo', 'monospace'],
+      },
+      fontSize: {
+        large: ['26px', { lineHeight: '1.15', letterSpacing: '-0.022em', fontWeight: '700' }],
+        title1: ['22px', { lineHeight: '1.2', letterSpacing: '-0.02em', fontWeight: '700' }],
+        title2: ['17px', { lineHeight: '1.25', letterSpacing: '-0.012em', fontWeight: '600' }],
+        title3: ['15px', { lineHeight: '1.3', letterSpacing: '-0.008em', fontWeight: '600' }],
+        body: ['13px', { lineHeight: '1.38' }],
+        callout: '12px',
+        caption: '11px',
+        eyebrow: ['11px', { letterSpacing: '0.01em', fontWeight: '600' }],
+      },
+      colors: {
+        accent: { DEFAULT: 'var(--accent)', strong: 'var(--accent-strong)', soft: 'var(--accent-soft)', softer: 'var(--accent-softer)', foreground: 'var(--on-accent)' },
+        mint: { DEFAULT: 'var(--mint)', ink: 'var(--mint-ink)', soft: 'var(--mint-soft)' },
+        coral: { DEFAULT: 'var(--coral)', ink: 'var(--coral-ink)', soft: 'var(--coral-soft)' },
+        amber: { DEFAULT: 'var(--amber)', soft: 'var(--amber-soft)' },
+        label: { DEFAULT: 'var(--label)', 2: 'var(--label-2)', 3: 'var(--label-3)', 4: 'var(--label-4)' },
+        window: 'var(--window-bg)',
+        content: 'var(--content-bg)',
+        surface: { DEFAULT: 'var(--surface)', sunken: 'var(--surface-sunken)' },
+        fill: { DEFAULT: 'var(--fill)', 2: 'var(--fill-2)', 3: 'var(--fill-3)' },
+        separator: 'var(--separator)',
+        hairline: 'var(--hairline)',
+        glass: { DEFAULT: 'var(--glass)', strong: 'var(--glass-strong)', rim: 'var(--glass-rim)', edge: 'var(--glass-edge)' },
+        scrim: 'var(--scrim)',
+        series: { blue: 'var(--series-blue)', orange: 'var(--series-orange)', green: 'var(--series-green)', purple: 'var(--series-purple)', teal: 'var(--series-teal)', pink: 'var(--series-pink)', gray: 'var(--series-gray)' },
+        background: 'var(--content-bg)',
+        foreground: 'var(--label)',
+        primary: { DEFAULT: 'var(--accent)', foreground: 'var(--on-accent)' },
+        secondary: { DEFAULT: 'var(--fill-2)', foreground: 'var(--label)' },
+        muted: { DEFAULT: 'var(--fill)', foreground: 'var(--label-2)' },
+        destructive: { DEFAULT: 'var(--coral)', foreground: '#FFFFFF' },
+        popover: { DEFAULT: 'var(--glass-strong)', foreground: 'var(--label)' },
+        card: { DEFAULT: 'var(--surface)', foreground: 'var(--label)' },
+        border: 'var(--hairline)',
+        input: 'var(--hairline)',
+        ring: 'var(--accent)',
+      },
+      borderRadius: {
+        window: 'var(--r-window)',
+        card: 'var(--r-card)',
+        control: 'var(--r-control)',
+        lg: 'var(--r-control)',
+        md: '6px',
+        sm: '4px',
+      },
+      boxShadow: { card: 'var(--shadow-card)', 'card-hover': 'var(--shadow-card-hover)', float: 'var(--shadow-float)', window: 'var(--shadow-window)' },
+      transitionTimingFunction: { out: 'var(--ease-out)', 'in-out': 'var(--ease-in-out)', drawer: 'var(--ease-drawer)', spring: 'var(--spring)', 'spring-bounce': 'var(--spring-bounce)' },
+      transitionDuration: { press: '140ms', fast: '160ms', base: '220ms', drawer: '300ms', spring: '490ms', 'spring-bounce': '600ms' },
+      keyframes: {
+        'accordion-down': { from: { height: '0' }, to: { height: 'var(--radix-accordion-content-height)' } },
+        'accordion-up': { from: { height: 'var(--radix-accordion-content-height)' }, to: { height: '0' } },
+        'kit-enter': { from: { opacity: '0', transform: 'translateY(6px)' } },
+        'kit-receive': { '0%, 30%': { backgroundColor: 'var(--accent-soft)' }, '100%': { backgroundColor: 'transparent' } },
+        'kit-bump': { '40%': { transform: 'scale(1.18)' } },
+        'kit-rec': { '50%': { opacity: '0.3' } },
+        'kit-wave': { '50%': { transform: 'scaleY(1)' } },
+        'kit-shimmer': { from: { backgroundPosition: '100% 0' }, to: { backgroundPosition: '-100% 0' } },
+      },
+      animation: {
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        enter: 'kit-enter 280ms var(--ease-out) both',
+        receive: 'kit-receive 900ms var(--ease-out)',
+        bump: 'kit-bump 420ms var(--ease-out)',
+        rec: 'kit-rec 1.4s ease-in-out infinite',
+        'rec-slow': 'kit-rec 2.4s ease-in-out infinite',
+        wave: 'kit-wave 900ms ease-in-out infinite',
+        shimmer: 'kit-shimmer 1.3s linear infinite',
+        'spin-ring': 'spin 700ms linear infinite',
+      },
+    },
   },
   plugins: [
-    require("tailwindcss-animate"),
-    require("@tailwindcss/typography"),
-    require("@tailwindcss/container-queries"),
+    require('tailwindcss-animate'),
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/container-queries'),
   ],
 }

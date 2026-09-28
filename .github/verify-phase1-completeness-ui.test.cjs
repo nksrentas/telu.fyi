@@ -144,8 +144,8 @@ test('zero gaps never promote completion and touched surfaces use Telu tokens', 
     /(gaps\.length|gapCount)\s*={2,3}\s*0[\s\S]{0,100}(Complete|'complete'|"complete")/,
   );
   assert.match(completeness, /switch \(completeness\)/);
-  assert.match(globals, /--background:\s*60 16\.7% 96\.3%/);
-  assert.match(globals, /--primary:\s*239 74\.3% 64\.9%/);
-  assert.match(globals, /--destructive:\s*4 100% 69\.2%/);
+  assert.match(globals, /--accent:\s*#6366E8/);
+  assert.match(globals, /--coral:\s*#FF6B62/);
+  assert.match(globals, /--window-bg:\s*#F7F7F4/);
   assert.doesNotMatch(completeness, /#67E8C5|fresh-mint|Fresh Mint/i);
 });

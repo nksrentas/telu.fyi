@@ -4,37 +4,44 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+const DEFAULT = "bg-fill-2 text-label hover:bg-fill-3"
+const PLAIN = "bg-transparent hover:bg-fill"
+const CORAL =
+  "bg-coral text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_1px_2px_rgba(23,25,31,0.14)] hover:bg-coral-ink"
+const MEDIUM = "h-7 px-3 text-[13px]"
+
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-medium [transition:transform_140ms_var(--ease-out),background-color_150ms_ease,box-shadow_150ms_ease,color_150ms_ease] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-[0.45] [&_kbd]:text-inherit [&_kbd]:opacity-60 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
-        outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
-        secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
-        green: "bg-green-600 text-white hover:bg-green-600",
-        blue: "bg-blue-500 text-white hover:bg-blue-600",
-        red: "bg-red-500 text-white hover:bg-red-600",
-        gray: "border bg-gray-100 border-input shadow-sm hover:bg-gray-200 hover:text-accent-foreground",
+        default: DEFAULT,
+        primary:
+          "bg-accent text-accent-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_1px_2px_rgba(23,25,31,0.14)] hover:bg-accent-strong",
+        record: CORAL,
+        tinted: "bg-accent-soft text-accent-strong hover:text-accent",
+        plain: PLAIN,
+        outline: DEFAULT,
+        secondary: DEFAULT,
+        ghost: PLAIN,
+        link: `${PLAIN} text-accent`,
+        destructive: CORAL,
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
+        sm: "h-6 px-2.5 text-[12px]",
+        md: MEDIUM,
+        default: MEDIUM,
+        lg: "h-[34px] px-4 text-[14px]",
+        icon: `${MEDIUM} w-7 px-0`,
       },
+      icon: { true: "px-0" },
     },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
+    compoundVariants: [
+      { size: "sm", icon: true, class: "w-6" },
+      { size: ["md", "default"], icon: true, class: "w-7" },
+      { size: "lg", icon: true, class: "w-[34px]" },
+    ],
+    defaultVariants: { variant: "default", size: "md" },
   }
 )
 
@@ -45,11 +52,12 @@ export interface ButtonProps
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, icon, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        data-slot="button"
+        className={cn(buttonVariants({ variant, size, icon, className }))}
         ref={ref}
         {...props}
       />

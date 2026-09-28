@@ -1,7 +1,7 @@
 'use client'
 
 import './globals.css'
-import { Source_Sans_3 } from 'next/font/google'
+import { MotionConfig } from 'framer-motion'
 import Sidebar from '@/components/Sidebar'
 import { SidebarProvider } from '@/components/Sidebar/SidebarProvider'
 import MainContent from '@/components/MainContent'
@@ -26,12 +26,24 @@ import { ImportAudioDialog, ImportDropOverlay } from '@/components/ImportAudio'
 import { ImportDialogProvider } from '@/contexts/ImportDialogContext'
 import { isAudioExtension, getAudioFormatsDisplayList } from '@/constants/audioFormats'
 
+const TOAST_CAPSULE =
+  'left-0 right-0 mx-auto flex w-fit max-w-full min-h-[38px] items-center gap-2.5 rounded-[19px] bg-glass-strong py-[5px] pl-3.5 pr-4 text-[13px] text-label shadow-float backdrop-blur-[24px] backdrop-saturate-[1.8] has-[button]:pr-[5px]'
 
-const sourceSans3 = Source_Sans_3({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-source-sans-3',
-})
+const TOAST_CLASS_NAMES = {
+  success: TOAST_CAPSULE,
+  info: TOAST_CAPSULE,
+  loading: TOAST_CAPSULE,
+  warning: `${TOAST_CAPSULE} [&_[data-icon]]:text-amber`,
+  error: `${TOAST_CAPSULE} [&_[data-icon]]:text-coral-ink`,
+  icon: 'flex shrink-0 text-accent [&>svg]:size-4',
+  content: 'flex min-w-0 flex-col gap-0.5',
+  title: 'font-medium leading-[1.3]',
+  description: 'text-[12px] leading-[1.35] text-label-2',
+  actionButton:
+    'ml-1 inline-flex h-6 shrink-0 items-center rounded-full bg-accent-soft px-2.5 text-[12px] font-medium text-accent-strong transition-colors hover:text-accent',
+  cancelButton:
+    'inline-flex h-6 shrink-0 items-center rounded-full px-2.5 text-[12px] font-medium text-label-2 transition-colors hover:bg-fill',
+}
 
 // Module-level component — stable reference across RootLayout re-renders.
 // Defined here (not inside RootLayout) so React never sees a new function type
@@ -232,51 +244,60 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <body className={`${sourceSans3.variable} font-sans antialiased`}>
-        <AnalyticsProvider>
-          <RecordingStateProvider>
-            <TranscriptProvider>
-              <ConfigProvider>
-                <OllamaDownloadProvider>
-                  <OnboardingProvider>
-                    <UpdateCheckProvider>
-                      <SidebarProvider>
-                        <TooltipProvider>
-                          <RecordingPostProcessingProvider>
-                            <ImportDialogProvider onOpen={handleOpenImportDialog}>
-                              {/* Download progress toast provider - listens for background downloads */}
-                              <DownloadProgressToastProvider />
+      <body className="font-sans antialiased">
+        <MotionConfig reducedMotion="user">
+          <AnalyticsProvider>
+            <RecordingStateProvider>
+              <TranscriptProvider>
+                <ConfigProvider>
+                  <OllamaDownloadProvider>
+                    <OnboardingProvider>
+                      <UpdateCheckProvider>
+                        <SidebarProvider>
+                          <TooltipProvider>
+                            <RecordingPostProcessingProvider>
+                              <ImportDialogProvider onOpen={handleOpenImportDialog}>
+                                {/* Download progress toast provider - listens for background downloads */}
+                                <DownloadProgressToastProvider />
 
-                              {/* Show onboarding or main app */}
-                              {showOnboarding ? (
-                                <OnboardingFlow onComplete={handleOnboardingComplete} />
-                              ) : (
-                                <div className="flex">
-                                  <Sidebar />
-                                  <MainContent>{children}</MainContent>
-                                </div>
-                              )}
-                              {/* Import audio overlay and dialog */}
-                              <ImportDropOverlay visible={showDropOverlay} />
-                              <ConditionalImportDialog
-                                showImportDialog={showImportDialog}
-                                handleImportDialogClose={handleImportDialogClose}
-                                importFilePath={importFilePath}
-                              />
-                            </ImportDialogProvider>
-                          </RecordingPostProcessingProvider>
-                        </TooltipProvider>
-                      </SidebarProvider>
-                    </UpdateCheckProvider>
-                  </OnboardingProvider>
+                                {/* Show onboarding or main app */}
+                                {showOnboarding ? (
+                                  <OnboardingFlow onComplete={handleOnboardingComplete} />
+                                ) : (
+                                  <div className="flex">
+                                    <Sidebar />
+                                    <MainContent>{children}</MainContent>
+                                  </div>
+                                )}
+                                {/* Import audio overlay and dialog */}
+                                <ImportDropOverlay visible={showDropOverlay} />
+                                <ConditionalImportDialog
+                                  showImportDialog={showImportDialog}
+                                  handleImportDialogClose={handleImportDialogClose}
+                                  importFilePath={importFilePath}
+                                />
+                              </ImportDialogProvider>
+                            </RecordingPostProcessingProvider>
+                          </TooltipProvider>
+                        </SidebarProvider>
+                      </UpdateCheckProvider>
+                    </OnboardingProvider>
 
-                </OllamaDownloadProvider>
-              </ConfigProvider>
-            </TranscriptProvider>
-          </RecordingStateProvider>
-        </AnalyticsProvider>
+                  </OllamaDownloadProvider>
+                </ConfigProvider>
+              </TranscriptProvider>
+            </RecordingStateProvider>
+          </AnalyticsProvider>
+        </MotionConfig>
 
-        <Toaster position="bottom-center" richColors closeButton />
+        <Toaster
+          position="bottom-center"
+          expand
+          gap={8}
+          offset={18}
+          duration={4200}
+          toastOptions={{ unstyled: true, classNames: TOAST_CLASS_NAMES }}
+        />
       </body>
     </html>
   )
