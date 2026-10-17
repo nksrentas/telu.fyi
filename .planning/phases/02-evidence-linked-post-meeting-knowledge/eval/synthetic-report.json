@@ -1,9 +1,10 @@
 {
   "schemaVersion": 1,
-  "generatedAtUtc": "2026-09-28T15:09:54.672742+00:00",
+  "evaluationKind": "synthetic",
+  "generatedAtUtc": "2026-10-17T17:47:27.683089+00:00",
   "promptVersion": "knowledge-extract-v2",
-  "thresholdsSha256": "aa1261fae592fb70282e68cdd02192191c1f8ef0c9d3d9541c47764c0693ae79",
-  "gitCommit": "61222ff693b3ccaa94c511bec4ec1f02ffca6e86",
+  "thresholdsSha256": "a0a8db8068e93d271220bc60872f956981c1f129cf02c5f1613d35471a6566ae",
+  "gitCommit": "27c10dc5b7d69b1d8246b4f2e5426d9044e797f9",
   "fixtures": [
     "degraded-capture",
     "insufficient-evidence",
@@ -300,6 +301,17 @@
   },
   "gate": "fail",
   "failures": [
-    "inputs.representativeFixtures"
+    "inputs.representativeFixtures",
+    "decision.maxDuplication",
+    "decision.minReviewAccepted",
+    "commitment.minReviewAccepted",
+    "question.attribution",
+    "question.minReviewAccepted",
+    "fact.semanticSupport",
+    "fact.attribution",
+    "fact.minReviewAccepted",
+    "overall.semanticSupport",
+    "overall.maxDuplication",
+    "overall.minReviewAccepted"
   ]
 }

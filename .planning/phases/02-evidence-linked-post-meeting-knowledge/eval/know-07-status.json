@@ -1,7 +1,6 @@
 {
   "status": "open",
   "reasons": [
-    "quality_thresholds_undeclared",
     "representative_evaluation_pending"
   ]
 }
