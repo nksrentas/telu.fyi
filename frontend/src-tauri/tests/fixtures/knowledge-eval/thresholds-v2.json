@@ -7,47 +7,47 @@
   },
   "quality": {
     "abstention": {
-      "insufficientEvidence": null
+      "insufficientEvidence": 1.0
     },
     "decision": {
-      "claimCorrectness": null,
-      "semanticSupport": null,
-      "evidenceCoverage": null,
-      "attribution": null,
-      "maxDuplication": null,
-      "minReviewAccepted": null
+      "claimCorrectness": 0.9,
+      "semanticSupport": 0.9,
+      "evidenceCoverage": 0.5,
+      "attribution": 0.9,
+      "maxDuplication": 0.1,
+      "minReviewAccepted": 0.75
     },
     "commitment": {
-      "claimCorrectness": null,
-      "semanticSupport": null,
-      "evidenceCoverage": null,
-      "attribution": null,
-      "maxDuplication": null,
-      "minReviewAccepted": null
+      "claimCorrectness": 0.9,
+      "semanticSupport": 0.9,
+      "evidenceCoverage": 0.5,
+      "attribution": 0.9,
+      "maxDuplication": 0.1,
+      "minReviewAccepted": 0.75
     },
     "question": {
-      "claimCorrectness": null,
-      "semanticSupport": null,
-      "evidenceCoverage": null,
-      "attribution": null,
-      "maxDuplication": null,
-      "minReviewAccepted": null
+      "claimCorrectness": 0.8,
+      "semanticSupport": 0.9,
+      "evidenceCoverage": 0.5,
+      "attribution": 0.9,
+      "maxDuplication": 0.1,
+      "minReviewAccepted": 0.75
     },
     "fact": {
-      "claimCorrectness": null,
-      "semanticSupport": null,
-      "evidenceCoverage": null,
-      "attribution": null,
-      "maxDuplication": null,
-      "minReviewAccepted": null
+      "claimCorrectness": 0.9,
+      "semanticSupport": 0.9,
+      "evidenceCoverage": 0.5,
+      "attribution": 0.9,
+      "maxDuplication": 0.1,
+      "minReviewAccepted": 0.75
     },
     "overall": {
-      "claimCorrectness": null,
-      "semanticSupport": null,
-      "evidenceCoverage": null,
-      "attribution": null,
-      "maxDuplication": null,
-      "minReviewAccepted": null
+      "claimCorrectness": 0.9,
+      "semanticSupport": 0.9,
+      "evidenceCoverage": 0.5,
+      "attribution": 0.9,
+      "maxDuplication": 0.1,
+      "minReviewAccepted": 0.75
     }
   }
 }
