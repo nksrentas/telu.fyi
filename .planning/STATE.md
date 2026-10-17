@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Evidence-Linked Post-Meeting Knowledge
 status: executing
-stopped_at: Completed 02-35-PLAN.md
-last_updated: "2026-10-17T17:37:22.569Z"
+stopped_at: Completed 02-36-PLAN.md
+last_updated: "2026-10-17T17:48:43.755Z"
 last_activity: 2026-10-17
-last_activity_desc: 02-33 halted at KNOW-07 threshold precondition
-state_head: f242705651cfeebed53db4a12a282912a24d6b3f
+last_activity_desc: 02-36 declared KNOW-07 thresholds v2; 02-37 held-out evaluation next
+state_head: f8db5968e31eba05cc56cb3d55b121f092fd88da
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 56
-  completed_plans: 54
+  completed_plans: 55
   percent: 17
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 02 (Evidence-Linked Post-Meeting Knowledge) — EXECUTING
-Plan: 2 of 37
+Plan: 3 of 37
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 02 execution started
 
@@ -110,6 +110,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P32 | 3min | 1 tasks | 1 files |
 | Phase 02 P34 | 7 min | 2 tasks | 5 files |
 | Phase 02 P35 | 90min | 2 tasks | 2 files |
+| Phase 02 P36 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -198,6 +199,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-33: halted at Task 1 precondition (quality_thresholds_undeclared); user keeps 02-33 blocked per 02-32 option-keep-open; representative evaluation not run, KNOW-07 open, Phase 3 blocked
 - [Phase 02]: 02-34: evaluationKind is optional and additive (schemaVersion stays 1); status module fails closed on a missing kind and requires representative fixtures to be disjoint from eval/real-meeting-pilot-report.json
 - [Phase 02]: [02-35] Real-meeting pilot committed alone (orientation only): 3 public AMI meetings (ES2002b, ES2002c, ES2002a first 300 s), PILOT_MIN=3, gate fail on input minimums; gold from AMI abstractive summaries and review/labels by Claude at the user's request; thresholds stay undeclared, KNOW-07 open
+- [Phase 02]: 02-36: KNOW-07 thresholds v2 declared by delegation (user on 2026-10-17, values chosen by Claude from the core value and Phase 2 exit gate, not from pilot numbers): abstention 1.0; per scope semanticSupport 0.9, evidenceCoverage 0.5, attribution 0.9, maxDuplication 0.1, minReviewAccepted 0.75, claimCorrectness 0.9 (question 0.8); sha256 a0a8db80...66ae, committed alone in 27c10dc
+- [Phase 02]: 02-36: KNOW-07 still open with only representative_evaluation_pending; thresholds-v2.json must not change once 02-37 scores a representative report against it
 
 ### Pending Todos
 
@@ -210,7 +213,7 @@ None yet.
 - [Phase 1]: Canonical meeting identity, idempotent incremental final-transcript persistence, and privacy/provider boundaries must pass before downstream features depend on them.
 - [Phase 3]: Sensitive document ingestion waits for a passing replace/delete propagation canary.
 - [Phase 6]: Supported-platform scope and numeric release thresholds remain intentionally undeclared until baseline and user-evaluation evidence exists.
-- [Phase 2 → Phase 3]: 02-33 halted (status: halted) until the user declares all 31 KNOW-07 quality thresholds in their own commit and re-runs 02-33; scored meetings need their first knowledge run on a build containing 02-29 (42866bb). KNOW-07 open: quality_thresholds_undeclared, representative_evaluation_pending.
+- [Phase 2 → Phase 3]: KNOW-07 thresholds declared in 27c10dc (02-36); Phase 3 stays blocked until the held-out representative evaluation (02-37, supersedes the halted 02-33) passes against them. Scored meetings need their first knowledge run on a build containing 02-29 (42866bb) and must exclude the 02-35 pilot meetings. KNOW-07 open: representative_evaluation_pending.
 
 ### Quick Tasks Completed
 
@@ -235,6 +238,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-10-17T17:37:22.505Z
-Stopped at: Completed 02-35-PLAN.md
+Last session: 2026-10-17T17:48:43.692Z
+Stopped at: Completed 02-36-PLAN.md
 Resume file: None
