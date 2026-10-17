@@ -341,7 +341,8 @@ async fn run_import<R: Runtime>(
 
     // Create meeting folder
     let base_folder = get_default_recordings_folder();
-    let meeting_folder = create_meeting_folder(&base_folder, &title, false)?;
+    let meeting_id = Uuid::new_v4().to_string();
+    let meeting_folder = create_meeting_folder(&base_folder, &meeting_id, false)?;
 
     // Copy audio file to meeting folder
     emit_progress(&app, "copying", 10, "Copying audio file...");
@@ -638,8 +639,9 @@ async fn run_import<R: Runtime>(
         .try_state::<AppState>()
         .ok_or_else(|| anyhow!("App state not available"))?;
 
-    let meeting_id = create_meeting_with_transcripts(
+    create_meeting_with_transcripts(
         app_state.db_manager.pool(),
+        &meeting_id,
         &title,
         &segments,
         meeting_folder.to_string_lossy().to_string(),
@@ -690,11 +692,11 @@ fn emit_progress<R: Runtime>(app: &AppHandle<R>, stage: &str, progress: u32, mes
 /// Create a new meeting with transcripts in the database
 async fn create_meeting_with_transcripts(
     pool: &sqlx::SqlitePool,
+    meeting_id: &str,
     title: &str,
     segments: &[TranscriptSegment],
     folder_path: String,
-) -> Result<String> {
-    let meeting_id = format!("meeting-{}", Uuid::new_v4());
+) -> Result<()> {
     let now = chrono::Utc::now();
 
     // Start transaction
@@ -703,19 +705,45 @@ async fn create_meeting_with_transcripts(
         .await
         .map_err(|e| anyhow!("Failed to start transaction: {}", e))?;
 
-    // Insert meeting
     sqlx::query(
-        "INSERT INTO meetings (id, title, created_at, updated_at, folder_path)
-         VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO meetings (
+            id, title, created_at, updated_at, folder_path,
+            lifecycle, completeness, completeness_reason, started_at_utc
+         ) VALUES (?, ?, ?, ?, ?, 'complete', 'complete', NULL, ?)",
     )
-    .bind(&meeting_id)
+    .bind(meeting_id)
     .bind(title)
     .bind(now)
     .bind(now)
     .bind(&folder_path)
+    .bind(now.to_rfc3339())
     .execute(&mut *tx)
     .await
     .map_err(|e| anyhow!("Failed to create meeting: {}", e))?;
+
+    let spoken = segments.iter().filter(|segment| !segment.text.trim().is_empty());
+    for (sequence, segment) in spoken.enumerate() {
+        let start = segment.audio_start_time.unwrap_or(0.0).max(0.0);
+        sqlx::query(
+            "INSERT INTO transcript_evidence (
+                evidence_id, meeting_id, source_track, source_segment_key, sequence,
+                transcript, audio_start_time, audio_end_time, is_final,
+                capture_completeness, created_at, updated_at
+             ) VALUES (?, ?, 'mixed', ?, ?, ?, ?, ?, 1, 'complete', ?, ?)",
+        )
+        .bind(Uuid::new_v4().to_string())
+        .bind(meeting_id)
+        .bind(&segment.id)
+        .bind(sequence as i64)
+        .bind(&segment.text)
+        .bind(start)
+        .bind(segment.audio_end_time.unwrap_or(start).max(start))
+        .bind(now)
+        .bind(now)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| anyhow!("Failed to insert transcript evidence: {}", e))?;
+    }
 
     // Insert transcripts
     for segment in segments {
@@ -724,7 +752,7 @@ async fn create_meeting_with_transcripts(
              VALUES (?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(&segment.id)
-        .bind(&meeting_id)
+        .bind(meeting_id)
         .bind(&segment.text)
         .bind(&segment.timestamp)
         .bind(segment.audio_start_time)
@@ -745,7 +773,7 @@ async fn create_meeting_with_transcripts(
         segments.len()
     );
 
-    Ok(meeting_id)
+    Ok(())
 }
 
 /// Get or initialize the Whisper engine
@@ -1008,6 +1036,39 @@ pub async fn is_import_in_progress_command() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn imported_meeting_is_canonical_complete_and_cites_spoken_segments() {
+        let pool = sqlx::sqlite::SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect("sqlite::memory:")
+            .await
+            .expect("in-memory SQLite pool");
+        sqlx::migrate!("./migrations").run(&pool).await.expect("fresh migration set");
+        let meeting_id = Uuid::new_v4().to_string();
+        let segments = create_transcript_segments(&[
+            ("We will use regular batteries.".to_string(), 0.0, 2000.0),
+            ("   ".to_string(), 2000.0, 2500.0),
+        ]);
+
+        create_meeting_with_transcripts(&pool, &meeting_id, "ES2002b", &segments, "/tmp/es2002b".to_string())
+            .await
+            .expect("imported meeting");
+
+        let (lifecycle, completeness): (String, String) =
+            sqlx::query_as("SELECT lifecycle, completeness FROM meetings WHERE id = ?")
+                .bind(&meeting_id)
+                .fetch_one(&pool)
+                .await
+                .expect("meeting row");
+        assert_eq!((lifecycle.as_str(), completeness.as_str()), ("complete", "complete"));
+        let evidence: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM transcript_evidence WHERE meeting_id = ?")
+            .bind(&meeting_id)
+            .fetch_one(&pool)
+            .await
+            .expect("evidence count");
+        assert_eq!(evidence, 1);
+    }
 
     #[test]
     fn test_audio_extensions() {
