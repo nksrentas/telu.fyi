@@ -155,9 +155,13 @@ mod tests {
     }
 
     #[test]
-    fn window_budget_reserves_output_tokens_and_keeps_a_floor() {
-        assert_eq!(window_budget(32468), 30468);
-        assert_eq!(window_budget(1200), 500);
+    fn window_budget_caps_at_the_extraction_window_maximum() {
+        assert_eq!(window_budget(32468), MAX_WINDOW_TOKENS);
+        assert_eq!(
+            window_budget(MAX_WINDOW_TOKENS + RESERVED_OUTPUT_TOKENS - 100),
+            MAX_WINDOW_TOKENS - 100
+        );
+        assert_eq!(window_budget(1200), MIN_WINDOW_TOKENS);
     }
 
     #[test]

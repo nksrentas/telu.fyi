@@ -486,6 +486,21 @@ mod tests {
     }
 
     #[test]
+    fn verify_attribute_states_group_role_and_relative_due_values_from_a_claim_segment() {
+        let text = "each of you will send the specs to the project manager by the next meeting";
+        let claim = LabeledSegments::new(vec![segment("S1", text, false)]);
+        let stated = |value: &str| match verify_attribute(value, "S1", text, &claim, &ids(&["S1"])) {
+            AttributeSupport::Stated { text, .. } => Some(text),
+            AttributeSupport::NotStated => None,
+        };
+
+        assert_eq!(stated("each of you").as_deref(), Some("each of you"));
+        assert_eq!(stated("the project manager").as_deref(), Some("the project manager"));
+        assert_eq!(stated("by the next meeting").as_deref(), Some("by the next meeting"));
+        assert_eq!(stated("you"), None);
+    }
+
+    #[test]
     fn verify_claim_quote_rejects_quotes_that_start_or_end_mid_word() {
         let later = "They disagree with the plan to ship, we agree with the plan to ship";
         let claims = LabeledSegments::new(vec![
