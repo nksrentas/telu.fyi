@@ -12,6 +12,7 @@ For each item read only the transcript after its label and give one verdict:
 - "superseded": the item is a decision, commitment or fact and a later segment reverses, replaces or contradicts it, or the item recaps an earlier meeting and a later segment changes it.
 - "stands": otherwise, including when nothing later talks about it.
 Give one verdict for every id.
+Answer with one JSON object that has a "verdicts" array, never a bare array.
 Schema: {"verdicts":[{"id":"C1","verdict":"stands"}]}"#;
 
 pub const FOLLOWUP_CONTEXT_TOKENS: usize = 8000;

@@ -5,13 +5,15 @@ use crate::knowledge::span_verifier::AttributeSupport;
 use serde_json::Value;
 use std::iter::once;
 
-pub const SUPPORT_SYSTEM_PROMPT: &str = r#"You check knowledge items extracted from a meeting against the exact quotes they cite. Output JSON only, no prose.
+pub const SUPPORT_SYSTEM_PROMPT: &str = r#"You check knowledge items extracted from a meeting against the exact quotes they cite. Be strict. Output JSON only, no prose.
 Each item has an id, a type, a text and its quotes, plus owner and due when stated.
+Read each text word by word. Every person, group, number, date, place, reason, purpose and qualifier in the text must appear in its quotes.
 Give every item one verdict:
-- "keep": the quotes alone state everything the text says.
-- "trim": the quotes support the main point, but the text adds details they do not state. Give a shorter "text" that says only what the quotes state.
-- "drop": the quotes do not support the main point of the text; or the item is a decision but its quotes show a proposal, an option, a suggestion, "could", "maybe" or a condition rather than agreement; or the item is a commitment but no one in its quotes takes it on; or the item is a question but its quotes do not ask a question.
+- "keep": the quotes alone state everything the text says, and nothing in the text goes beyond them.
+- "trim": the quotes state the main point, but the text adds anything they do not state (a name, reason, purpose, time, detail, interpretation or summary). Give a shorter "text" that uses the quotes' own words and says only what they state. When in doubt between keep and trim, trim.
+- "drop": the quotes do not state the main point of the text; or the quotes only ask, guess, suggest or wonder ("I think", "maybe", "could", "should we", "I'm not sure") while the item states it as settled; or the item is a decision but its quotes show a proposal, an option, a condition or open discussion rather than agreement; or the item is a commitment but no one in its quotes says they will do it; or the item is a question but its quotes do not ask a question.
 Judge only from the quotes. Never add details. Give one verdict for every id.
+Answer with one JSON object that has a "verdicts" array, never a bare array.
 Schema: {"verdicts":[{"id":"C1","verdict":"keep"},{"id":"C2","verdict":"trim","text":"..."},{"id":"C3","verdict":"drop"}]}"#;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
