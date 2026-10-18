@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Evidence-Linked Post-Meeting Knowledge
 status: verifying
-stopped_at: Completed 02-39-PLAN.md
-last_updated: "2026-10-18T13:08:00.923Z"
+stopped_at: Completed 02-41-PLAN.md
+last_updated: "2026-10-18T17:19:13.874Z"
 last_activity: 2026-10-17
 last_activity_desc: 02-37 held-out KNOW-07 evaluation committed (gate fail, KNOW-07 open)
-state_head: 4f0be94185c7f6cae82ea8455d81c256cb76f01a
+state_head: 092f1f5659285534cdaff1c13f3a13b58bb66aad
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 62
-  completed_plans: 59
+  completed_plans: 60
   percent: 17
 ---
 
@@ -114,6 +114,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P38 | 54min | 3 tasks | 11 files |
 | Phase 02 P40 | 4h35min | 3 tasks | 8 files |
 | Phase 02 P39 | 25min | 3 tasks | 1 files |
+| Phase 02 P41 | 5h40min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,9 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-40: identical-config run-to-run variance on qwen3.5:4b is 0.055 overall evidenceCoverage; single 10-fixture runs cannot resolve 0.02 effects
 - [Phase 02]: 02-39: new KNOW-07 held-out set approved by the user ("approved", 2026-10-18T12:58:16Z) and prepared in $HOME/telu-know07-audio2 outside the repository: ES2005b, ES2006c, ES2007c, IS1000b, IS1001c, TS3004c representative; ES2009a first 300 s insufficient_evidence; TS3005b silenced at 300-345/780-870/1320-1380/1800-1890 s degraded_capture; spares unused
 - [Phase 02]: 02-39: degraded-capture silence applied per sample (ffmpeg aeval); volume enable= leaks frame-edge samples
+- [Phase 02]: 02-41: per-window support check (keep/trim/drop against verified quotes) and follow-up check (answered questions, superseded items); checks only narrow or drop, unusable verdicts keep the candidate
+- [Phase 02]: 02-41: final labeled v6 (02-41-3) gate fail 16: overall claimCorrectness 75/90, semanticSupport 60/90, evidenceCoverage 24/127, review accepted+corrected 75/90; precision up, coverage down vs 02-40-4
+- [Phase 02]: 02-41: qwen3.5:4b returned bare verdict arrays; explicit one-JSON-object wording took follow-up unparsed from 47 to 0
 
 ### Pending Todos
 
@@ -248,6 +252,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-10-18T13:08:00.816Z
-Stopped at: Completed 02-39-PLAN.md
+Last session: 2026-10-18T17:19:13.810Z
+Stopped at: Completed 02-41-PLAN.md
 Resume file: None
