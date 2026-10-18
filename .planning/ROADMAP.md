@@ -144,7 +144,7 @@ Plans:
 **Verification approach:** Use representative held-out transcripts plus insufficient-evidence and degraded-capture cases; test exact evidence navigation and semantic support separately; exercise accept, reject, correct, restore, regenerate, delete, and retry scenarios; audit append-only lineage and future-context eligibility.
 **Exit gate:** Phase 3 may proceed only when item correctness, exact evidence-span support, abstention behavior, correction lineage, regeneration safety, and deletion effects meet the predeclared representative-review thresholds. If provenance or user actions do not deterministically control future eligibility, stop before preparation, live assistance, or series memory can amplify the defect.
 **Principal risks / stop conditions:** Fluent unsupported claims, reconstructed citations, destructive correction, rejected-item resurrection, incomplete evidence, mutable summary blobs, or one score conflating claim correctness with citation support. Stop when evidence lineage is ambiguous or review actions fail to propagate.
-**Plans:** 37/37 plans executed
+**Plans:** 37/43 plans executed
 Plans:
 **Wave 1**
 
@@ -226,6 +226,29 @@ Plans:
 - [x] 02-35-PLAN.md — KNOW-07: user runs the real-meeting pilot (orientation only) against the undeclared thresholds; commit the content-free pilot report alone. *(blocked on 02-34)*
 - [x] 02-36-PLAN.md — KNOW-07: user declares the quality thresholds after the pilot (decision checkpoint), committed alone before scoring. *(blocked on 02-35)*
 - [x] 02-37-PLAN.md — KNOW-07: user runs the held-out representative evaluation; commit the content-free report and the derived status. Supersedes the halted 02-33. *(blocked on 02-36)*
+
+**Gap closure, round 3** *(re-verification fb231a1: KNOW-07 open with representative_gate_not_pass; improve extraction on the spent meetings as a development set, pass a development gate, then evaluate on a new held-out set; thresholds-v2 unchanged)*
+
+**Gap wave 8**
+
+- [ ] 02-38-PLAN.md — KNOW-07: tracer — `telu-knowledge-eval live` runs the production extraction headless on the local qwen3.5:4b and replays exactly; development reports from a blind review plan; calibrated baseline on the 10 spent meetings.
+- [ ] 02-39-PLAN.md — KNOW-07: acquire the new held-out AMI set (6 representative, 1 insufficient-evidence, 1 degraded-capture) after one batched download approval; nothing imported.
+
+**Gap wave 9** *(blocked on 02-38)*
+
+- [ ] 02-40-PLAN.md — KNOW-07: extraction v3 — stricter prompt rules, capped windows and a missed-items pass, chosen and measured on the development set.
+
+**Gap wave 10** *(blocked on 02-40)*
+
+- [ ] 02-41-PLAN.md — KNOW-07: support check (keep, trim or drop against the quotes) and follow-up check (answered or superseded later), measured with blind labels.
+
+**Gap wave 11** *(blocked on 02-41)*
+
+- [ ] 02-42-PLAN.md — KNOW-07: commit the development gate report; stop at a user decision if it does not pass.
+
+**Gap wave 12** *(blocked on 02-39 and 02-42)*
+
+- [ ] 02-43-PLAN.md — KNOW-07: harden the status against spent meetings and a recomputed gate; run the second held-out evaluation through the app; commit the report and the derived status.
 
 **UI hint:** yes
 
