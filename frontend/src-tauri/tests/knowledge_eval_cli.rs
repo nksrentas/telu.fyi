@@ -443,3 +443,107 @@ async fn score_with_db_counts_review_outcomes_only_for_the_scored_meetings() {
     assert!(!refused.status.success());
     assert!(stderr_of(&refused).contains("INVALID_MEETING_ID"));
 }
+
+#[test]
+fn live_rejects_an_unknown_builtin_model() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let out = temp.path().join("live");
+
+    let output = run(&[
+        "live",
+        "--gold-dir",
+        gold_dir().to_str().unwrap(),
+        "--app-data-dir",
+        temp.path().to_str().unwrap(),
+        "--model",
+        "not-a-model:1b",
+        "--out",
+        out.to_str().unwrap(),
+    ]);
+
+    assert!(!output.status.success(), "live accepted an unknown model");
+    assert!(stderr_of(&output).contains("{\"error\":\"LIVE_MODEL_UNKNOWN\"}"), "stderr: {}", stderr_of(&output));
+    assert!(!out.exists());
+}
+
+fn review_plan_for(predictions: &Path, path: &Path) -> Vec<(String, String)> {
+    let parsed: Value = serde_json::from_str(&text(predictions)).expect("predictions json");
+    let decided: Vec<(String, String, String)> = parsed["fixtures"]
+        .as_array()
+        .expect("fixtures")
+        .iter()
+        .flat_map(|fixture| fixture["items"].as_array().cloned().unwrap_or_default())
+        .enumerate()
+        .map(|(index, item)| {
+            let action = if index == 0 { "reject" } else { "accept" };
+            (item["predId"].as_str().unwrap().to_string(), item["type"].as_str().unwrap().to_string(), action.to_string())
+        })
+        .collect();
+    let plan: serde_json::Map<String, Value> = decided
+        .iter()
+        .map(|(pred_id, _, action)| (pred_id.clone(), serde_json::json!({ "action": action, "text": "", "owner": null, "due": null })))
+        .collect();
+    fs::write(path, Value::Object(plan).to_string()).expect("review plan");
+    decided.into_iter().map(|(_, item_type, action)| (item_type, action)).collect()
+}
+
+fn score_with_plan(predictions: &Path, plan: &Path, out: &Path, kind_args: &[&str]) -> Output {
+    let gold = gold_dir();
+    let labels = fixtures().join("labels-sample.json");
+    let thresholds = fixtures().join("thresholds-v2.json");
+    let base = [
+        "score",
+        "--gold-dir",
+        gold.to_str().unwrap(),
+        "--predictions",
+        predictions.to_str().unwrap(),
+        "--labels",
+        labels.to_str().unwrap(),
+        "--review-plan",
+        plan.to_str().unwrap(),
+        "--thresholds",
+        thresholds.to_str().unwrap(),
+        "--out",
+        out.to_str().unwrap(),
+    ];
+    run(&[&base[..], kind_args].concat())
+}
+
+#[test]
+fn score_with_a_review_plan_reports_development_review_outcomes() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let predictions = replay_predictions(&temp.path().join("run"));
+    let plan = temp.path().join("plan.json");
+    let decided = review_plan_for(&predictions, &plan);
+    let out = temp.path().join("score");
+
+    let output = score_with_plan(&predictions, &plan, &out, &["--kind", "development"]);
+
+    assert!(output.status.success(), "score failed: {}", stderr_of(&output));
+    let report = report_at(&out);
+    assert_eq!(report["evaluationKind"], "development");
+    for (item_type, _) in &decided {
+        let count = |action: &str| decided.iter().filter(|(kind, done)| kind == item_type && done == action).count() as u64;
+        let rates = &report["reviewOutcomes"][item_type.as_str()];
+        assert_eq!(rates["accepted"]["numerator"], count("accept"), "{item_type} accepted");
+        assert_eq!(rates["rejected"]["numerator"], count("reject"), "{item_type} rejected");
+        assert_eq!(rates["pending"]["numerator"], 0, "{item_type} pending");
+    }
+}
+
+#[test]
+fn score_refuses_a_review_plan_without_the_development_kind() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let predictions = replay_predictions(&temp.path().join("run"));
+    let plan = temp.path().join("plan.json");
+    review_plan_for(&predictions, &plan);
+
+    for (name, kind_args) in [("representative", vec!["--kind", "representative"]), ("unlabeled", Vec::new())] {
+        let out = temp.path().join(name);
+        let output = score_with_plan(&predictions, &plan, &out, &kind_args);
+
+        assert!(!output.status.success(), "score accepted a review plan for {name}");
+        assert!(stderr_of(&output).contains("{\"error\":\"REVIEW_PLAN_NOT_ALLOWED\"}"), "{name}: {}", stderr_of(&output));
+        assert!(!out.join("report.json").exists());
+    }
+}

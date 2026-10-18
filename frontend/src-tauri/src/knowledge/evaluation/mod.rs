@@ -1,4 +1,6 @@
+pub mod live;
 pub mod replay;
+pub mod review_plan;
 
 use crate::knowledge::models::KnowledgeType;
 use serde::{Deserialize, Serialize};
