@@ -149,6 +149,12 @@ mod tests {
     }
 
     #[test]
+    fn window_budget_reserves_output_tokens_and_keeps_a_floor() {
+        assert_eq!(window_budget(32468), 30468);
+        assert_eq!(window_budget(1200), 500);
+    }
+
+    #[test]
     fn chunk_windows_keep_a_single_small_meeting_in_one_window() {
         let windows = chunk_windows(&segments(&["only segment"]), 1000);
 
