@@ -1,4 +1,6 @@
+use app_lib::knowledge::evaluation::live::{run_live, LiveError, LiveOutput, LiveRunMeta, LiveSettings};
 use app_lib::knowledge::evaluation::replay::{export_from_db, review_outcomes, run_replay, ReplayError, REPLAY_BUDGET_TOKENS};
+use app_lib::knowledge::evaluation::review_plan::{plan_review_outcomes, ReviewPlan};
 use app_lib::knowledge::evaluation::{
     score, EvaluationKind, EvaluationReport, GoldFixture, LabelSet, PredictionSet, ReportEnvelope, ReviewOutcomeRates,
     ScoreInput, Thresholds,
@@ -15,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 
 const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024;
+const KNOWLEDGE_SOURCES: &str = "src/knowledge";
 
 #[derive(Debug, Parser)]
 #[command(name = "telu-knowledge-eval")]
@@ -43,12 +46,26 @@ enum Command {
         commit: Option<String>,
         #[arg(long, value_parser = parse_kind)]
         kind: Option<EvaluationKind>,
+        #[arg(long, conflicts_with = "db")]
+        review_plan: Option<PathBuf>,
     },
     Run {
         #[arg(long)]
         gold_dir: PathBuf,
         #[arg(long)]
         replay_completions: PathBuf,
+        #[arg(long, default_value_t = REPLAY_BUDGET_TOKENS, value_parser = parse_budget)]
+        budget_tokens: usize,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    Live {
+        #[arg(long)]
+        gold_dir: PathBuf,
+        #[arg(long)]
+        app_data_dir: PathBuf,
+        #[arg(long)]
+        model: String,
         #[arg(long)]
         out: PathBuf,
     },
@@ -72,7 +89,10 @@ enum EvalError {
     ThresholdsInvalid,
     FixtureInvalid,
     NoFixtures,
+    ReviewPlanNotAllowed,
+    ReviewPlanInvalid,
     Replay(ReplayError),
+    Live(LiveError),
 }
 
 impl EvalError {
@@ -86,7 +106,10 @@ impl EvalError {
             Self::ThresholdsInvalid => "THRESHOLDS_INVALID",
             Self::FixtureInvalid => "FIXTURE_INVALID",
             Self::NoFixtures => "NO_FIXTURES",
+            Self::ReviewPlanNotAllowed => "REVIEW_PLAN_NOT_ALLOWED",
+            Self::ReviewPlanInvalid => "REVIEW_PLAN_INVALID",
             Self::Replay(error) => error.code(),
+            Self::Live(error) => error.code(),
         }
     }
 }
@@ -104,16 +127,23 @@ fn main() {
 
 async fn execute(command: Command) -> Result<(), EvalError> {
     match command {
-        Command::Score { gold_dir, predictions, labels, thresholds, out, db, commit, kind } => {
+        Command::Score { gold_dir, predictions, labels, thresholds, out, db, commit, kind, review_plan } => {
             let files = ScoreFiles {
                 gold_dir: &gold_dir,
                 predictions: &predictions,
                 labels: &labels,
                 thresholds: &thresholds,
+                review_plan: review_plan.as_deref(),
             };
             score_command(&files, &out, db.as_deref(), commit, kind).await
         }
-        Command::Run { gold_dir, replay_completions, out } => run_command(&gold_dir, &replay_completions, &out).await,
+        Command::Run { gold_dir, replay_completions, budget_tokens, out } => {
+            run_command(&gold_dir, &replay_completions, budget_tokens, &out).await
+        }
+        Command::Live { gold_dir, app_data_dir, model, out } => {
+            let settings = LiveSettings { app_data_dir, model_name: model };
+            live_command(&gold_dir, &settings, &out).await
+        }
         Command::Export { db, meetings, out } => export_command(&db, &meetings, &out).await,
     }
 }
@@ -123,11 +153,21 @@ struct ScoreFiles<'a> {
     predictions: &'a Path,
     labels: &'a Path,
     thresholds: &'a Path,
+    review_plan: Option<&'a Path>,
 }
 
 fn parse_kind(value: &str) -> Result<EvaluationKind, String> {
-    serde_json::from_value(Value::String(value.to_string()))
-        .map_err(|_| format!("unknown kind '{value}': expected synthetic, real_meeting_pilot or representative"))
+    serde_json::from_value(Value::String(value.to_string())).map_err(|_| {
+        format!("unknown kind '{value}': expected synthetic, real_meeting_pilot, representative or development")
+    })
+}
+
+fn parse_budget(value: &str) -> Result<usize, String> {
+    value
+        .parse::<usize>()
+        .ok()
+        .filter(|budget| *budget >= 1)
+        .ok_or_else(|| format!("invalid budget '{value}': expected a whole number of at least 1"))
 }
 
 async fn score_command(
@@ -137,14 +177,18 @@ async fn score_command(
     commit: Option<String>,
     kind: Option<EvaluationKind>,
 ) -> Result<(), EvalError> {
+    if files.review_plan.is_some() && kind != Some(EvaluationKind::Development) {
+        return Err(EvalError::ReviewPlanNotAllowed);
+    }
     let fixtures = load_fixtures(files.gold_dir)?;
     let predictions: PredictionSet = read_json(files.predictions)?;
     let labels: LabelSet = read_json(files.labels)?;
     let threshold_bytes = read_bounded(files.thresholds)?;
     let limits = parse_thresholds(&threshold_bytes)?;
-    let review = match db {
-        Some(path) => Some(scored_review_outcomes(path, &fixtures).await?),
-        None => None,
+    let review = match (db, files.review_plan) {
+        (Some(path), _) => Some(scored_review_outcomes(path, &fixtures).await?),
+        (None, Some(path)) => Some(planned_review_outcomes(path, &fixtures, &predictions)?),
+        (None, None) => None,
     };
     let envelope = ReportEnvelope {
         generated_at_utc: Utc::now().to_rfc3339(),
@@ -172,10 +216,20 @@ async fn scored_review_outcomes(
     review_outcomes(&safe_input(db)?, &meeting_ids).await.map_err(EvalError::Replay)
 }
 
-async fn run_command(gold_dir: &Path, replay_completions: &Path, out: &Path) -> Result<(), EvalError> {
+fn planned_review_outcomes(
+    plan: &Path,
+    fixtures: &[GoldFixture],
+    predictions: &PredictionSet,
+) -> Result<BTreeMap<String, ReviewOutcomeRates>, EvalError> {
+    let plan: ReviewPlan = read_json(plan)?;
+    let fixture_ids: Vec<String> = fixtures.iter().map(|fixture| fixture.fixture_id.clone()).collect();
+    plan_review_outcomes(&fixture_ids, predictions, &plan).map_err(|_| EvalError::ReviewPlanInvalid)
+}
+
+async fn run_command(gold_dir: &Path, replay_completions: &Path, budget_tokens: usize, out: &Path) -> Result<(), EvalError> {
     let fixtures = load_fixtures(gold_dir)?;
     let completions: HashMap<String, Vec<String>> = read_json(replay_completions)?;
-    let predictions = run_replay(&fixtures, &completions, REPLAY_BUDGET_TOKENS).await.map_err(EvalError::Replay)?;
+    let predictions = run_replay(&fixtures, &completions, budget_tokens).await.map_err(EvalError::Replay)?;
     write_json(out, "predictions.json", &predictions)?;
     print_summary(json!({
         "fixtures": predictions.fixtures.len(),
@@ -183,6 +237,79 @@ async fn run_command(gold_dir: &Path, replay_completions: &Path, out: &Path) -> 
         "resurrection": predictions.resurrection_count,
     }));
     Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LiveRunRecord<'a> {
+    #[serde(flatten)]
+    meta: &'a LiveRunMeta,
+    git_commit: &'a str,
+    knowledge_tree_clean: bool,
+    knowledge_diff_sha256: &'a str,
+}
+
+struct KnowledgeProvenance {
+    git_commit: String,
+    tree_clean: bool,
+    diff_sha256: String,
+}
+
+impl KnowledgeProvenance {
+    fn current() -> Self {
+        let status = knowledge_git(&["status", "--porcelain", "--", KNOWLEDGE_SOURCES]);
+        let diff = knowledge_git(&["diff", "HEAD", "--", KNOWLEDGE_SOURCES]).unwrap_or_default();
+        Self {
+            git_commit: git_commit(),
+            tree_clean: status.is_some_and(|output| output.is_empty()),
+            diff_sha256: format!("{:x}", Sha256::digest(&diff)),
+        }
+    }
+}
+
+async fn live_command(gold_dir: &Path, settings: &LiveSettings, out: &Path) -> Result<(), EvalError> {
+    let fixtures = load_fixtures(gold_dir)?;
+    let provenance = KnowledgeProvenance::current();
+    let mut write_failure = None;
+    let output = run_live(&fixtures, settings, |output: &LiveOutput| {
+        if write_failure.is_none() {
+            write_failure = write_live(out, output, &provenance).err();
+        }
+    })
+    .await
+    .map_err(EvalError::Live)?;
+    if let Some(error) = write_failure {
+        return Err(error);
+    }
+    print_summary(json!({
+        "fixtures": output.meta.fixtures.len(),
+        "completions": output.meta.fixtures.iter().map(|fixture| fixture.completions).sum::<usize>(),
+        "items": output.meta.fixtures.iter().map(|fixture| fixture.items).sum::<usize>(),
+        "budgetTokens": output.meta.budget_tokens,
+    }));
+    Ok(())
+}
+
+fn write_live(out: &Path, output: &LiveOutput, provenance: &KnowledgeProvenance) -> Result<(), EvalError> {
+    let record = LiveRunRecord {
+        meta: &output.meta,
+        git_commit: &provenance.git_commit,
+        knowledge_tree_clean: provenance.tree_clean,
+        knowledge_diff_sha256: &provenance.diff_sha256,
+    };
+    write_json(out, "predictions.json", &output.predictions)?;
+    write_json(out, "completions.json", &output.completions)?;
+    write_json(out, "live-run.json", &record)
+}
+
+fn knowledge_git(args: &[&str]) -> Option<Vec<u8>> {
+    Process::new("git")
+        .args(args)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| output.stdout)
 }
 
 async fn export_command(db: &Path, meetings: &[String], out: &Path) -> Result<(), EvalError> {

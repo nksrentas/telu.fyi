@@ -1,3 +1,65 @@
+use super::{ratio, PredictionSet, ReviewOutcomeRates};
+use serde::Deserialize;
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewDecision {
+    Accept,
+    Correct,
+    Reject,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct PlannedReview {
+    pub action: ReviewDecision,
+}
+
+pub type ReviewPlan = HashMap<String, PlannedReview>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReviewPlanError {
+    UnknownPrediction,
+}
+
+pub fn plan_review_outcomes(
+    fixture_ids: &[String],
+    predictions: &PredictionSet,
+    plan: &ReviewPlan,
+) -> Result<BTreeMap<String, ReviewOutcomeRates>, ReviewPlanError> {
+    let scored: HashSet<&str> = fixture_ids.iter().map(String::as_str).collect();
+    let items: Vec<_> = predictions
+        .fixtures
+        .iter()
+        .filter(|fixture| scored.contains(fixture.fixture_id.as_str()))
+        .flat_map(|fixture| fixture.items.iter())
+        .collect();
+    let known: HashSet<&str> = items.iter().map(|item| item.pred_id.as_str()).collect();
+    if plan.keys().any(|pred_id| !known.contains(pred_id.as_str())) {
+        return Err(ReviewPlanError::UnknownPrediction);
+    }
+    let mut by_type: BTreeMap<String, Vec<Option<ReviewDecision>>> = BTreeMap::new();
+    for item in items {
+        let decision = plan.get(&item.pred_id).map(|review| review.action);
+        by_type.entry(item.item_type.as_str().to_string()).or_default().push(decision);
+    }
+    Ok(by_type
+        .into_iter()
+        .map(|(item_type, decisions)| (item_type, rates(&decisions)))
+        .collect())
+}
+
+fn rates(decisions: &[Option<ReviewDecision>]) -> ReviewOutcomeRates {
+    let total = decisions.len() as u64;
+    let count = |wanted: Option<ReviewDecision>| decisions.iter().filter(|decision| **decision == wanted).count() as u64;
+    ReviewOutcomeRates {
+        accepted: ratio(count(Some(ReviewDecision::Accept)), total),
+        corrected: ratio(count(Some(ReviewDecision::Correct)), total),
+        rejected: ratio(count(Some(ReviewDecision::Reject)), total),
+        pending: ratio(count(None), total),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

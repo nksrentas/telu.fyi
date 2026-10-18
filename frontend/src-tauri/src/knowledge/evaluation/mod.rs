@@ -272,6 +272,7 @@ pub enum EvaluationKind {
     Synthetic,
     RealMeetingPilot,
     Representative,
+    Development,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
