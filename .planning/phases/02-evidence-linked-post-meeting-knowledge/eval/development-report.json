@@ -1,0 +1,433 @@
+{
+  "schemaVersion": 1,
+  "evaluationKind": "development",
+  "generatedAtUtc": "2026-10-18T17:16:45.554738+00:00",
+  "promptVersion": "knowledge-extract-v6",
+  "thresholdsSha256": "a0a8db8068e93d271220bc60872f956981c1f129cf02c5f1613d35471a6566ae",
+  "gitCommit": "092f1f5659285534cdaff1c13f3a13b58bb66aad",
+  "fixtures": [
+    "0b045933-bd7f-4ae0-8fb0-695567e1ca39",
+    "6cbc0bfb-b8ef-4654-938a-d380595aa339",
+    "80c35127-dcaf-4b3d-a2ba-03dcbfa9c8a8",
+    "858f467a-f441-42b4-9d0e-88a32338b669",
+    "a5f25562-67c7-436b-a00d-73267b6c1aa5",
+    "b6785f83-58bd-4294-85a1-7f4f0eec0eba",
+    "da46d11c-d95f-43ea-af79-c56926a431bf",
+    "deae606d-af46-400b-a7f0-423cbaadcf24",
+    "f864c6d5-b2d5-4b40-8872-10d823a9ac75",
+    "f91d9838-577f-4555-928c-833d892e6fbf"
+  ],
+  "metrics": [
+    {
+      "scope": "decision",
+      "claimCorrectness": {
+        "value": 0.8571428571428571,
+        "status": "measured",
+        "numerator": 12,
+        "denominator": 14
+      },
+      "semanticSupport": {
+        "value": 0.6428571428571429,
+        "status": "measured",
+        "numerator": 9,
+        "denominator": 14
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 14,
+        "denominator": 14
+      },
+      "rawGrounding": {
+        "value": 0.9333333333333333,
+        "status": "measured",
+        "numerator": 14,
+        "denominator": 15
+      },
+      "evidenceCoverage": {
+        "value": 0.18867924528301888,
+        "status": "measured",
+        "numerator": 10,
+        "denominator": 53
+      },
+      "attribution": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 28,
+        "denominator": 28
+      },
+      "duplication": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 14
+      }
+    },
+    {
+      "scope": "commitment",
+      "claimCorrectness": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 3,
+        "denominator": 3
+      },
+      "semanticSupport": {
+        "value": 0.3333333333333333,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 3
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 3,
+        "denominator": 3
+      },
+      "rawGrounding": {
+        "value": 0.3333333333333333,
+        "status": "measured",
+        "numerator": 3,
+        "denominator": 9
+      },
+      "evidenceCoverage": {
+        "value": 0.2727272727272727,
+        "status": "measured",
+        "numerator": 6,
+        "denominator": 22
+      },
+      "attribution": {
+        "value": 0.5,
+        "status": "measured",
+        "numerator": 3,
+        "denominator": 6
+      },
+      "duplication": {
+        "value": 0.3333333333333333,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 3
+      }
+    },
+    {
+      "scope": "question",
+      "claimCorrectness": {
+        "value": 0.2,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 10
+      },
+      "semanticSupport": {
+        "value": 0.8,
+        "status": "measured",
+        "numerator": 8,
+        "denominator": 10
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 10,
+        "denominator": 10
+      },
+      "rawGrounding": {
+        "value": 0.625,
+        "status": "measured",
+        "numerator": 10,
+        "denominator": 16
+      },
+      "evidenceCoverage": {
+        "value": 0.16666666666666666,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 6
+      },
+      "attribution": {
+        "value": 0.9,
+        "status": "measured",
+        "numerator": 18,
+        "denominator": 20
+      },
+      "duplication": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 10
+      }
+    },
+    {
+      "scope": "fact",
+      "claimCorrectness": {
+        "value": 0.9206349206349206,
+        "status": "measured",
+        "numerator": 58,
+        "denominator": 63
+      },
+      "semanticSupport": {
+        "value": 0.6666666666666666,
+        "status": "measured",
+        "numerator": 42,
+        "denominator": 63
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 63,
+        "denominator": 63
+      },
+      "rawGrounding": {
+        "value": 0.84,
+        "status": "measured",
+        "numerator": 63,
+        "denominator": 75
+      },
+      "evidenceCoverage": {
+        "value": 0.15217391304347827,
+        "status": "measured",
+        "numerator": 7,
+        "denominator": 46
+      },
+      "attribution": {
+        "value": 0.9841269841269841,
+        "status": "measured",
+        "numerator": 124,
+        "denominator": 126
+      },
+      "duplication": {
+        "value": 0.015873015873015872,
+        "status": "measured",
+        "numerator": 1,
+        "denominator": 63
+      }
+    },
+    {
+      "scope": "overall",
+      "claimCorrectness": {
+        "value": 0.8333333333333334,
+        "status": "measured",
+        "numerator": 75,
+        "denominator": 90
+      },
+      "semanticSupport": {
+        "value": 0.6666666666666666,
+        "status": "measured",
+        "numerator": 60,
+        "denominator": 90
+      },
+      "exactSpanSupport": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 90,
+        "denominator": 90
+      },
+      "rawGrounding": {
+        "value": 0.782608695652174,
+        "status": "measured",
+        "numerator": 90,
+        "denominator": 115
+      },
+      "evidenceCoverage": {
+        "value": 0.1889763779527559,
+        "status": "measured",
+        "numerator": 24,
+        "denominator": 127
+      },
+      "attribution": {
+        "value": 0.9611111111111111,
+        "status": "measured",
+        "numerator": 173,
+        "denominator": 180
+      },
+      "duplication": {
+        "value": 0.022222222222222223,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 90
+      }
+    }
+  ],
+  "degradedCapture": {
+    "scope": "overall",
+    "claimCorrectness": {
+      "value": 0.7272727272727273,
+      "status": "measured",
+      "numerator": 8,
+      "denominator": 11
+    },
+    "semanticSupport": {
+      "value": 0.8181818181818182,
+      "status": "measured",
+      "numerator": 9,
+      "denominator": 11
+    },
+    "exactSpanSupport": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 11,
+      "denominator": 11
+    },
+    "rawGrounding": {
+      "value": 0.9166666666666666,
+      "status": "measured",
+      "numerator": 11,
+      "denominator": 12
+    },
+    "evidenceCoverage": {
+      "value": 0.25,
+      "status": "measured",
+      "numerator": 4,
+      "denominator": 16
+    },
+    "attribution": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 22,
+      "denominator": 22
+    },
+    "duplication": {
+      "value": 0.0,
+      "status": "measured",
+      "numerator": 0,
+      "denominator": 11
+    }
+  },
+  "abstention": {
+    "value": 1.0,
+    "status": "measured",
+    "numerator": 2,
+    "denominator": 2
+  },
+  "reviewOutcomes": {
+    "commitment": {
+      "accepted": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 3
+      },
+      "corrected": {
+        "value": 1.0,
+        "status": "measured",
+        "numerator": 3,
+        "denominator": 3
+      },
+      "rejected": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 3
+      },
+      "pending": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 3
+      }
+    },
+    "decision": {
+      "accepted": {
+        "value": 0.5,
+        "status": "measured",
+        "numerator": 7,
+        "denominator": 14
+      },
+      "corrected": {
+        "value": 0.35714285714285715,
+        "status": "measured",
+        "numerator": 5,
+        "denominator": 14
+      },
+      "rejected": {
+        "value": 0.14285714285714285,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 14
+      },
+      "pending": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 14
+      }
+    },
+    "fact": {
+      "accepted": {
+        "value": 0.6507936507936508,
+        "status": "measured",
+        "numerator": 41,
+        "denominator": 63
+      },
+      "corrected": {
+        "value": 0.2698412698412698,
+        "status": "measured",
+        "numerator": 17,
+        "denominator": 63
+      },
+      "rejected": {
+        "value": 0.07936507936507936,
+        "status": "measured",
+        "numerator": 5,
+        "denominator": 63
+      },
+      "pending": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 63
+      }
+    },
+    "question": {
+      "accepted": {
+        "value": 0.2,
+        "status": "measured",
+        "numerator": 2,
+        "denominator": 10
+      },
+      "corrected": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 10
+      },
+      "rejected": {
+        "value": 0.8,
+        "status": "measured",
+        "numerator": 8,
+        "denominator": 10
+      },
+      "pending": {
+        "value": 0.0,
+        "status": "measured",
+        "numerator": 0,
+        "denominator": 10
+      }
+    }
+  },
+  "invariants": {
+    "exactSpanSupport": {
+      "value": 1.0,
+      "status": "measured",
+      "numerator": 90,
+      "denominator": 90
+    },
+    "resurrection": 0,
+    "deletionResidue": 0
+  },
+  "gate": "fail",
+  "failures": [
+    "decision.claimCorrectness",
+    "decision.semanticSupport",
+    "decision.evidenceCoverage",
+    "commitment.semanticSupport",
+    "commitment.evidenceCoverage",
+    "commitment.attribution",
+    "commitment.maxDuplication",
+    "question.claimCorrectness",
+    "question.semanticSupport",
+    "question.evidenceCoverage",
+    "question.minReviewAccepted",
+    "fact.semanticSupport",
+    "fact.evidenceCoverage",
+    "overall.claimCorrectness",
+    "overall.semanticSupport",
+    "overall.evidenceCoverage"
+  ]
+}
