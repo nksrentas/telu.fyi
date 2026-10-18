@@ -1,4 +1,4 @@
-use app_lib::knowledge::evaluation::replay::{export_from_db, review_outcomes, run_replay, ReplayError};
+use app_lib::knowledge::evaluation::replay::{export_from_db, review_outcomes, run_replay, ReplayError, REPLAY_BUDGET_TOKENS};
 use app_lib::knowledge::evaluation::{
     score, EvaluationKind, EvaluationReport, GoldFixture, LabelSet, PredictionSet, ReportEnvelope, ReviewOutcomeRates,
     ScoreInput, Thresholds,
@@ -175,7 +175,7 @@ async fn scored_review_outcomes(
 async fn run_command(gold_dir: &Path, replay_completions: &Path, out: &Path) -> Result<(), EvalError> {
     let fixtures = load_fixtures(gold_dir)?;
     let completions: HashMap<String, Vec<String>> = read_json(replay_completions)?;
-    let predictions = run_replay(&fixtures, &completions).await.map_err(EvalError::Replay)?;
+    let predictions = run_replay(&fixtures, &completions, REPLAY_BUDGET_TOKENS).await.map_err(EvalError::Replay)?;
     write_json(out, "predictions.json", &predictions)?;
     print_summary(json!({
         "fixtures": predictions.fixtures.len(),

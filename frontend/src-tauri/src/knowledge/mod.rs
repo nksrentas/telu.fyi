@@ -1,4 +1,5 @@
 pub mod commands;
+pub(crate) mod dispatch;
 pub mod evaluation;
 pub mod extraction;
 pub mod matcher;

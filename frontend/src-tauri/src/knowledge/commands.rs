@@ -15,8 +15,8 @@ use crate::knowledge::models::{
 use crate::knowledge::review::{accept_all, append_review, correct_item};
 use crate::knowledge::repository::{KnowledgeRepository, NewRun};
 use crate::state::AppState;
-use crate::summary::llm_client::generate_summary;
-use crate::summary::service::{resolve_summary_dispatch, summary_context_tokens, SummaryDispatch};
+use crate::knowledge::dispatch::{dispatch_completer, extraction_budget};
+use crate::summary::service::{resolve_summary_dispatch, SummaryDispatch};
 use crate::trust::provider_route::{validate_route_contract, EffectiveRoute, LocationClass};
 use sqlx::SqlitePool;
 use std::sync::Arc;
@@ -26,8 +26,6 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 const KNOWLEDGE_UPDATED_EVENT: &str = "knowledge-updated";
-const RESERVED_OUTPUT_TOKENS: usize = 2000;
-const MIN_WINDOW_TOKENS: usize = 500;
 
 pub struct StartContext {
     meeting_id: String,
@@ -247,11 +245,13 @@ fn spawn_extraction<R: Runtime>(
     token: CancellationToken,
 ) {
     tauri::async_runtime::spawn(async move {
-        let budget = summary_context_tokens(&dispatch, &context.meeting_id)
-            .await
-            .saturating_sub(RESERVED_OUTPUT_TOKENS)
-            .max(MIN_WINDOW_TOKENS);
-        let complete = completion_closure(&app, dispatch, context.meeting_id.clone(), token.clone());
+        let budget = extraction_budget(&dispatch, &context.meeting_id).await;
+        let complete = dispatch_completer(
+            Arc::new(dispatch),
+            context.meeting_id.clone(),
+            app.path().app_data_dir().ok(),
+            token.clone(),
+        );
         let status = match run_extraction(
             &pool,
             &context.meeting_id,
@@ -272,44 +272,6 @@ fn spawn_extraction<R: Runtime>(
         release_extraction(&context.meeting_id, &run_id);
         emit_updated(&app, &context.meeting_id, &run_id, status);
     });
-}
-
-fn completion_closure<R: Runtime>(
-    app: &AppHandle<R>,
-    dispatch: SummaryDispatch,
-    meeting_id: String,
-    token: CancellationToken,
-) -> impl FnMut(String, String) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String, String>> + Send>> {
-    let app_data_dir = app.path().app_data_dir().ok();
-    let client = reqwest::Client::new();
-    let dispatch = Arc::new(dispatch);
-    move |system_prompt: String, user_prompt: String| {
-        let client = client.clone();
-        let dispatch = Arc::clone(&dispatch);
-        let meeting_id = meeting_id.clone();
-        let app_data_dir = app_data_dir.clone();
-        let token = token.clone();
-        Box::pin(async move {
-            generate_summary(
-                &client,
-                Some(meeting_id.as_str()),
-                &dispatch.provider,
-                &dispatch.model_name,
-                &dispatch.api_key,
-                &system_prompt,
-                &user_prompt,
-                dispatch.ollama_endpoint.as_deref(),
-                dispatch.custom_openai_endpoint.as_deref(),
-                dispatch.max_tokens,
-                dispatch.temperature,
-                dispatch.top_p,
-                app_data_dir.as_ref(),
-                Some(&token),
-            )
-            .await
-            .map(|completion| completion.content)
-        })
-    }
 }
 
 fn emit_updated<R: Runtime>(app: &AppHandle<R>, meeting_id: &str, run_id: &str, status: RunStatus) {

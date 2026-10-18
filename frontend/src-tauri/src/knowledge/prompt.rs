@@ -3,6 +3,8 @@ use crate::knowledge::span_verifier::{LabeledSegment, LabeledSegments};
 
 pub const PROMPT_VERSION: &str = "knowledge-extract-v2";
 pub const WINDOW_OVERLAP_SEGMENTS: usize = 2;
+pub const RESERVED_OUTPUT_TOKENS: usize = 2000;
+pub const MIN_WINDOW_TOKENS: usize = 500;
 const CHARS_PER_TOKEN: usize = 4;
 
 pub const EXTRACTION_SYSTEM_PROMPT: &str = r#"You extract meeting knowledge from a transcript. Output JSON only, no prose.
@@ -35,6 +37,10 @@ pub fn label_segments(evidence: &[TranscriptEvidence]) -> LabeledSegments {
             })
             .collect(),
     )
+}
+
+pub fn window_budget(context_tokens: usize) -> usize {
+    context_tokens.saturating_sub(RESERVED_OUTPUT_TOKENS).max(MIN_WINDOW_TOKENS)
 }
 
 pub fn chunk_windows(segments: &LabeledSegments, budget_tokens: usize) -> Vec<ChunkWindow> {

@@ -277,7 +277,7 @@ async fn run_replay_reports_zero_resurrection_when_rejected_items_return_under_o
     let fixtures = [release_fixture()];
     let completions = HashMap::from([("release".to_string(), vec![release_reply()])]);
 
-    let predictions = replay::run_replay(&fixtures, &completions).await.expect("replay");
+    let predictions = replay::run_replay(&fixtures, &completions, replay::REPLAY_BUDGET_TOKENS).await.expect("replay");
 
     assert_eq!(predictions.fixtures[0].items.len(), 3);
     assert_eq!(predictions.resurrection_count, Some(0));
@@ -306,7 +306,7 @@ async fn run_replay_measures_zero_deletion_residue_through_the_production_delete
     let fixtures = [release_fixture()];
     let completions = HashMap::from([("release".to_string(), vec![release_reply()])]);
 
-    let predictions = replay::run_replay(&fixtures, &completions).await.expect("replay");
+    let predictions = replay::run_replay(&fixtures, &completions, replay::REPLAY_BUDGET_TOKENS).await.expect("replay");
 
     assert_eq!(predictions.deletion_residue_count, Some(0));
     assert_eq!(predictions.resurrection_count, Some(0));
@@ -317,7 +317,7 @@ async fn run_replay_leaves_resurrection_unmeasured_without_rejected_items() {
     let fixtures = [empty_reply_fixture()];
     let completions = HashMap::from([("quiet".to_string(), vec!["{\"items\": []}".to_string()])]);
 
-    let predictions = replay::run_replay(&fixtures, &completions).await.expect("replay");
+    let predictions = replay::run_replay(&fixtures, &completions, replay::REPLAY_BUDGET_TOKENS).await.expect("replay");
 
     assert_eq!(predictions.resurrection_count, None);
     assert_eq!(predictions.deletion_residue_count, Some(0));

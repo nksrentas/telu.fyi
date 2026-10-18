@@ -24,7 +24,7 @@ use std::path::Path;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-const REPLAY_BUDGET_TOKENS: usize = 100_000;
+pub const REPLAY_BUDGET_TOKENS: usize = 100_000;
 const EMPTY_REPLY: &str = "{\"items\": []}";
 const MEETING_SCOPED_TABLES: &str = "SELECT m.name FROM sqlite_master m JOIN pragma_table_info(m.name) p
      WHERE m.type = 'table' AND p.name = 'meeting_id' ORDER BY m.name";
@@ -49,19 +49,20 @@ impl ReplayError {
 pub async fn run_replay(
     fixtures: &[GoldFixture],
     completions: &HashMap<String, Vec<String>>,
+    budget_tokens: usize,
 ) -> Result<PredictionSet, ReplayError> {
     let mut predicted = Vec::new();
     let mut counts = Vec::new();
     for fixture in fixtures {
         let replies = completions.get(&fixture.fixture_id).cloned().unwrap_or_default();
-        let outcome = extract_fixture(fixture, &replies).await;
+        let outcome = extract_fixture(fixture, &replies, budget_tokens).await;
         predicted.push(fixture_predictions(&fixture.fixture_id, &outcome));
-        counts.push(measure_invariants(fixture, FirstPass::Recorded(&replies)).await?);
+        counts.push(measure_invariants(fixture, FirstPass::Recorded(&replies), budget_tokens).await?);
     }
     Ok(prediction_set(predicted, &counts))
 }
 
-fn prediction_set(fixtures: Vec<FixturePredictions>, counts: &[InvariantCounts]) -> PredictionSet {
+pub(super) fn prediction_set(fixtures: Vec<FixturePredictions>, counts: &[InvariantCounts]) -> PredictionSet {
     let probes: u64 = counts.iter().map(|count| count.probes).sum();
     PredictionSet {
         prompt_version: PROMPT_VERSION.to_string(),
@@ -71,7 +72,7 @@ fn prediction_set(fixtures: Vec<FixturePredictions>, counts: &[InvariantCounts])
     }
 }
 
-fn labeled(fixture: &GoldFixture) -> LabeledSegments {
+pub(super) fn labeled(fixture: &GoldFixture) -> LabeledSegments {
     LabeledSegments::new(
         fixture
             .segments
@@ -93,14 +94,14 @@ fn replayer(replies: &[String]) -> impl FnMut(String, String) -> std::future::Re
     move |_, _| std::future::ready(Ok(queue.next().unwrap_or_else(|| EMPTY_REPLY.to_string())))
 }
 
-async fn extract_fixture(fixture: &GoldFixture, replies: &[String]) -> ExtractionOutcome {
+async fn extract_fixture(fixture: &GoldFixture, replies: &[String], budget_tokens: usize) -> ExtractionOutcome {
     let mut replay = replayer(replies);
-    extract_from_segments(&labeled(fixture), REPLAY_BUDGET_TOKENS, Vec::new(), &CancellationToken::new(), &mut replay)
+    extract_from_segments(&labeled(fixture), budget_tokens, Vec::new(), &CancellationToken::new(), &mut replay)
         .await
         .unwrap_or_default()
 }
 
-fn fixture_predictions(fixture_id: &str, outcome: &ExtractionOutcome) -> FixturePredictions {
+pub(super) fn fixture_predictions(fixture_id: &str, outcome: &ExtractionOutcome) -> FixturePredictions {
     let type_of: HashMap<&str, KnowledgeType> = outcome
         .items
         .iter()
@@ -169,30 +170,35 @@ fn attribute_links(role: &str, attribute: &AttributeSupport) -> Vec<PredictedLin
     }
 }
 
-enum FirstPass<'a> {
+pub(super) enum FirstPass<'a> {
     Recorded(&'a [String]),
     Synthesized(String),
 }
 
-struct InvariantCounts {
+pub(super) struct InvariantCounts {
     resurrected: u64,
     probes: u64,
     deletion_residue: u64,
 }
 
-async fn measure_invariants(fixture: &GoldFixture, first_pass: FirstPass<'_>) -> Result<InvariantCounts, ReplayError> {
+pub(super) async fn measure_invariants(
+    fixture: &GoldFixture,
+    first_pass: FirstPass<'_>,
+    budget_tokens: usize,
+) -> Result<InvariantCounts, ReplayError> {
     let pool = replay_pool().await?;
     let meeting_id = Uuid::new_v4().to_string();
     seed_meeting(&pool, &meeting_id, &fixture.segments).await?;
     let evidence = TranscriptsRepository::list_evidence_by_meeting(&pool, &meeting_id)
         .await
         .map_err(|_| ReplayError::Storage)?;
-    let first_run = first_pass_run(&pool, &meeting_id, &evidence, first_pass).await?;
+    let first_run = first_pass_run(&pool, &meeting_id, &evidence, first_pass, budget_tokens).await?;
     let rejected = items_of_run(&pool, &meeting_id, &first_run).await?;
     reject_all(&pool, &meeting_id, &rejected).await?;
     let reply = regenerate_reply(&rejected, fixture);
+    let regenerate = repeat_replayer(reply);
     let second_run =
-        replay_run(&pool, &meeting_id, &evidence, TriggerKind::Regenerate, repeat_replayer(reply)).await?;
+        replay_run(&pool, &meeting_id, &evidence, TriggerKind::Regenerate, budget_tokens, regenerate).await?;
     let regenerated = items_of_run(&pool, &meeting_id, &second_run).await?;
     MeetingsRepository::delete_meeting(&pool, &meeting_id)
         .await
@@ -209,11 +215,13 @@ async fn first_pass_run(
     meeting_id: &str,
     evidence: &[TranscriptEvidence],
     first_pass: FirstPass<'_>,
+    budget_tokens: usize,
 ) -> Result<String, ReplayError> {
+    let user = TriggerKind::User;
     match first_pass {
-        FirstPass::Recorded(replies) => replay_run(pool, meeting_id, evidence, TriggerKind::User, replayer(replies)).await,
+        FirstPass::Recorded(replies) => replay_run(pool, meeting_id, evidence, user, budget_tokens, replayer(replies)).await,
         FirstPass::Synthesized(reply) => {
-            replay_run(pool, meeting_id, evidence, TriggerKind::User, repeat_replayer(reply)).await
+            replay_run(pool, meeting_id, evidence, user, budget_tokens, repeat_replayer(reply)).await
         }
     }
 }
@@ -376,6 +384,7 @@ async fn replay_run<F, Fut>(
     meeting_id: &str,
     evidence: &[TranscriptEvidence],
     trigger: TriggerKind,
+    budget_tokens: usize,
     complete: F,
 ) -> Result<String, ReplayError>
 where
@@ -401,7 +410,7 @@ where
     )
     .await
     .map_err(|_| ReplayError::Storage)?;
-    run_extraction(pool, meeting_id, &run_id, evidence, REPLAY_BUDGET_TOKENS, &CancellationToken::new(), complete)
+    run_extraction(pool, meeting_id, &run_id, evidence, budget_tokens, &CancellationToken::new(), complete)
         .await
         .map_err(|_| ReplayError::Storage)?;
     Ok(run_id)
@@ -433,7 +442,7 @@ pub async fn export_from_db(
     for meeting_id in meeting_ids {
         let (fixture, predictions) = export_meeting(&pool, meeting_id).await?;
         let first_pass = FirstPass::Synthesized(claim_reply(&fixture, &predictions.items));
-        counts.push(measure_invariants(&fixture, first_pass).await?);
+        counts.push(measure_invariants(&fixture, first_pass, REPLAY_BUDGET_TOKENS).await?);
         fixtures.push(fixture);
         predicted.push(predictions);
     }
