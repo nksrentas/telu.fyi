@@ -4,7 +4,7 @@ use crate::knowledge::models::{CorrectionInput, ReviewAction};
 use crate::knowledge::prompt::PROMPT_VERSION;
 use crate::knowledge::repository::NewRun;
 use crate::knowledge::review::{append_review, correct_item};
-use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
+use crate::knowledge::test_support::{extraction_replies, insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
 
 const TEXTS: [&str; 4] = [
     "We agreed to ship the beta on Friday.",
@@ -54,12 +54,9 @@ async fn run(pool: &SqlitePool, evidence: &[TranscriptEvidence], run_id: &str, i
     .await
     .expect("running run");
     let reply = format!("{{\"items\":[{}]}}", items.join(","));
-    run_extraction(pool, MEETING_ID, run_id, evidence, 100_000, &CancellationToken::new(), move |_, _| {
-        let reply = reply.clone();
-        async move { Ok(reply) }
-    })
-    .await
-    .expect("run outcome")
+    run_extraction(pool, MEETING_ID, run_id, evidence, 100_000, &CancellationToken::new(), extraction_replies(vec![reply]))
+        .await
+        .expect("run outcome")
 }
 
 async fn item_id(pool: &SqlitePool, text: &str) -> String {

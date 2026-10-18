@@ -180,6 +180,7 @@ mod tests {
     use super::*;
     use crate::knowledge::evaluation::replay::run_replay;
     use crate::knowledge::evaluation::{FixtureCategory, GoldSegment};
+    use crate::knowledge::test_support::extraction_replies;
     use serde_json::{json, Value};
     use std::collections::HashMap;
 
@@ -233,20 +234,21 @@ mod tests {
     async fn live_recording_replays_to_identical_predictions() {
         let fixtures = [fixture("standup")];
         let replies = vec![
-            Ok(reply(&[item("decision", "Ship on Friday", "S1", "ship on Friday")])),
-            Ok(reply(&[
+            reply(&[item("decision", "Ship on Friday", "S1", "ship on Friday")]),
+            reply(&[
                 item("fact", "The beta has forty customers", "S5", "The beta has forty customers"),
                 item("question", "Did the budget double", "S6", "the budget doubled"),
-            ])),
+            ]),
         ];
 
-        let output = run_live_with(&fixtures, "scripted", TWO_WINDOW_BUDGET, |_: &str| scripted(replies.clone()), |_: &LiveOutput| {})
+        let output = run_live_with(&fixtures, "scripted", TWO_WINDOW_BUDGET, |_: &str| extraction_replies(replies.clone()), |_: &LiveOutput| {})
             .await
             .expect("live run");
 
         let meta = &output.meta.fixtures[0];
-        assert_eq!(output.completions["standup"].len(), 2);
-        assert_eq!((meta.windows, meta.completions, meta.items, meta.abstentions), (2, 2, 2, 1));
+        assert_eq!(output.completions["standup"].len(), 4);
+        assert_eq!((meta.windows, meta.completions, meta.items, meta.abstentions), (2, 4, 2, 1));
+        assert_eq!(meta.stages, StageCounts { completions: 4, missed_added: 0, missed_malformed: 0 });
         assert_eq!(output.predictions.resurrection_count, Some(0));
         let recorded: HashMap<String, Vec<String>> = output.completions.clone().into_iter().collect();
         let replayed = run_replay(&fixtures, &recorded, TWO_WINDOW_BUDGET).await.expect("replay");

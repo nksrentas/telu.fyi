@@ -461,7 +461,9 @@ mod tests {
     use crate::knowledge::review::append_review;
     use crate::knowledge::prompt::PROMPT_VERSION;
     use crate::knowledge::repository::NewRun;
-    use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
+    use crate::knowledge::test_support::{
+        extraction_replies, insert_evidence, insert_meeting, migrated_pool, MEETING_ID,
+    };
     use crate::summary::service::SummaryService;
     use chrono::Utc;
 
@@ -529,12 +531,8 @@ mod tests {
         budget: usize,
         replies: Vec<&'static str>,
     ) -> RunOutcome {
-        let mut remaining = replies.into_iter();
-        run_extraction(pool, MEETING_ID, RUN_ID, evidence, budget, &CancellationToken::new(), |_, _| {
-            let reply = remaining.next().unwrap_or("{\"items\": []}").to_string();
-            async move { Ok(reply) }
-        })
-        .await
+        run_extraction(pool, MEETING_ID, RUN_ID, evidence, budget, &CancellationToken::new(), extraction_replies(replies))
+            .await
         .expect("extraction outcome")
     }
 
@@ -755,7 +753,7 @@ mod tests {
             {"type":"decision","text":"Ship the beta on Friday","evidence":[{"segment":"S2","quote":"ship the beta on Friday"}]},
             {"type":"fact","text":"Budget doubled","evidence":[{"segment":"S2","quote":"the budget doubled"}]}
         ]}"#;
-        let mut replay = |_: String, _: String| async move { Ok(reply.to_string()) };
+        let mut replay = extraction_replies(vec![reply]);
 
         let pure = extract_from_segments(&label_segments(&evidence), LARGE_BUDGET, Vec::new(), &CancellationToken::new(), &mut replay)
             .await

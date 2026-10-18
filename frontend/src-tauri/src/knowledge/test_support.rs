@@ -1,7 +1,24 @@
+use crate::knowledge::prompt::EXTRACTION_SYSTEM_PROMPT;
 use chrono::Utc;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use std::future::{ready, Ready};
+
+const EMPTY_REPLY: &str = "{\"items\": []}";
 
 pub const MEETING_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141ae";
+
+pub fn extraction_replies<S: Into<String>>(
+    replies: Vec<S>,
+) -> impl FnMut(String, String) -> Ready<Result<String, String>> {
+    let mut queue = replies.into_iter().map(Into::into);
+    move |system_prompt: String, _: String| {
+        let reply = (system_prompt == EXTRACTION_SYSTEM_PROMPT)
+            .then(|| queue.next())
+            .flatten()
+            .unwrap_or_else(|| EMPTY_REPLY.to_string());
+        ready(Ok(reply))
+    }
+}
 
 pub async fn migrated_pool() -> SqlitePool {
     let pool = SqlitePoolOptions::new()
