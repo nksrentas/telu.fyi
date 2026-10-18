@@ -10,6 +10,7 @@ pub mod prompt;
 pub mod repository;
 pub mod review;
 pub mod span_verifier;
+pub(crate) mod support;
 pub(crate) mod window;
 
 #[cfg(test)]

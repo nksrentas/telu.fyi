@@ -145,6 +145,9 @@ mod tests {
     use crate::knowledge::prompt::{chunk_windows, label_segments};
     use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
     use crate::database::repositories::transcript::TranscriptsRepository;
+    use crate::knowledge::support::SUPPORT_SYSTEM_PROMPT;
+    use crate::knowledge::test_support::staged_replies;
+    use std::future::{ready, Ready};
     use std::sync::{Arc, Mutex};
 
     const TEXTS: [&str; 2] = [
@@ -152,7 +155,32 @@ mod tests {
         "Maria will own the release notes by Monday.",
     ];
     const ONE_SEGMENT_BUDGET: usize = 10;
+    const ONE_WINDOW_BUDGET: usize = 1000;
     const ITEM_A: &str = r#"{"items":[{"type":"decision","text":"Ship the beta on Friday","evidence":[{"segment":"S1","quote":"ship the beta on Friday"}]}]}"#;
+    const TWO_ITEMS: &str = r#"{"items":[{"type":"decision","text":"Ship the beta on Friday","evidence":[{"segment":"S1","quote":"ship the beta on Friday"}]},{"type":"commitment","text":"Maria owns the release notes","evidence":[{"segment":"S2","quote":"Maria will own the release notes"}]}]}"#;
+    const NO_ITEMS: &str = r#"{"items": []}"#;
+
+    type Calls = Arc<Mutex<Vec<(String, String)>>>;
+
+    fn recording<F>(mut inner: F, calls: Calls) -> impl FnMut(String, String) -> Ready<Result<String, String>>
+    where
+        F: FnMut(String, String) -> Ready<Result<String, String>>,
+    {
+        move |system_prompt: String, user_prompt: String| {
+            calls.lock().expect("calls").push((system_prompt.clone(), user_prompt.clone()));
+            inner(system_prompt, user_prompt)
+        }
+    }
+
+    fn prompts_for(calls: &Calls, system_prompt: &str) -> Vec<String> {
+        calls
+            .lock()
+            .expect("calls")
+            .iter()
+            .filter(|(system, _)| system == system_prompt)
+            .map(|(_, user)| user.clone())
+            .collect()
+    }
 
     async fn evidence() -> Vec<TranscriptEvidence> {
         let pool = migrated_pool().await;
@@ -203,6 +231,104 @@ mod tests {
 
         assert_eq!(outcome.window_count, 2);
         assert_eq!(outcome.stages.completions, *calls.lock().expect("calls"));
-        assert_eq!(outcome.stages.completions, 2);
+        assert_eq!(outcome.stages.completions, 3);
+        assert_eq!(outcome.stages.support_checks, 1);
+    }
+
+    #[tokio::test]
+    async fn support_check_runs_once_per_window_with_candidates_and_never_for_an_empty_window() {
+        let segments = label_segments(&evidence().await);
+        let calls: Calls = Arc::default();
+        let mut complete = recording(
+            staged_replies(vec![(EXTRACTION_SYSTEM_PROMPT, vec![ITEM_A, NO_ITEMS])]),
+            Arc::clone(&calls),
+        );
+
+        let outcome = extract_from_segments(&segments, ONE_SEGMENT_BUDGET, Vec::new(), &CancellationToken::new(), &mut complete)
+            .await
+            .expect("extraction");
+
+        let support_prompts = prompts_for(&calls, SUPPORT_SYSTEM_PROMPT);
+        assert_eq!(outcome.window_count, 2);
+        assert_eq!(support_prompts.len(), 1);
+        assert!(support_prompts[0].contains("C1 decision: Ship the beta on Friday"));
+        assert!(support_prompts[0].contains("quote: \"ship the beta on Friday\""));
+        assert_eq!(outcome.stages.support_checks, 1);
+        assert_eq!(outcome.stages.support_unparsed, 1);
+        assert_eq!(outcome.items.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn support_verdicts_narrow_or_drop_candidates_and_keep_their_evidence() {
+        let segments = label_segments(&evidence().await);
+        let unchecked = extract_from_segments(
+            &segments,
+            ONE_WINDOW_BUDGET,
+            Vec::new(),
+            &CancellationToken::new(),
+            &mut staged_replies(vec![(EXTRACTION_SYSTEM_PROMPT, vec![TWO_ITEMS])]),
+        )
+        .await
+        .expect("unchecked extraction");
+        let verdicts = r#"{"verdicts":[{"id":"C1","verdict":"drop"},{"id":"C2","verdict":"trim","text":"Maria owns the notes"}]}"#;
+
+        let checked = extract_from_segments(
+            &segments,
+            ONE_WINDOW_BUDGET,
+            Vec::new(),
+            &CancellationToken::new(),
+            &mut staged_replies(vec![(EXTRACTION_SYSTEM_PROMPT, vec![TWO_ITEMS]), (SUPPORT_SYSTEM_PROMPT, vec![verdicts])]),
+        )
+        .await
+        .expect("checked extraction");
+
+        assert_eq!(unchecked.items.len(), 2);
+        assert_eq!(checked.items.len(), 1);
+        assert_eq!(checked.items[0].text, "Maria owns the notes");
+        assert_eq!(checked.items[0].claims, unchecked.items[1].claims);
+        assert_eq!(checked.items[0].owner, unchecked.items[1].owner);
+        assert_eq!(checked.items[0].due, unchecked.items[1].due);
+        assert_eq!(checked.abstentions, unchecked.abstentions);
+        assert_eq!(
+            (checked.stages.support_checks, checked.stages.support_trimmed, checked.stages.support_dropped, checked.stages.support_unparsed),
+            (1, 1, 1, 0)
+        );
+    }
+
+    #[tokio::test]
+    async fn support_check_provider_error_stops_the_run() {
+        let segments = label_segments(&evidence().await);
+        let mut complete = |system_prompt: String, _: String| {
+            ready(if system_prompt == EXTRACTION_SYSTEM_PROMPT {
+                Ok(ITEM_A.to_string())
+            } else {
+                Err("provider down".to_string())
+            })
+        };
+
+        let result = extract_from_segments(&segments, ONE_WINDOW_BUDGET, Vec::new(), &CancellationToken::new(), &mut complete).await;
+
+        assert_eq!(result.err(), Some(WindowStop::ProviderError));
+    }
+
+    #[tokio::test]
+    async fn support_check_is_skipped_when_cancelled_during_extraction() {
+        let segments = label_segments(&evidence().await);
+        let cancel = CancellationToken::new();
+        let calls: Calls = Arc::default();
+        let cancelling = cancel.clone();
+        let mut complete = recording(
+            move |_: String, _: String| {
+                cancelling.cancel();
+                ready(Ok(ITEM_A.to_string()))
+            },
+            Arc::clone(&calls),
+        );
+
+        let result = extract_from_segments(&segments, ONE_WINDOW_BUDGET, Vec::new(), &cancel, &mut complete).await;
+
+        assert_eq!(result.err(), Some(WindowStop::Cancelled));
+        assert_eq!(prompts_for(&calls, EXTRACTION_SYSTEM_PROMPT).len(), 1);
+        assert_eq!(calls.lock().expect("calls").len(), 1);
     }
 }

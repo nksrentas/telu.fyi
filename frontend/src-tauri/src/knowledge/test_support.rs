@@ -1,22 +1,60 @@
+use crate::knowledge::matcher::normalized_key;
+use crate::knowledge::models::KnowledgeType;
 use crate::knowledge::prompt::EXTRACTION_SYSTEM_PROMPT;
+use crate::knowledge::repository::NewItem;
+use crate::knowledge::span_verifier::{sha256_hex, AttributeSupport, VerifiedSpan};
 use chrono::Utc;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use std::collections::HashMap;
 use std::future::{ready, Ready};
+use uuid::Uuid;
 
 const EMPTY_REPLY: &str = "{\"items\": []}";
 
 pub const MEETING_ID: &str = "018f5e27-2f68-7e27-9c90-7c72123141ae";
 
+pub fn staged_replies<S: Into<String>>(
+    stages: Vec<(&'static str, Vec<S>)>,
+) -> impl FnMut(String, String) -> Ready<Result<String, String>> {
+    let mut queues: HashMap<&'static str, std::vec::IntoIter<String>> = stages
+        .into_iter()
+        .map(|(system_prompt, replies)| {
+            let replies: Vec<String> = replies.into_iter().map(Into::into).collect();
+            (system_prompt, replies.into_iter())
+        })
+        .collect();
+    move |system_prompt: String, _: String| {
+        let reply = queues
+            .get_mut(system_prompt.as_str())
+            .and_then(Iterator::next)
+            .unwrap_or_else(|| EMPTY_REPLY.to_string());
+        ready(Ok(reply))
+    }
+}
+
 pub fn extraction_replies<S: Into<String>>(
     replies: Vec<S>,
 ) -> impl FnMut(String, String) -> Ready<Result<String, String>> {
-    let mut queue = replies.into_iter().map(Into::into);
-    move |system_prompt: String, _: String| {
-        let reply = (system_prompt == EXTRACTION_SYSTEM_PROMPT)
-            .then(|| queue.next())
-            .flatten()
-            .unwrap_or_else(|| EMPTY_REPLY.to_string());
-        ready(Ok(reply))
+    staged_replies(vec![(EXTRACTION_SYSTEM_PROMPT, replies)])
+}
+
+pub fn verified_item(item_type: KnowledgeType, text: &str, evidence_id: &str, quote: &str) -> NewItem {
+    NewItem {
+        item_id: Uuid::new_v4().to_string(),
+        item_type,
+        text: text.to_string(),
+        normalized_key: normalized_key(text),
+        claims: vec![VerifiedSpan {
+            evidence_id: evidence_id.to_string(),
+            raw_start: 0,
+            raw_end: quote.len(),
+            quote_text: quote.to_string(),
+            normalized_quote: quote.to_lowercase(),
+            evidence_text_sha256: sha256_hex(quote),
+            segment_capture_incomplete: false,
+        }],
+        owner: AttributeSupport::NotStated,
+        due: AttributeSupport::NotStated,
     }
 }
 
@@ -85,10 +123,8 @@ pub async fn insert_evidence(
 pub const SEEDED_EVIDENCE_TEXT: &str = "We ship the beta on Friday.";
 
 pub async fn seed_items(pool: &SqlitePool, meeting_id: &str, texts: &[&str]) -> Vec<String> {
-    use crate::knowledge::models::{KnowledgeType, RunStatus, TriggerKind};
-    use crate::knowledge::repository::{KnowledgeRepository, NewItem, NewRun, RunCounts};
-    use crate::knowledge::span_verifier::{sha256_hex, AttributeSupport, VerifiedSpan};
-    use uuid::Uuid;
+    use crate::knowledge::models::{RunStatus, TriggerKind};
+    use crate::knowledge::repository::{KnowledgeRepository, NewRun, RunCounts};
 
     insert_meeting(pool, meeting_id, "complete", "complete").await;
     let evidence_id = Uuid::new_v4().to_string();
