@@ -249,9 +249,9 @@ mod tests {
             .expect("live run");
 
         let meta = &output.meta.fixtures[0];
-        assert_eq!(output.completions["standup"].len(), 4);
-        assert_eq!((meta.windows, meta.completions, meta.items, meta.abstentions), (2, 4, 2, 1));
-        assert_eq!(meta.stages, StageCounts { completions: 4, missed_added: 0, missed_malformed: 0 });
+        assert_eq!(output.completions["standup"].len(), 2);
+        assert_eq!((meta.windows, meta.completions, meta.items, meta.abstentions), (2, 2, 2, 1));
+        assert_eq!(meta.stages, StageCounts { completions: 2 });
         assert_eq!(output.predictions.resurrection_count, Some(0));
         let recorded: HashMap<String, Vec<String>> = output.completions.clone().into_iter().collect();
         let replayed = run_replay(&fixtures, &recorded, TWO_WINDOW_BUDGET).await.expect("replay");

@@ -164,8 +164,6 @@ where
         windows = candidates.window_count,
         malformed_windows = candidates.malformed_windows,
         completions = candidates.stages.completions,
-        missed_added = candidates.stages.missed_added,
-        missed_malformed = candidates.stages.missed_malformed,
         status = outcome.status.as_str(),
         proposed = outcome.counts.proposed,
         skipped = outcome.counts.skipped,
@@ -194,7 +192,7 @@ where
     for window in &windows {
         let collected = window_candidates(window, cancel, complete).await?;
         candidates.abstentions.extend(collected.abstentions);
-        candidates.malformed_windows += usize::from(collected.first_pass_malformed);
+        candidates.malformed_windows += usize::from(collected.malformed);
         candidates.stages = candidates.stages + collected.stages;
         for verified in collected.items {
             place(&mut candidates, verified);
