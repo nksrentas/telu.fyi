@@ -164,6 +164,13 @@ where
         windows = candidates.window_count,
         malformed_windows = candidates.malformed_windows,
         completions = candidates.stages.completions,
+        support_checks = candidates.stages.support_checks,
+        support_trimmed = candidates.stages.support_trimmed,
+        support_dropped = candidates.stages.support_dropped,
+        support_unparsed = candidates.stages.support_unparsed,
+        followup_checks = candidates.stages.followup_checks,
+        followup_dropped = candidates.stages.followup_dropped,
+        followup_unparsed = candidates.stages.followup_unparsed,
         status = outcome.status.as_str(),
         proposed = outcome.counts.proposed,
         skipped = outcome.counts.skipped,
@@ -190,7 +197,7 @@ where
         ..ExtractionOutcome::default()
     };
     for window in &windows {
-        let collected = window_candidates(window, cancel, complete).await?;
+        let collected = window_candidates(window, segments, cancel, complete).await?;
         candidates.abstentions.extend(collected.abstentions);
         candidates.malformed_windows += usize::from(collected.malformed);
         candidates.stages = candidates.stages + collected.stages;

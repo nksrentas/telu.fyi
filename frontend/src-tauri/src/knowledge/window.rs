@@ -1,4 +1,5 @@
 use crate::knowledge::extraction::WindowStop;
+use crate::knowledge::followup::{apply_followup, followup_prompt, parse_followup, FOLLOWUP_SYSTEM_PROMPT};
 use crate::knowledge::matcher::normalized_key;
 use crate::knowledge::models::AbstentionReason;
 use crate::knowledge::parse::{parse_extraction, ParsedAttribute, ParsedExtraction, ParsedItem};
@@ -20,6 +21,9 @@ pub struct StageCounts {
     pub support_trimmed: usize,
     pub support_dropped: usize,
     pub support_unparsed: usize,
+    pub followup_checks: usize,
+    pub followup_dropped: usize,
+    pub followup_unparsed: usize,
 }
 
 impl Add for StageCounts {
@@ -32,6 +36,9 @@ impl Add for StageCounts {
             support_trimmed: self.support_trimmed + other.support_trimmed,
             support_dropped: self.support_dropped + other.support_dropped,
             support_unparsed: self.support_unparsed + other.support_unparsed,
+            followup_checks: self.followup_checks + other.followup_checks,
+            followup_dropped: self.followup_dropped + other.followup_dropped,
+            followup_unparsed: self.followup_unparsed + other.followup_unparsed,
         }
     }
 }
@@ -45,6 +52,7 @@ pub(crate) struct WindowCandidates {
 
 pub(crate) async fn window_candidates<F, Fut>(
     window: &ChunkWindow,
+    meeting: &LabeledSegments,
     cancel: &CancellationToken,
     complete: &mut F,
 ) -> Result<WindowCandidates, WindowStop>
@@ -57,11 +65,12 @@ where
     let malformed = parsed.is_none();
     let (items, abstentions) = parsed.map(|parsed| verified(parsed, &window.segments)).unwrap_or_default();
     let (items, support) = support_checked(items, cancel, complete).await?;
+    let (items, followup) = followup_checked(items, meeting, window_start(window, meeting), cancel, complete).await?;
     Ok(WindowCandidates {
         items,
         abstentions,
         malformed,
-        stages: StageCounts { completions: 1, ..StageCounts::default() } + support,
+        stages: StageCounts { completions: 1, ..StageCounts::default() } + support + followup,
     })
 }
 
@@ -87,8 +96,46 @@ where
             support_trimmed: counts.trimmed,
             support_dropped: counts.dropped,
             support_unparsed: counts.unparsed,
+            ..StageCounts::default()
         },
     ))
+}
+
+async fn followup_checked<F, Fut>(
+    items: Vec<NewItem>,
+    meeting: &LabeledSegments,
+    from: usize,
+    cancel: &CancellationToken,
+    complete: &mut F,
+) -> Result<(Vec<NewItem>, StageCounts), WindowStop>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
+    if items.is_empty() {
+        return Ok((items, StageCounts::default()));
+    }
+    let reply = ask(FOLLOWUP_SYSTEM_PROMPT, followup_prompt(meeting, from, &items), cancel, complete).await?;
+    let (items, counts) = apply_followup(items, parse_followup(&reply));
+    Ok((
+        items,
+        StageCounts {
+            completions: 1,
+            followup_checks: 1,
+            followup_dropped: counts.dropped,
+            followup_unparsed: counts.unparsed,
+            ..StageCounts::default()
+        },
+    ))
+}
+
+fn window_start(window: &ChunkWindow, meeting: &LabeledSegments) -> usize {
+    window
+        .segments
+        .as_slice()
+        .first()
+        .and_then(|first| meeting.as_slice().iter().position(|segment| segment.label == first.label))
+        .unwrap_or_default()
 }
 
 async fn ask<F, Fut>(
@@ -194,8 +241,6 @@ mod tests {
     use crate::knowledge::prompt::{chunk_windows, label_segments};
     use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
     use crate::database::repositories::transcript::TranscriptsRepository;
-    use crate::knowledge::followup::FOLLOWUP_SYSTEM_PROMPT;
-    use crate::knowledge::support::SUPPORT_SYSTEM_PROMPT;
     use crate::knowledge::test_support::staged_replies;
     use std::future::{ready, Ready};
     use std::sync::{Arc, Mutex};

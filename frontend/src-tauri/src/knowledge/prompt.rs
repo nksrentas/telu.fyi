@@ -67,7 +67,7 @@ pub fn chunk_windows(segments: &LabeledSegments, budget_tokens: usize) -> Vec<Ch
     windows
 }
 
-fn window_end(all: &[LabeledSegment], start: usize, budget_tokens: usize) -> usize {
+pub(crate) fn window_end(all: &[LabeledSegment], start: usize, budget_tokens: usize) -> usize {
     let mut used = 0;
     let mut end = start;
     while end < all.len() {

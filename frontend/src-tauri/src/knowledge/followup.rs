@@ -1,10 +1,112 @@
+use crate::knowledge::models::KnowledgeType;
+use crate::knowledge::parse::{parse_verdicts, ParseFailure};
+use crate::knowledge::prompt::{prompt_line, window_end};
+use crate::knowledge::repository::NewItem;
+use crate::knowledge::span_verifier::{LabeledSegment, LabeledSegments};
+use crate::knowledge::support::{candidate_id, verdict_for};
+
+pub const FOLLOWUP_SYSTEM_PROMPT: &str = r#"You check whether knowledge items from a meeting still stand later in the same meeting. Output JSON only, no prose.
+You get the transcript from where the items were said onward, one labeled segment per line, and the items. Each item has an id, a type, a text and the label of the segment where it was said.
+For each item read only the transcript after its label and give one verdict:
+- "answered": the item is a question and a later segment answers it.
+- "superseded": the item is a decision, commitment or fact and a later segment reverses, replaces or contradicts it, or the item recaps an earlier meeting and a later segment changes it.
+- "stands": otherwise, including when nothing later talks about it.
+Give one verdict for every id.
+Schema: {"verdicts":[{"id":"C1","verdict":"stands"}]}"#;
+
+pub const FOLLOWUP_CONTEXT_TOKENS: usize = 8000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FollowupVerdict {
+    Stands,
+    Answered,
+    Superseded,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct FollowupCounts {
+    pub dropped: usize,
+    pub unparsed: usize,
+}
+
+pub fn later_context(all: &LabeledSegments, from: usize, budget_tokens: usize) -> &[LabeledSegment] {
+    let segments = all.as_slice();
+    let from = from.min(segments.len());
+    &segments[from..window_end(segments, from, budget_tokens)]
+}
+
+pub fn followup_prompt(all: &LabeledSegments, from: usize, candidates: &[NewItem]) -> String {
+    let transcript = later_context(all, from, FOLLOWUP_CONTEXT_TOKENS).iter().map(prompt_line);
+    let items = candidates
+        .iter()
+        .enumerate()
+        .map(|(index, candidate)| candidate_line(all, index, candidate));
+    std::iter::once("Transcript:".to_string())
+        .chain(transcript)
+        .chain(std::iter::once("Items:".to_string()))
+        .chain(items)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn candidate_line(all: &LabeledSegments, index: usize, candidate: &NewItem) -> String {
+    let said_at = first_claim_label(all, candidate)
+        .map(|label| format!(" at {label}"))
+        .unwrap_or_default();
+    format!("{} {}{}: {}", candidate_id(index), candidate.item_type.as_str(), said_at, candidate.text)
+}
+
+fn first_claim_label<'a>(all: &'a LabeledSegments, candidate: &NewItem) -> Option<&'a str> {
+    let evidence_id = &candidate.claims.first()?.evidence_id;
+    all.as_slice()
+        .iter()
+        .find(|segment| segment.evidence_id == *evidence_id)
+        .map(|segment| segment.label.as_str())
+}
+
+pub fn parse_followup(raw: &str) -> Result<Vec<(String, FollowupVerdict)>, ParseFailure> {
+    parse_verdicts(raw, |verdict, _| match verdict {
+        "stands" => Some(FollowupVerdict::Stands),
+        "answered" => Some(FollowupVerdict::Answered),
+        "superseded" => Some(FollowupVerdict::Superseded),
+        _ => None,
+    })
+}
+
+pub fn apply_followup(
+    candidates: Vec<NewItem>,
+    verdicts: Result<Vec<(String, FollowupVerdict)>, ParseFailure>,
+) -> (Vec<NewItem>, FollowupCounts) {
+    let Ok(verdicts) = verdicts else {
+        let unparsed = candidates.len();
+        return (candidates, FollowupCounts { unparsed, ..FollowupCounts::default() });
+    };
+    let mut kept = Vec::with_capacity(candidates.len());
+    let mut counts = FollowupCounts::default();
+    for (index, candidate) in candidates.into_iter().enumerate() {
+        match verdict_for(&verdicts, index) {
+            Some(verdict) if is_dropped(candidate.item_type, *verdict) => counts.dropped += 1,
+            Some(_) => kept.push(candidate),
+            None => {
+                counts.unparsed += 1;
+                kept.push(candidate);
+            }
+        }
+    }
+    (kept, counts)
+}
+
+fn is_dropped(item_type: KnowledgeType, verdict: FollowupVerdict) -> bool {
+    match verdict {
+        FollowupVerdict::Answered => item_type == KnowledgeType::Question,
+        FollowupVerdict::Superseded => item_type != KnowledgeType::Question,
+        FollowupVerdict::Stands => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::knowledge::models::KnowledgeType;
-    use crate::knowledge::parse::ParseFailure;
-    use crate::knowledge::repository::NewItem;
-    use crate::knowledge::span_verifier::{LabeledSegment, LabeledSegments};
     use crate::knowledge::test_support::verified_item;
 
     fn meeting(count: usize) -> LabeledSegments {
