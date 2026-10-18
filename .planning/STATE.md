@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Evidence-Linked Post-Meeting Knowledge
 status: executing
-stopped_at: Completed 02-36-PLAN.md
-last_updated: "2026-10-17T17:48:43.755Z"
+stopped_at: Completed 02-37-PLAN.md
+last_updated: "2026-10-18T05:05:01.325Z"
 last_activity: 2026-10-17
-last_activity_desc: 02-36 declared KNOW-07 thresholds v2; 02-37 held-out evaluation next
-state_head: f8db5968e31eba05cc56cb3d55b121f092fd88da
+last_activity_desc: 02-37 held-out KNOW-07 evaluation committed (gate fail, KNOW-07 open)
+state_head: 6cb394afec7a32a03d4812126dfa089b545e7b00
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 56
-  completed_plans: 55
+  completed_plans: 56
   percent: 17
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-20)
 ## Current Position
 
 Phase: 02 (Evidence-Linked Post-Meeting Knowledge) — EXECUTING
-Plan: 3 of 37
+Plan: 37 of 37
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 02 execution started
 
@@ -201,6 +201,7 @@ Recent decisions affecting current work:
 - [Phase 02]: [02-35] Real-meeting pilot committed alone (orientation only): 3 public AMI meetings (ES2002b, ES2002c, ES2002a first 300 s), PILOT_MIN=3, gate fail on input minimums; gold from AMI abstractive summaries and review/labels by Claude at the user's request; thresholds stay undeclared, KNOW-07 open
 - [Phase 02]: 02-36: KNOW-07 thresholds v2 declared by delegation (user on 2026-10-17, values chosen by Claude from the core value and Phase 2 exit gate, not from pilot numbers): abstention 1.0; per scope semanticSupport 0.9, evidenceCoverage 0.5, attribution 0.9, maxDuplication 0.1, minReviewAccepted 0.75, claimCorrectness 0.9 (question 0.8); sha256 a0a8db80...66ae, committed alone in 27c10dc
 - [Phase 02]: 02-36: KNOW-07 still open with only representative_evaluation_pending; thresholds-v2.json must not change once 02-37 scores a representative report against it
+- [Phase 02]: 02-37: held-out representative KNOW-07 evaluation (7 AMI meetings, run by Claude under delegation) scored gate fail with 18 failures; KNOW-07 open (representative_gate_not_pass); Phase 3 blocked
 
 ### Pending Todos
 
@@ -213,7 +214,7 @@ None yet.
 - [Phase 1]: Canonical meeting identity, idempotent incremental final-transcript persistence, and privacy/provider boundaries must pass before downstream features depend on them.
 - [Phase 3]: Sensitive document ingestion waits for a passing replace/delete propagation canary.
 - [Phase 6]: Supported-platform scope and numeric release thresholds remain intentionally undeclared until baseline and user-evaluation evidence exists.
-- [Phase 2 → Phase 3]: KNOW-07 thresholds declared in 27c10dc (02-36); Phase 3 stays blocked until the held-out representative evaluation (02-37, supersedes the halted 02-33) passes against them. Scored meetings need their first knowledge run on a build containing 02-29 (42866bb) and must exclude the 02-35 pilot meetings. KNOW-07 open: representative_evaluation_pending.
+- [Phase 2 → Phase 3]: Held-out representative KNOW-07 evaluation (02-37, 6cb394a) scored gate fail with 18 failures against thresholds v2 (27c10dc); KNOW-07 open: representative_gate_not_pass. Phase 3 stays blocked until a representative evaluation passes; thresholds v2 and these 7 AMI meetings are spent, so another attempt needs improved extraction plus a new held-out set or a new threshold version.
 
 ### Quick Tasks Completed
 
@@ -238,6 +239,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-10-17T17:48:43.692Z
-Stopped at: Completed 02-36-PLAN.md
+Last session: 2026-10-18T05:05:01.263Z
+Stopped at: Completed 02-37-PLAN.md
 Resume file: None
