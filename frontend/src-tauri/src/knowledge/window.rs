@@ -194,6 +194,8 @@ mod tests {
     use crate::knowledge::prompt::{chunk_windows, label_segments};
     use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
     use crate::database::repositories::transcript::TranscriptsRepository;
+    use crate::knowledge::followup::FOLLOWUP_SYSTEM_PROMPT;
+    use crate::knowledge::support::SUPPORT_SYSTEM_PROMPT;
     use crate::knowledge::test_support::staged_replies;
     use std::future::{ready, Ready};
     use std::sync::{Arc, Mutex};
@@ -256,7 +258,7 @@ mod tests {
 
         let result = extract_from_segments(&segments, ONE_SEGMENT_BUDGET, Vec::new(), &cancel, &mut complete).await;
         let window = &chunk_windows(&segments, ONE_SEGMENT_BUDGET)[0];
-        let direct = window_candidates(window, &cancel, &mut complete).await;
+        let direct = window_candidates(window, &segments, &cancel, &mut complete).await;
 
         assert_eq!(result.err(), Some(WindowStop::Cancelled));
         assert_eq!(direct.err(), Some(WindowStop::Cancelled));
@@ -279,8 +281,9 @@ mod tests {
 
         assert_eq!(outcome.window_count, 2);
         assert_eq!(outcome.stages.completions, *calls.lock().expect("calls"));
-        assert_eq!(outcome.stages.completions, 3);
+        assert_eq!(outcome.stages.completions, 4);
         assert_eq!(outcome.stages.support_checks, 1);
+        assert_eq!(outcome.stages.followup_checks, 1);
     }
 
     #[tokio::test]
@@ -378,5 +381,63 @@ mod tests {
         assert_eq!(result.err(), Some(WindowStop::Cancelled));
         assert_eq!(prompts_for(&calls, EXTRACTION_SYSTEM_PROMPT).len(), 1);
         assert_eq!(calls.lock().expect("calls").len(), 1);
+    }
+
+    #[tokio::test]
+    async fn followup_check_runs_after_the_support_check_on_survivors_only() {
+        let segments = label_segments(&evidence().await);
+        let calls: Calls = Arc::default();
+        let drop_first = r#"{"verdicts":[{"id":"C1","verdict":"drop"},{"id":"C2","verdict":"keep"}]}"#;
+        let drop_all = r#"{"verdicts":[{"id":"C1","verdict":"drop"},{"id":"C2","verdict":"drop"}]}"#;
+        let superseded = r#"{"verdicts":[{"id":"C1","verdict":"superseded"}]}"#;
+        let mut complete = recording(
+            staged_replies(vec![
+                (EXTRACTION_SYSTEM_PROMPT, vec![TWO_ITEMS, TWO_ITEMS]),
+                (SUPPORT_SYSTEM_PROMPT, vec![drop_first, drop_all]),
+                (FOLLOWUP_SYSTEM_PROMPT, vec![superseded]),
+            ]),
+            Arc::clone(&calls),
+        );
+
+        let first = extract_from_segments(&segments, ONE_WINDOW_BUDGET, Vec::new(), &CancellationToken::new(), &mut complete)
+            .await
+            .expect("first extraction");
+        let second = extract_from_segments(&segments, ONE_WINDOW_BUDGET, Vec::new(), &CancellationToken::new(), &mut complete)
+            .await
+            .expect("second extraction");
+
+        let followup_prompts = prompts_for(&calls, FOLLOWUP_SYSTEM_PROMPT);
+        assert_eq!(followup_prompts.len(), 1);
+        assert!(followup_prompts[0].contains("C1 commitment at S2: Maria owns the release notes"));
+        assert!(!followup_prompts[0].contains("C2 "));
+        assert!(followup_prompts[0].contains("[S1 00:00] We agreed to ship the beta on Friday."));
+        assert!(first.items.is_empty());
+        assert_eq!((first.stages.followup_checks, first.stages.followup_dropped, first.stages.followup_unparsed), (1, 1, 0));
+        assert_eq!(first.stages.completions, 3);
+        assert!(second.items.is_empty());
+        assert_eq!(second.stages.followup_checks, 0);
+        assert_eq!(second.stages.completions, 2);
+    }
+
+    #[tokio::test]
+    async fn followup_context_starts_at_the_window_first_segment() {
+        let segments = label_segments(&evidence().await);
+        let calls: Calls = Arc::default();
+        let second_window_item = r#"{"items":[{"type":"commitment","text":"Maria owns the release notes","evidence":[{"segment":"S2","quote":"Maria will own the release notes"}]}]}"#;
+        let mut complete = recording(
+            staged_replies(vec![(EXTRACTION_SYSTEM_PROMPT, vec![NO_ITEMS, second_window_item])]),
+            Arc::clone(&calls),
+        );
+
+        let outcome = extract_from_segments(&segments, ONE_SEGMENT_BUDGET, Vec::new(), &CancellationToken::new(), &mut complete)
+            .await
+            .expect("extraction");
+
+        let followup_prompts = prompts_for(&calls, FOLLOWUP_SYSTEM_PROMPT);
+        assert_eq!(outcome.items.len(), 1);
+        assert_eq!(followup_prompts.len(), 1);
+        assert!(!followup_prompts[0].contains("[S1 "));
+        assert!(followup_prompts[0].contains("[S2 00:05] Maria will own the release notes by Monday."));
+        assert_eq!(outcome.stages.followup_unparsed, 1);
     }
 }

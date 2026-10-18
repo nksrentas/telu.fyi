@@ -249,11 +249,18 @@ mod tests {
             .expect("live run");
 
         let meta = &output.meta.fixtures[0];
-        assert_eq!(output.completions["standup"].len(), 4);
-        assert_eq!((meta.windows, meta.completions, meta.items, meta.abstentions), (2, 4, 2, 1));
+        assert_eq!(output.completions["standup"].len(), 6);
+        assert_eq!((meta.windows, meta.completions, meta.items, meta.abstentions), (2, 6, 2, 1));
         assert_eq!(
             meta.stages,
-            StageCounts { completions: 4, support_checks: 2, support_unparsed: 2, ..StageCounts::default() }
+            StageCounts {
+                completions: 6,
+                support_checks: 2,
+                support_unparsed: 2,
+                followup_checks: 2,
+                followup_unparsed: 2,
+                ..StageCounts::default()
+            }
         );
         assert_eq!(output.predictions.resurrection_count, Some(0));
         let recorded: HashMap<String, Vec<String>> = output.completions.clone().into_iter().collect();
