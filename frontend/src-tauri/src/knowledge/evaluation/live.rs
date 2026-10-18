@@ -5,6 +5,7 @@ use super::{GoldFixture, PredictionSet};
 use crate::knowledge::dispatch::{dispatch_completer, extraction_budget};
 use crate::knowledge::extraction::extract_from_segments;
 use crate::knowledge::prompt::PROMPT_VERSION;
+use crate::knowledge::window::StageCounts;
 use crate::summary::service::{resolve_summary_dispatch, SummaryDispatch};
 use crate::summary::summary_engine::client::force_shutdown_sidecar;
 use crate::summary::summary_engine::models::{get_model_by_name, get_model_path};
@@ -49,6 +50,7 @@ pub struct LiveFixtureMeta {
     pub items: usize,
     pub abstentions: usize,
     pub elapsed_ms: u64,
+    pub stages: StageCounts,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,6 +169,7 @@ where
             items: outcome.items.len(),
             abstentions: outcome.abstentions.len(),
             elapsed_ms: started.elapsed().as_millis() as u64,
+            stages: outcome.stages,
         });
         output.completions.insert(fixture.fixture_id.clone(), replies);
         output.predictions = prediction_set(predicted.clone(), &counts);

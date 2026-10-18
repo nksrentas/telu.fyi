@@ -1,24 +1,18 @@
 use crate::database::models::{MeetingCompleteness, MeetingLifecycle, TranscriptEvidence};
-use crate::knowledge::matcher::{match_candidate, normalized_key, Candidate, ExistingItem, MatchOutcome};
-use crate::knowledge::models::{
-    AbstentionReason, KnowledgeError, ReviewState, RunStatus, SuppressionReason, TriggerKind,
-};
-use crate::knowledge::parse::{parse_extraction, ParsedAttribute, ParsedExtraction, ParsedItem};
-use crate::knowledge::prompt::{chunk_windows, label_segments, EXTRACTION_SYSTEM_PROMPT};
+use crate::knowledge::matcher::{match_candidate, Candidate, ExistingItem, MatchOutcome};
+use crate::knowledge::models::{KnowledgeError, ReviewState, RunStatus, SuppressionReason, TriggerKind};
+use crate::knowledge::prompt::{chunk_windows, label_segments};
 use crate::knowledge::repository::{
     KnowledgeRepository, NewAbstention, NewItem, NewSuppression, RunCounts,
 };
-use crate::knowledge::span_verifier::{
-    sha256_hex, verify_attribute, verify_claim_quote, AttributeSupport, LabeledSegments,
-    VerifiedSpan,
-};
+use crate::knowledge::span_verifier::{sha256_hex, LabeledSegments};
+use crate::knowledge::window::{window_candidates, StageCounts};
 use sqlx::SqlitePool;
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::sync::{LazyLock, Mutex, MutexGuard};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
-use uuid::Uuid;
 
 struct RegisteredExtraction {
     run_id: String,
@@ -42,6 +36,7 @@ pub struct ExtractionOutcome {
     pub suppressions: Vec<NewSuppression>,
     pub malformed_windows: usize,
     pub window_count: usize,
+    pub stages: StageCounts,
     index: Vec<ExistingItem>,
     in_run: HashSet<String>,
 }
@@ -168,6 +163,9 @@ where
         run_id,
         windows = candidates.window_count,
         malformed_windows = candidates.malformed_windows,
+        completions = candidates.stages.completions,
+        missed_added = candidates.stages.missed_added,
+        missed_malformed = candidates.stages.missed_malformed,
         status = outcome.status.as_str(),
         proposed = outcome.counts.proposed,
         skipped = outcome.counts.skipped,
@@ -194,39 +192,18 @@ where
         ..ExtractionOutcome::default()
     };
     for window in &windows {
-        if cancel.is_cancelled() {
-            return Err(WindowStop::Cancelled);
-        }
-        let reply = complete(EXTRACTION_SYSTEM_PROMPT.to_string(), window.user_prompt.clone())
-            .await
-            .map_err(|_| stop_reason(cancel))?;
-        match parse_extraction(&reply) {
-            Ok(parsed) => absorb(&mut candidates, parsed, &window.segments),
-            Err(_) => candidates.malformed_windows += 1,
+        let collected = window_candidates(window, cancel, complete).await?;
+        candidates.abstentions.extend(collected.abstentions);
+        candidates.malformed_windows += usize::from(collected.first_pass_malformed);
+        candidates.stages = candidates.stages + collected.stages;
+        for verified in collected.items {
+            place(&mut candidates, verified);
         }
     }
     if cancel.is_cancelled() {
         return Err(WindowStop::Cancelled);
     }
     Ok(candidates)
-}
-
-fn stop_reason(cancel: &CancellationToken) -> WindowStop {
-    if cancel.is_cancelled() {
-        WindowStop::Cancelled
-    } else {
-        WindowStop::ProviderError
-    }
-}
-
-fn absorb(candidates: &mut ExtractionOutcome, parsed: ParsedExtraction, segments: &LabeledSegments) {
-    candidates.abstentions.extend(parsed.rejected);
-    for item in parsed.items {
-        match verify_item(item, segments) {
-            Ok(verified) => place(candidates, verified),
-            Err(abstention) => candidates.abstentions.push(abstention),
-        }
-    }
 }
 
 fn place(candidates: &mut ExtractionOutcome, verified: NewItem) {
@@ -262,63 +239,6 @@ fn place(candidates: &mut ExtractionOutcome, verified: NewItem) {
         candidate_normalized_key: candidate.key,
         candidate_text: verified.text,
     });
-}
-
-fn verify_item(item: ParsedItem, segments: &LabeledSegments) -> Result<NewItem, NewAbstention> {
-    let (claims, first_failure) = verify_claims(&item, segments);
-    if claims.is_empty() {
-        return Err(NewAbstention {
-            reason: first_failure.unwrap_or(AbstentionReason::QuoteNotFound),
-            candidate_type: Some(item.item_type),
-        });
-    }
-    let claim_evidence_ids: Vec<String> = claims.iter().map(|span| span.evidence_id.clone()).collect();
-    Ok(NewItem {
-        item_id: Uuid::new_v4().to_string(),
-        item_type: item.item_type,
-        normalized_key: normalized_key(&item.text),
-        owner: attribute_support(item.owner.as_ref(), segments, &claim_evidence_ids),
-        due: attribute_support(item.due.as_ref(), segments, &claim_evidence_ids),
-        text: item.text,
-        claims,
-    })
-}
-
-fn verify_claims(
-    item: &ParsedItem,
-    segments: &LabeledSegments,
-) -> (Vec<VerifiedSpan>, Option<AbstentionReason>) {
-    let mut spans: Vec<VerifiedSpan> = Vec::new();
-    let mut first_failure = None;
-    for quote in &item.evidence {
-        match verify_claim_quote(&quote.segment, &quote.quote, segments) {
-            Ok(verified) => {
-                for span in verified {
-                    let duplicate = spans.iter().any(|known| {
-                        (known.evidence_id.as_str(), known.raw_start, known.raw_end)
-                            == (span.evidence_id.as_str(), span.raw_start, span.raw_end)
-                    });
-                    if !duplicate {
-                        spans.push(span);
-                    }
-                }
-            }
-            Err(reason) => first_failure = first_failure.or(Some(reason)),
-        }
-    }
-    (spans, first_failure)
-}
-
-fn attribute_support(
-    attribute: Option<&ParsedAttribute>,
-    segments: &LabeledSegments,
-    claim_evidence_ids: &[String],
-) -> AttributeSupport {
-    attribute
-        .map(|attribute| {
-            verify_attribute(&attribute.value, &attribute.segment, &attribute.quote, segments, claim_evidence_ids)
-        })
-        .unwrap_or(AttributeSupport::NotStated)
 }
 
 fn completed_outcome(candidates: &ExtractionOutcome) -> RunOutcome {

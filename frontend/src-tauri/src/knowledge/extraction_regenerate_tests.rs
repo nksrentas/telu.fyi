@@ -1,5 +1,6 @@
 use super::*;
 use crate::database::repositories::transcript::TranscriptsRepository;
+use crate::knowledge::matcher::normalized_key;
 use crate::knowledge::models::{CorrectionInput, ReviewAction};
 use crate::knowledge::prompt::PROMPT_VERSION;
 use crate::knowledge::repository::NewRun;

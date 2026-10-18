@@ -1,4 +1,5 @@
 use crate::database::models::{CaptureCompleteness, TranscriptEvidence};
+use crate::knowledge::repository::NewItem;
 use crate::knowledge::span_verifier::{LabeledSegment, LabeledSegments};
 
 pub const PROMPT_VERSION: &str = "knowledge-extract-v3";
@@ -8,8 +9,9 @@ pub const MIN_WINDOW_TOKENS: usize = 500;
 pub const MAX_WINDOW_TOKENS: usize = 1500;
 const CHARS_PER_TOKEN: usize = 4;
 
-pub const EXTRACTION_SYSTEM_PROMPT: &str = r#"You extract meeting knowledge from one part of a meeting transcript. Output JSON only, no prose.
-Types:
+macro_rules! extraction_rules {
+    () => {
+        r#"Types:
 - "decision": something the participants agreed or settled in this transcript. Never a proposal, an option, a suggestion, "could", "maybe", "should we", a condition, or a recap of an earlier meeting that this transcript changes.
 - "commitment": a person or group agreeing to do something.
 - "question": asked here and not answered anywhere later in this transcript.
@@ -21,7 +23,21 @@ Rules:
 - Fill "owner" and "due" when the words state them, including roles such as "the project manager", groups such as "each of you", "everyone" or "the team", and relative times such as "by the next meeting", "in thirty minutes" or "tomorrow". Give each its own segment and a quote containing those exact words, and also cite that segment in "evidence". Never guess who "I" or "we" is. Otherwise use null.
 - List every qualifying item separately. Do not merge different items and do not repeat an item.
 - If nothing qualifies, return {"items": []}.
-Schema: {"items":[{"type":"...","text":"...","evidence":[{"segment":"S3","quote":"..."}],"owner":{"value":"...","segment":"S4","quote":"..."}|null,"due":{"value":"...","segment":"S4","quote":"..."}|null}]}"#;
+Schema: {"items":[{"type":"...","text":"...","evidence":[{"segment":"S3","quote":"..."}],"owner":{"value":"...","segment":"S4","quote":"..."}|null,"due":{"value":"...","segment":"S4","quote":"..."}|null}]}"#
+    };
+}
+
+pub const EXTRACTION_SYSTEM_PROMPT: &str = concat!(
+    "You extract meeting knowledge from one part of a meeting transcript. Output JSON only, no prose.\n",
+    extraction_rules!()
+);
+
+pub const MISSED_ITEMS_SYSTEM_PROMPT: &str = concat!(
+    "You check one part of a meeting transcript for meeting knowledge that was missed. Output JSON only, no prose.\nThe user message ends with the items already found in this transcript part. Return only qualifying items that are not in that list. If there are none, return {\"items\": []}.\n",
+    extraction_rules!()
+);
+
+const FOUND_ITEMS_HEADER: &str = "Items already found in this transcript part:";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChunkWindow {
@@ -86,6 +102,14 @@ fn window(segments: &[LabeledSegment]) -> ChunkWindow {
         user_prompt: segments.iter().map(prompt_line).collect::<Vec<_>>().join("\n"),
         segments: LabeledSegments::new(segments.to_vec()),
     }
+}
+
+pub fn missed_items_prompt(window: &ChunkWindow, found: &[NewItem]) -> String {
+    [window.user_prompt.clone(), String::new(), FOUND_ITEMS_HEADER.to_string()]
+        .into_iter()
+        .chain(found.iter().map(|item| format!("- [{}] {}", item.item_type.as_str(), item.text)))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 pub fn prompt_line(segment: &LabeledSegment) -> String {

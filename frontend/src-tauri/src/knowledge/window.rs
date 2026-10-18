@@ -1,3 +1,167 @@
+use crate::knowledge::extraction::WindowStop;
+use crate::knowledge::matcher::normalized_key;
+use crate::knowledge::models::AbstentionReason;
+use crate::knowledge::parse::{parse_extraction, ParsedAttribute, ParsedExtraction, ParsedItem};
+use crate::knowledge::prompt::{missed_items_prompt, ChunkWindow, EXTRACTION_SYSTEM_PROMPT, MISSED_ITEMS_SYSTEM_PROMPT};
+use crate::knowledge::repository::{NewAbstention, NewItem};
+use crate::knowledge::span_verifier::{verify_attribute, verify_claim_quote, AttributeSupport, LabeledSegments, VerifiedSpan};
+use serde::Serialize;
+use std::future::Future;
+use std::ops::Add;
+use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StageCounts {
+    pub completions: usize,
+    pub missed_added: usize,
+    pub missed_malformed: usize,
+}
+
+impl Add for StageCounts {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            completions: self.completions + other.completions,
+            missed_added: self.missed_added + other.missed_added,
+            missed_malformed: self.missed_malformed + other.missed_malformed,
+        }
+    }
+}
+
+pub(crate) struct WindowCandidates {
+    pub items: Vec<NewItem>,
+    pub abstentions: Vec<NewAbstention>,
+    pub first_pass_malformed: bool,
+    pub stages: StageCounts,
+}
+
+pub(crate) async fn window_candidates<F, Fut>(
+    window: &ChunkWindow,
+    cancel: &CancellationToken,
+    complete: &mut F,
+) -> Result<WindowCandidates, WindowStop>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
+    let first_reply = completion(EXTRACTION_SYSTEM_PROMPT, window.user_prompt.clone(), cancel, complete).await?;
+    let first = parse_extraction(&first_reply).ok();
+    let first_pass_malformed = first.is_none();
+    let (found, first_abstentions) = first.map(|parsed| verified(parsed, &window.segments)).unwrap_or_default();
+    let missed_reply = completion(MISSED_ITEMS_SYSTEM_PROMPT, missed_items_prompt(window, &found), cancel, complete).await?;
+    let missed = parse_extraction(&missed_reply).ok();
+    let missed_malformed = usize::from(missed.is_none());
+    let (added, missed_abstentions) = missed.map(|parsed| verified(parsed, &window.segments)).unwrap_or_default();
+    Ok(WindowCandidates {
+        stages: StageCounts {
+            completions: 2,
+            missed_added: added.len(),
+            missed_malformed,
+        },
+        items: found.into_iter().chain(added).collect(),
+        abstentions: first_abstentions.into_iter().chain(missed_abstentions).collect(),
+        first_pass_malformed,
+    })
+}
+
+async fn completion<F, Fut>(
+    system_prompt: &str,
+    user_prompt: String,
+    cancel: &CancellationToken,
+    complete: &mut F,
+) -> Result<String, WindowStop>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
+    if cancel.is_cancelled() {
+        return Err(WindowStop::Cancelled);
+    }
+    complete(system_prompt.to_string(), user_prompt)
+        .await
+        .map_err(|_| stop_reason(cancel))
+}
+
+fn stop_reason(cancel: &CancellationToken) -> WindowStop {
+    if cancel.is_cancelled() {
+        WindowStop::Cancelled
+    } else {
+        WindowStop::ProviderError
+    }
+}
+
+fn verified(parsed: ParsedExtraction, segments: &LabeledSegments) -> (Vec<NewItem>, Vec<NewAbstention>) {
+    let (items, abstentions): (Vec<_>, Vec<_>) = parsed
+        .items
+        .into_iter()
+        .map(|item| verify_item(item, segments))
+        .partition(Result::is_ok);
+    (
+        items.into_iter().filter_map(Result::ok).collect(),
+        parsed.rejected.into_iter().chain(abstentions.into_iter().filter_map(Result::err)).collect(),
+    )
+}
+
+fn verify_item(item: ParsedItem, segments: &LabeledSegments) -> Result<NewItem, NewAbstention> {
+    let (claims, first_failure) = verify_claims(&item, segments);
+    if claims.is_empty() {
+        return Err(NewAbstention {
+            reason: first_failure.unwrap_or(AbstentionReason::QuoteNotFound),
+            candidate_type: Some(item.item_type),
+        });
+    }
+    let claim_evidence_ids: Vec<String> = claims.iter().map(|span| span.evidence_id.clone()).collect();
+    Ok(NewItem {
+        item_id: Uuid::new_v4().to_string(),
+        item_type: item.item_type,
+        normalized_key: normalized_key(&item.text),
+        owner: attribute_support(item.owner.as_ref(), segments, &claim_evidence_ids),
+        due: attribute_support(item.due.as_ref(), segments, &claim_evidence_ids),
+        text: item.text,
+        claims,
+    })
+}
+
+fn verify_claims(
+    item: &ParsedItem,
+    segments: &LabeledSegments,
+) -> (Vec<VerifiedSpan>, Option<AbstentionReason>) {
+    let mut spans: Vec<VerifiedSpan> = Vec::new();
+    let mut first_failure = None;
+    for quote in &item.evidence {
+        match verify_claim_quote(&quote.segment, &quote.quote, segments) {
+            Ok(verified) => {
+                for span in verified {
+                    let duplicate = spans.iter().any(|known| {
+                        (known.evidence_id.as_str(), known.raw_start, known.raw_end)
+                            == (span.evidence_id.as_str(), span.raw_start, span.raw_end)
+                    });
+                    if !duplicate {
+                        spans.push(span);
+                    }
+                }
+            }
+            Err(reason) => first_failure = first_failure.or(Some(reason)),
+        }
+    }
+    (spans, first_failure)
+}
+
+fn attribute_support(
+    attribute: Option<&ParsedAttribute>,
+    segments: &LabeledSegments,
+    claim_evidence_ids: &[String],
+) -> AttributeSupport {
+    attribute
+        .map(|attribute| {
+            verify_attribute(&attribute.value, &attribute.segment, &attribute.quote, segments, claim_evidence_ids)
+        })
+        .unwrap_or(AttributeSupport::NotStated)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
