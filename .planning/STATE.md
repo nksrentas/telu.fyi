@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 current_phase: 02
 current_phase_name: Evidence-Linked Post-Meeting Knowledge
 status: verifying
-stopped_at: Completed 02-38-PLAN.md
-last_updated: "2026-10-18T07:03:29.977Z"
+stopped_at: Completed 02-40-PLAN.md
+last_updated: "2026-10-18T11:36:44.471Z"
 last_activity: 2026-10-17
 last_activity_desc: 02-37 held-out KNOW-07 evaluation committed (gate fail, KNOW-07 open)
-state_head: e4689bebdc377d1b1740e2bcc2caa9a593fc2c98
+state_head: e8882e3e983ef8a184ab34641e6c34f3d4755aa6
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 62
-  completed_plans: 57
+  completed_plans: 58
   percent: 17
 ---
 
@@ -112,6 +112,7 @@ Progress: [██░░░░░░░░] 17%
 | Phase 02 P35 | 90min | 2 tasks | 2 files |
 | Phase 02 P36 | 8min | 3 tasks | 3 files |
 | Phase 02 P38 | 54min | 3 tasks | 11 files |
+| Phase 02 P40 | 4h35min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -205,6 +206,8 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-37: held-out representative KNOW-07 evaluation (7 AMI meetings, run by Claude under delegation) scored gate fail with 18 failures; KNOW-07 open (representative_gate_not_pass); Phase 3 blocked
 - [Phase 02]: 02-38: telu-knowledge-eval live measures the production extraction headless on the local builtin model only, replays exactly with run --budget-tokens, and score --review-plan is development-only
 - [Phase 02]: 02-38: baseline dev measurement 02-38-1 (knowledge-extract-v2, e4689be) overall coverage 27/127, claimCorrectness 37/57, semanticSupport 22/57, review accepted+corrected 37/57; calibration 27/106 vs 02-37 25/106
+- [Phase 02]: 02-40: MAX_WINDOW_TOKENS 1500 (overall evidenceCoverage 57/127 vs 49/127 at 3000); missed-items pass removed (+0.016 < 0.02); labeled v3 base 02-40-4 at 98b98ed: coverage 48/127, claimCorrectness 110/157, semanticSupport 85/157, gate fail 18
+- [Phase 02]: 02-40: identical-config run-to-run variance on qwen3.5:4b is 0.055 overall evidenceCoverage; single 10-fixture runs cannot resolve 0.02 effects
 
 ### Pending Todos
 
@@ -242,6 +245,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-10-18T07:03:29.901Z
-Stopped at: Completed 02-38-PLAN.md
+Last session: 2026-10-18T11:36:44.411Z
+Stopped at: Completed 02-40-PLAN.md
 Resume file: None
