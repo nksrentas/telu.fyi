@@ -1,7 +1,7 @@
 use crate::database::models::{CaptureCompleteness, TranscriptEvidence};
 use crate::knowledge::span_verifier::{LabeledSegment, LabeledSegments};
 
-pub const PROMPT_VERSION: &str = "knowledge-extract-v3";
+pub const PROMPT_VERSION: &str = "knowledge-extract-v4";
 pub const WINDOW_OVERLAP_SEGMENTS: usize = 2;
 pub const RESERVED_OUTPUT_TOKENS: usize = 2000;
 pub const MIN_WINDOW_TOKENS: usize = 500;

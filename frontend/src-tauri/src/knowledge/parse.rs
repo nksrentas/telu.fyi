@@ -64,14 +64,18 @@ struct RawAttribute {
     quote: String,
 }
 
-pub fn parse_extraction(raw: &str) -> Result<ParsedExtraction, ParseFailure> {
+pub(crate) fn json_object(raw: &str) -> Result<Value, ParseFailure> {
     let cleaned = clean_llm_markdown_detailed(raw).markdown;
     let start = cleaned.find('{').ok_or(ParseFailure)?;
     let end = cleaned.rfind('}').ok_or(ParseFailure)?;
     if end <= start {
         return Err(ParseFailure);
     }
-    let root: Value = serde_json::from_str(&cleaned[start..=end]).map_err(|_| ParseFailure)?;
+    serde_json::from_str(&cleaned[start..=end]).map_err(|_| ParseFailure)
+}
+
+pub fn parse_extraction(raw: &str) -> Result<ParsedExtraction, ParseFailure> {
+    let root = json_object(raw)?;
     let entries = root
         .get("items")
         .and_then(Value::as_array)
@@ -82,6 +86,25 @@ pub fn parse_extraction(raw: &str) -> Result<ParsedExtraction, ParseFailure> {
         .fold(ParsedExtraction::default(), |parsed, (index, entry)| {
             with_entry(parsed, validate_entry(index, entry))
         }))
+}
+
+pub(crate) fn parse_verdicts<V>(
+    raw: &str,
+    read: impl Fn(&str, &Value) -> Option<V>,
+) -> Result<Vec<(String, V)>, ParseFailure> {
+    let root = json_object(raw)?;
+    let entries = root
+        .get("verdicts")
+        .and_then(Value::as_array)
+        .ok_or(ParseFailure)?;
+    Ok(entries
+        .iter()
+        .filter_map(|entry| {
+            let id = entry.get("id")?.as_str()?.trim().to_string();
+            let verdict = entry.get("verdict")?.as_str()?.trim().to_lowercase();
+            read(&verdict, entry).map(|verdict| (id, verdict))
+        })
+        .collect())
 }
 
 fn with_entry(parsed: ParsedExtraction, entry: Result<ParsedItem, NewAbstention>) -> ParsedExtraction {

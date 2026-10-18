@@ -5,6 +5,7 @@ use crate::knowledge::parse::{parse_extraction, ParsedAttribute, ParsedExtractio
 use crate::knowledge::prompt::{ChunkWindow, EXTRACTION_SYSTEM_PROMPT};
 use crate::knowledge::repository::{NewAbstention, NewItem};
 use crate::knowledge::span_verifier::{verify_attribute, verify_claim_quote, AttributeSupport, LabeledSegments, VerifiedSpan};
+use crate::knowledge::support::{apply_support, parse_support, support_prompt, SUPPORT_SYSTEM_PROMPT};
 use serde::Serialize;
 use std::future::Future;
 use std::ops::Add;
@@ -15,6 +16,10 @@ use uuid::Uuid;
 #[serde(rename_all = "camelCase")]
 pub struct StageCounts {
     pub completions: usize,
+    pub support_checks: usize,
+    pub support_trimmed: usize,
+    pub support_dropped: usize,
+    pub support_unparsed: usize,
 }
 
 impl Add for StageCounts {
@@ -23,6 +28,10 @@ impl Add for StageCounts {
     fn add(self, other: Self) -> Self {
         Self {
             completions: self.completions + other.completions,
+            support_checks: self.support_checks + other.support_checks,
+            support_trimmed: self.support_trimmed + other.support_trimmed,
+            support_dropped: self.support_dropped + other.support_dropped,
+            support_unparsed: self.support_unparsed + other.support_unparsed,
         }
     }
 }
@@ -43,21 +52,61 @@ where
     F: FnMut(String, String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
 {
-    if cancel.is_cancelled() {
-        return Err(WindowStop::Cancelled);
-    }
-    let reply = complete(EXTRACTION_SYSTEM_PROMPT.to_string(), window.user_prompt.clone())
-        .await
-        .map_err(|_| stop_reason(cancel))?;
+    let reply = ask(EXTRACTION_SYSTEM_PROMPT, window.user_prompt.clone(), cancel, complete).await?;
     let parsed = parse_extraction(&reply).ok();
     let malformed = parsed.is_none();
     let (items, abstentions) = parsed.map(|parsed| verified(parsed, &window.segments)).unwrap_or_default();
+    let (items, support) = support_checked(items, cancel, complete).await?;
     Ok(WindowCandidates {
         items,
         abstentions,
         malformed,
-        stages: StageCounts { completions: 1 },
+        stages: StageCounts { completions: 1, ..StageCounts::default() } + support,
     })
+}
+
+async fn support_checked<F, Fut>(
+    items: Vec<NewItem>,
+    cancel: &CancellationToken,
+    complete: &mut F,
+) -> Result<(Vec<NewItem>, StageCounts), WindowStop>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
+    if items.is_empty() {
+        return Ok((items, StageCounts::default()));
+    }
+    let reply = ask(SUPPORT_SYSTEM_PROMPT, support_prompt(&items), cancel, complete).await?;
+    let (items, counts) = apply_support(items, parse_support(&reply));
+    Ok((
+        items,
+        StageCounts {
+            completions: 1,
+            support_checks: 1,
+            support_trimmed: counts.trimmed,
+            support_dropped: counts.dropped,
+            support_unparsed: counts.unparsed,
+        },
+    ))
+}
+
+async fn ask<F, Fut>(
+    system_prompt: &str,
+    user_prompt: String,
+    cancel: &CancellationToken,
+    complete: &mut F,
+) -> Result<String, WindowStop>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
+    if cancel.is_cancelled() {
+        return Err(WindowStop::Cancelled);
+    }
+    complete(system_prompt.to_string(), user_prompt)
+        .await
+        .map_err(|_| stop_reason(cancel))
 }
 
 fn stop_reason(cancel: &CancellationToken) -> WindowStop {
@@ -145,7 +194,6 @@ mod tests {
     use crate::knowledge::prompt::{chunk_windows, label_segments};
     use crate::knowledge::test_support::{insert_evidence, insert_meeting, migrated_pool, MEETING_ID};
     use crate::database::repositories::transcript::TranscriptsRepository;
-    use crate::knowledge::support::SUPPORT_SYSTEM_PROMPT;
     use crate::knowledge::test_support::staged_replies;
     use std::future::{ready, Ready};
     use std::sync::{Arc, Mutex};

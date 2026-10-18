@@ -1,13 +1,125 @@
+use crate::knowledge::matcher::normalized_key;
+use crate::knowledge::parse::{parse_verdicts, ParseFailure, MAX_TEXT_CHARS};
+use crate::knowledge::repository::NewItem;
+use crate::knowledge::span_verifier::AttributeSupport;
+use serde_json::Value;
+use std::iter::once;
+
+pub const SUPPORT_SYSTEM_PROMPT: &str = r#"You check knowledge items extracted from a meeting against the exact quotes they cite. Output JSON only, no prose.
+Each item has an id, a type, a text and its quotes, plus owner and due when stated.
+Give every item one verdict:
+- "keep": the quotes alone state everything the text says.
+- "trim": the quotes support the main point, but the text adds details they do not state. Give a shorter "text" that says only what the quotes state.
+- "drop": the quotes do not support the main point of the text; or the item is a decision but its quotes show a proposal, an option, a suggestion, "could", "maybe" or a condition rather than agreement; or the item is a commitment but no one in its quotes takes it on; or the item is a question but its quotes do not ask a question.
+Judge only from the quotes. Never add details. Give one verdict for every id.
+Schema: {"verdicts":[{"id":"C1","verdict":"keep"},{"id":"C2","verdict":"trim","text":"..."},{"id":"C3","verdict":"drop"}]}"#;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SupportVerdict {
+    Keep,
+    Trim(String),
+    Drop,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct SupportCounts {
+    pub trimmed: usize,
+    pub dropped: usize,
+    pub unparsed: usize,
+}
+
+pub(crate) fn candidate_id(index: usize) -> String {
+    format!("C{}", index + 1)
+}
+
+pub(crate) fn verdict_for<V>(verdicts: &[(String, V)], index: usize) -> Option<&V> {
+    let id = candidate_id(index);
+    verdicts.iter().find(|(known, _)| *known == id).map(|(_, verdict)| verdict)
+}
+
+pub fn support_prompt(candidates: &[NewItem]) -> String {
+    candidates
+        .iter()
+        .enumerate()
+        .map(|(index, candidate)| candidate_block(index, candidate))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn candidate_block(index: usize, candidate: &NewItem) -> String {
+    let quotes = candidate.claims.iter().map(|span| format!("  quote: \"{}\"", span.quote_text));
+    let attributes = [("owner", &candidate.owner), ("due", &candidate.due)]
+        .into_iter()
+        .filter_map(|(name, attribute)| match attribute {
+            AttributeSupport::Stated { text, .. } => Some(format!("  {name}: {text}")),
+            AttributeSupport::NotStated => None,
+        });
+    once(format!("{} {}: {}", candidate_id(index), candidate.item_type.as_str(), candidate.text))
+        .chain(quotes)
+        .chain(attributes)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+pub fn parse_support(raw: &str) -> Result<Vec<(String, SupportVerdict)>, ParseFailure> {
+    parse_verdicts(raw, |verdict, entry| match verdict {
+        "keep" => Some(SupportVerdict::Keep),
+        "drop" => Some(SupportVerdict::Drop),
+        "trim" => Some(SupportVerdict::Trim(
+            entry.get("text").and_then(Value::as_str).unwrap_or_default().to_string(),
+        )),
+        _ => None,
+    })
+}
+
+pub fn apply_support(
+    candidates: Vec<NewItem>,
+    verdicts: Result<Vec<(String, SupportVerdict)>, ParseFailure>,
+) -> (Vec<NewItem>, SupportCounts) {
+    let Ok(verdicts) = verdicts else {
+        let unparsed = candidates.len();
+        return (candidates, SupportCounts { unparsed, ..SupportCounts::default() });
+    };
+    let mut kept = Vec::with_capacity(candidates.len());
+    let mut counts = SupportCounts::default();
+    for (index, candidate) in candidates.into_iter().enumerate() {
+        match verdict_for(&verdicts, index) {
+            Some(SupportVerdict::Keep) => kept.push(candidate),
+            Some(SupportVerdict::Drop) => counts.dropped += 1,
+            Some(SupportVerdict::Trim(text)) if text.trim() == candidate.text => kept.push(candidate),
+            Some(SupportVerdict::Trim(text)) if is_usable_text(text) => {
+                counts.trimmed += 1;
+                kept.push(trimmed(candidate, text.trim()));
+            }
+            _ => {
+                counts.unparsed += 1;
+                kept.push(candidate);
+            }
+        }
+    }
+    (kept, counts)
+}
+
+fn is_usable_text(text: &str) -> bool {
+    let text = text.trim();
+    !text.is_empty() && text.chars().count() <= MAX_TEXT_CHARS
+}
+
+fn trimmed(candidate: NewItem, text: &str) -> NewItem {
+    NewItem {
+        normalized_key: normalized_key(text),
+        text: text.to_string(),
+        ..candidate
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::knowledge::matcher::normalized_key;
     use crate::knowledge::models::KnowledgeType;
-    use crate::knowledge::parse::{ParseFailure, MAX_TEXT_CHARS};
-    use crate::knowledge::span_verifier::AttributeSupport;
     use crate::knowledge::test_support::verified_item;
 
-    fn candidates() -> Vec<crate::knowledge::repository::NewItem> {
+    fn candidates() -> Vec<NewItem> {
         let mut owned = verified_item(KnowledgeType::Commitment, "Maria writes the notes by Monday", "e2", "Maria will write the notes");
         owned.owner = AttributeSupport::Stated {
             text: "Maria".to_string(),
