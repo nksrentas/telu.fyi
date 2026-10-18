@@ -1,19 +1,25 @@
 use crate::database::models::{CaptureCompleteness, TranscriptEvidence};
 use crate::knowledge::span_verifier::{LabeledSegment, LabeledSegments};
 
-pub const PROMPT_VERSION: &str = "knowledge-extract-v2";
+pub const PROMPT_VERSION: &str = "knowledge-extract-v3";
 pub const WINDOW_OVERLAP_SEGMENTS: usize = 2;
 pub const RESERVED_OUTPUT_TOKENS: usize = 2000;
 pub const MIN_WINDOW_TOKENS: usize = 500;
+pub const MAX_WINDOW_TOKENS: usize = 1500;
 const CHARS_PER_TOKEN: usize = 4;
 
-pub const EXTRACTION_SYSTEM_PROMPT: &str = r#"You extract meeting knowledge from a transcript. Output JSON only, no prose.
-Types: "decision" (something agreed), "commitment" (someone will do something), "question" (asked and not answered in the transcript), "fact" (a stated fact relevant later).
+pub const EXTRACTION_SYSTEM_PROMPT: &str = r#"You extract meeting knowledge from one part of a meeting transcript. Output JSON only, no prose.
+Types:
+- "decision": something the participants agreed or settled in this transcript. Never a proposal, an option, a suggestion, "could", "maybe", "should we", a condition, or a recap of an earlier meeting that this transcript changes.
+- "commitment": a person or group agreeing to do something.
+- "question": asked here and not answered anywhere later in this transcript.
+- "fact": a specific stated fact that matters later (a number, requirement, constraint, date or name). Not an opinion, a joke or a guess.
 Rules:
-- Every item needs at least one evidence entry: {"segment": "<label>", "quote": "<exact words copied from that segment>"}.
+- Every item needs at least one evidence entry: {"segment": "<label>", "quote": "<exact words copied from that segment>"}. Give up to 3 evidence entries.
 - Copy quotes character for character from the labeled segment. Never paraphrase inside "quote".
-- "owner" and "due" only when the words name them; give their own segment and quote. Otherwise null.
-- Never guess who "I" or "we" is.
+- The "text" says only what its quotes say. Every key detail of the text (who, what, number, date, name) appears inside one of its quotes. Write numbers the way the quote says them.
+- Fill "owner" and "due" when the words state them, including roles such as "the project manager", groups such as "each of you", "everyone" or "the team", and relative times such as "by the next meeting", "in thirty minutes" or "tomorrow". Give each its own segment and a quote containing those exact words, and also cite that segment in "evidence". Never guess who "I" or "we" is. Otherwise use null.
+- List every qualifying item separately. Do not merge different items and do not repeat an item.
 - If nothing qualifies, return {"items": []}.
 Schema: {"items":[{"type":"...","text":"...","evidence":[{"segment":"S3","quote":"..."}],"owner":{"value":"...","segment":"S4","quote":"..."}|null,"due":{"value":"...","segment":"S4","quote":"..."}|null}]}"#;
 
@@ -40,7 +46,10 @@ pub fn label_segments(evidence: &[TranscriptEvidence]) -> LabeledSegments {
 }
 
 pub fn window_budget(context_tokens: usize) -> usize {
-    context_tokens.saturating_sub(RESERVED_OUTPUT_TOKENS).max(MIN_WINDOW_TOKENS)
+    context_tokens
+        .saturating_sub(RESERVED_OUTPUT_TOKENS)
+        .max(MIN_WINDOW_TOKENS)
+        .min(MAX_WINDOW_TOKENS)
 }
 
 pub fn chunk_windows(segments: &LabeledSegments, budget_tokens: usize) -> Vec<ChunkWindow> {
