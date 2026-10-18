@@ -8,7 +8,7 @@ use crate::knowledge::support::{candidate_id, verdict_for};
 pub const FOLLOWUP_SYSTEM_PROMPT: &str = r#"You check whether knowledge items from a meeting still stand later in the same meeting. Output JSON only, no prose.
 You get the transcript from where the items were said onward, one labeled segment per line, and the items. Each item has an id, a type, a text and the label of the segment where it was said.
 For each item read only the transcript after its label and give one verdict:
-- "answered": the item is a question and a later segment answers it.
+- "answered": the item is a question and any later segment responds to it with an answer, even a short, partial or tentative one, or the group settles it. A question stands only if no later segment responds to it at all.
 - "superseded": the item is a decision, commitment or fact and a later segment reverses, replaces or contradicts it, or the item recaps an earlier meeting and a later segment changes it.
 - "stands": otherwise, including when nothing later talks about it.
 Give one verdict for every id.
