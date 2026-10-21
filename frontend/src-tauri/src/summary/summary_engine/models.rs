@@ -189,6 +189,18 @@ pub fn get_available_models() -> Vec<ModelDef> {
             sampling: SamplingParams::qwen35_summary(vec!["<|im_end|>".to_string()]),
             description: "High-quality Qwen 3.5 model for built-in summaries. Best local Qwen option in the current lineup.".to_string(),
         },
+        ModelDef {
+            name: "qwen3.5:9b".to_string(),
+            display_name: "Qwen 3.5 9B".to_string(),
+            gguf_file: "Qwen3.5-9B-Q4_K_M.gguf".to_string(),
+            template: "qwen3.5_nonthinking".to_string(),
+            download_url: "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf".to_string(),
+            size_mb: 5417,
+            context_size: 32768,
+            layer_count: 32,
+            sampling: SamplingParams::qwen35_summary(vec!["<|im_end|>".to_string()]),
+            description: "Largest local Qwen 3.5 model for built-in summaries. Slower than the 4B and needs more memory.".to_string(),
+        },
         // Gemma 3 4B - Legacy alternative retained for users who prefer Gemma output.
         ModelDef {
             name: "gemma3:4b".to_string(),
