@@ -361,6 +361,32 @@ mod tests {
     }
 
     #[test]
+    fn qwen35_9b_is_registered_after_the_4b_with_the_pinned_revision() {
+        let qwen_9b = get_model_by_name("qwen3.5:9b").expect("qwen 9b model should exist");
+        assert_eq!(qwen_9b.display_name, "Qwen 3.5 9B");
+        assert_eq!(qwen_9b.gguf_file, "Qwen3.5-9B-Q4_K_M.gguf");
+        assert_eq!(qwen_9b.template, "qwen3.5_nonthinking");
+        assert_eq!(
+            qwen_9b.download_url,
+            "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf"
+        );
+        assert_eq!(qwen_9b.size_mb, 5417);
+        assert_eq!(qwen_9b.context_size, 32768);
+        assert_eq!(qwen_9b.layer_count, 32);
+        assert!(!qwen_9b.description.is_empty());
+        assert_eq!(qwen_9b.sampling, SamplingParams::qwen35_summary(vec!["<|im_end|>".to_string()]));
+
+        let models = get_available_models();
+        let index_of = |name: &str| models.iter().position(|m| m.name == name).expect("model should be listed");
+        assert_eq!(index_of("qwen3.5:9b"), index_of("qwen3.5:4b") + 1);
+        assert_eq!(get_default_model().name, "qwen3.5:2b");
+        assert!(format_prompt(&qwen_9b.template, "s", "u").is_ok());
+
+        let model_path = get_model_path(&PathBuf::from("/app-data"), "qwen3.5:9b").unwrap();
+        assert!(model_path.ends_with("models/summary/Qwen3.5-9B-Q4_K_M.gguf"));
+    }
+
+    #[test]
     fn gemma_models_use_huggingface_urls_and_gemma3_instruct_sampling() {
         let gemma_1b = get_model_by_name("gemma3:1b").expect("gemma 1b model should exist");
         assert_eq!(gemma_1b.gguf_file, "gemma-3-1b-it-Q8_0.gguf");
