@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Telu sketch 002 — Knowledge card expansion</title>
+  <link rel="stylesheet" href="../themes/default.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 58px 24px 72px; background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans); }
+    button, input, textarea, select { font: inherit; }
+    button { color: inherit; }
+    .variant-nav { position: fixed; inset: 0 0 auto; z-index: 100; height: 46px; padding: 7px 14px; display: flex; justify-content: center; gap: 6px; background: rgba(255,255,255,.94); border-bottom: 1px solid var(--color-border); backdrop-filter: blur(14px); }
+    .variant-tab { padding: 7px 12px; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); cursor: pointer; transition: all .15s ease; }
+    .variant-tab:hover { background: var(--color-bg); color: var(--color-text); }
+    .variant-tab.active { color: var(--color-primary); background: var(--color-primary-soft); border-color: #dcdcff; font-weight: 650; }
+    #preview-shell { max-width: 1280px; margin: 0 auto; transition: max-width .25s ease; }
+    .variant { display: none; }
+    .variant.active { display: block; }
+    .caption { max-width: 900px; margin: 0 auto 14px; color: var(--color-text-muted); font-size: var(--text-sm); text-align: center; }
+    .app { position: relative; height: min(760px, calc(100vh - 150px)); min-height: 580px; display: grid; grid-template-columns: minmax(290px, 36%) 1fr; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 14px; box-shadow: var(--shadow-md); }
+    .transcript { display: flex; min-width: 0; flex-direction: column; border-right: 1px solid var(--color-border); background: #fcfcfa; }
+    .panel-head { min-height: 64px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+    .panel-title { font-size: var(--text-sm); font-weight: 720; }
+    .tiny { font-size: var(--text-xs); }
+    .muted { color: var(--color-text-muted); }
+    .transcript-list { padding: 18px; overflow: auto; }
+    .turn { display: grid; grid-template-columns: 46px 1fr; gap: 10px; padding: 9px 8px; margin-bottom: 5px; border-radius: var(--radius-md); transition: all .15s ease; }
+    .turn time { color: var(--color-text-muted); font: 11px var(--font-mono); padding-top: 3px; }
+    .turn p { margin: 0; color: #41444d; font-size: 13px; line-height: 1.5; }
+    .turn strong { display: block; margin-bottom: 2px; color: var(--color-text); font-size: 12px; }
+    .turn.is-source { background: var(--color-primary-soft); outline: 2px solid rgba(99,102,232,.28); }
+    .knowledge { min-width: 0; display: flex; flex-direction: column; background: var(--color-bg); }
+    .meeting-bar { min-height: 64px; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+    .meeting-title { font-size: var(--text-base); font-weight: 720; }
+    .pane-tabs { display: flex; gap: 4px; padding: 4px; background: var(--color-bg); border-radius: var(--radius-md); }
+    .pane-tab { padding: 6px 11px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-muted); font-size: 12px; }
+    .pane-tab.active { color: var(--color-text); background: var(--color-surface); box-shadow: var(--shadow-sm); font-weight: 650; }
+    .knowledge-head { padding: 18px 24px 12px; }
+    .knowledge-head h1 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.02em; }
+    .knowledge-head p { margin: 0; color: var(--color-text-muted); font-size: 13px; }
+    .content { padding: 0 24px 30px; overflow: auto; }
+    .group-head { margin: 18px 0 9px; display: flex; justify-content: space-between; align-items: center; }
+    .group-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 760; letter-spacing: .05em; text-transform: uppercase; }
+    .type-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); }
+    .count { padding: 2px 7px; border-radius: 999px; background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 11px; }
+    .card { margin-bottom: 9px; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--shadow-sm); transition: all .15s ease; }
+    .card:hover { border-color: #cacbf4; box-shadow: 0 4px 16px rgba(23,25,31,.06); }
+    .card-main { padding: 14px 15px; }
+    .card-top { display: flex; align-items: flex-start; gap: 11px; }
+    .type-icon { flex: 0 0 auto; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 12px; font-weight: 800; }
+    .claim-wrap { min-width: 0; flex: 1; }
+    .claim { margin: 1px 0 7px; font-size: 14px; line-height: 1.42; font-weight: 640; }
+    .meta-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .pill { display: inline-flex; align-items: center; gap: 5px; min-height: 23px; padding: 2px 7px; border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 11px; }
+    .pill.pending::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #d49a50; }
+    .evidence-chip { background: var(--color-primary-soft); border-color: #d9d9fa; color: #4f52c9; cursor: pointer; }
+    .evidence-chip:hover { border-color: var(--color-primary); background: #e7e7ff; }
+    .review-button { flex: 0 0 auto; min-height: 30px; padding: 5px 9px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); color: #555a65; font-size: 12px; font-weight: 650; cursor: pointer; transition: all .15s ease; }
+    .review-button:hover { border-color: #b9baf1; color: var(--color-primary); background: var(--color-primary-soft); }
+    .expanded { display: none; padding: 0 16px 16px 54px; background: var(--color-surface); }
+    .card.open .expanded { display: block; animation: reveal .18s ease; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 14px; }
+    .field { padding: 9px 10px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface-soft); }
+    .field-label { display: block; margin-bottom: 3px; color: var(--color-text-muted); font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+    .field-value { font-size: 12px; }
+    .quote-block { padding: 12px; border-radius: 8px; background: var(--color-primary-soft); }
+    .quote { margin: 0; padding-left: 11px; border-left: 2px solid var(--color-primary); color: #4f535e; font-size: 12px; line-height: 1.5; }
+    .provenance { margin-top: 8px; color: var(--color-text-muted); font-size: 11px; }
+    .review-actions { display: flex; align-items: center; gap: 7px; margin-top: 14px; }
+    .action { min-height: 31px; padding: 5px 10px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); color: #555a65; font-size: 12px; font-weight: 650; cursor: pointer; transition: all .15s ease; }
+    .action:hover { border-color: #b9baf1; color: var(--color-primary); }
+    .action.primary { margin-left: auto; background: var(--color-primary); border-color: var(--color-primary); color: white; }
+    .action.primary:hover { background: var(--color-primary-hover); }
+    .action.reject:hover { color: #c44740; border-color: #f0b1ad; background: var(--color-danger-soft); }
+    .correct-form { display: none; margin-top: 12px; }
+    .correct-form.open { display: block; animation: reveal .18s ease; }
+    .correct-form textarea { width: 100%; min-height: 74px; padding: 9px 10px; border: 1px solid #bfc0f0; border-radius: 7px; background: white; color: var(--color-text); resize: vertical; }
+    .correct-form textarea:focus { outline: 2px solid rgba(99,102,232,.18); border-color: var(--color-primary); }
+    .sheet-scrim { position: absolute; inset: 0; z-index: 20; display: none; background: rgba(23,25,31,.2); }
+    .sheet-scrim.open { display: block; }
+    .sheet { position: absolute; z-index: 21; inset: 0 0 0 auto; width: min(520px, 76%); display: flex; flex-direction: column; background: var(--color-surface); box-shadow: -18px 0 45px rgba(23,25,31,.18); transform: translateX(105%); transition: transform .22s ease; }
+    .sheet.open { transform: translateX(0); }
+    .sheet-head, .dialog-head { padding: 17px 20px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--color-border); }
+    .icon-button { width: 30px; height: 30px; border: 0; border-radius: 7px; background: var(--color-bg); color: var(--color-text-muted); cursor: pointer; }
+    .icon-button:hover { color: var(--color-text); background: var(--color-border); }
+    .sheet-body { flex: 1; padding: 22px; overflow: auto; }
+    .sheet-body h2, .dialog-body h2 { margin: 8px 0 18px; font-size: 20px; line-height: 1.4; }
+    .history { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--color-border); }
+    .history-row { display: grid; grid-template-columns: 72px 1fr; gap: 10px; margin-top: 9px; font-size: 12px; }
+    .dialog-scrim { position: absolute; inset: 0; z-index: 30; display: none; place-items: center; padding: 24px; background: rgba(23,25,31,.36); backdrop-filter: blur(2px); }
+    .dialog-scrim.open { display: grid; }
+    .dialog { width: min(660px, 94%); max-height: 90%; overflow: auto; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 13px; box-shadow: var(--shadow-lg); animation: dialogIn .18s ease; }
+    .dialog-body { padding: 22px; }
+    .stepper { display: flex; align-items: center; gap: 7px; color: var(--color-text-muted); font-size: 12px; }
+    .step-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-border-strong); }
+    .step-dot.active { width: 18px; border-radius: 99px; background: var(--color-primary); }
+    #toast { position: fixed; left: 50%; bottom: 24px; z-index: 150; padding: 9px 13px; border-radius: 8px; background: #252832; color: white; font-size: 12px; box-shadow: var(--shadow-lg); opacity: 0; transform: translate(-50%,16px); pointer-events: none; transition: all .2s ease; }
+    #toast.show { opacity: 1; transform: translate(-50%,0); }
+    #sketch-tools { position: fixed; right: 12px; bottom: 12px; z-index: 140; display: flex; gap: 5px; align-items: center; padding: 7px 9px; border-radius: 9px; background: rgba(20,22,28,.78); color: white; font: 11px system-ui; opacity: .42; transition: opacity .2s ease; }
+    #sketch-tools:hover { opacity: 1; }
+    #sketch-tools button, #sketch-tools select { padding: 4px 6px; border: 1px solid rgba(255,255,255,.22); border-radius: 5px; background: rgba(255,255,255,.08); color: white; cursor: pointer; }
+    #sketch-tools option { color: black; }
+    .annotated .card, .annotated .panel-head, .annotated .meeting-bar { outline: 1px dashed rgba(255,107,98,.8); outline-offset: -2px; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
+    @keyframes dialogIn { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: none; } }
+    @media (max-width: 720px) {
+      body { padding-inline: 8px; }
+      .app { grid-template-columns: 1fr; min-height: 650px; }
+      .transcript { display: none; }
+      .content, .knowledge-head { padding-inline: 16px; }
+      .sheet { width: 100%; }
+      .detail-grid { grid-template-columns: 1fr; }
+      .variant-nav { overflow-x: auto; justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="variant-nav" aria-label="Sketch variants">
+    <button class="variant-tab active" onclick="showVariant('a', this)">A: Inline accordion</button>
+    <button class="variant-tab" onclick="showVariant('b', this)">B: Review sheet</button>
+    <button class="variant-tab" onclick="showVariant('c', this)">C: Focused dialog</button>
+  </nav>
+
+  <main id="preview-shell">
+    <section id="variant-a" class="variant active">
+      <p class="caption"><strong>Variant A</strong> expands the candidate where it already lives. The grouped list and transcript stay visible.</p>
+      <div class="app"><aside class="transcript">__TRANSCRIPT__</aside><section class="knowledge">__HEADER__<div class="content">__GROUP_HEAD____INLINE_CARD____SECOND_CARD__</div></section></div>
+    </section>
+    <section id="variant-b" class="variant">
+      <p class="caption"><strong>Variant B</strong> uses a side sheet for more room while preserving a faint sense of the list underneath.</p>
+      <div class="app"><aside class="transcript">__TRANSCRIPT__</aside><section class="knowledge">__HEADER__<div class="content">__GROUP_HEAD____SHEET_CARD____SECOND_CARD__</div></section><div class="sheet-scrim" onclick="closeSheet(this.closest('.app'))"></div>__SHEET__</div>
+    </section>
+    <section id="variant-c" class="variant">
+      <p class="caption"><strong>Variant C</strong> turns review into a focused modal step with explicit previous/next navigation.</p>
+      <div class="app"><aside class="transcript">__TRANSCRIPT__</aside><section class="knowledge">__HEADER__<div class="content">__GROUP_HEAD____DIALOG_CARD____SECOND_CARD__</div></section>__DIALOG__</div>
+    </section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <div id="sketch-tools">
+    <label>Theme <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Telu</option></select></label>
+    <button onclick="setViewport('375px')">Phone</button><button onclick="setViewport('768px')">Tablet</button><button onclick="setViewport('1280px')">Desktop</button><button onclick="document.body.classList.toggle('annotated')">Annotate</button>
+  </div>
+
+  <script>
+    const transcript = `<div class="panel-head"><div><div class="panel-title">Transcript</div><div class="tiny muted">Product pilot review · 38 min</div></div><span class="pill">Complete</span></div><div class="transcript-list"><div class="turn"><time>14:03</time><p><strong>Leon</strong>The support team can join the pilot, but we should keep the first round intentionally small.</p></div><div class="turn" id="turn-1408"><time>14:08</time><p><strong>Maya</strong>Let's keep the pilot to three customer teams. Nora will own recruiting and share the list by Friday.</p></div><div class="turn" id="turn-1411"><time>14:11</time><p><strong>Leon</strong>The launch date stays June 17. We are not moving it unless legal finds a blocker.</p></div><div class="turn"><time>14:16</time><p><strong>Nora</strong>I can share the recruiting list. I need to check whether Friday means this week or next.</p></div></div>`;
+    const header = `<div class="meeting-bar"><div><div class="meeting-title">Product pilot review</div><div class="tiny muted">September 27 · Complete transcript</div></div><div class="pane-tabs"><button class="pane-tab">Summary</button><button class="pane-tab active">Knowledge</button></div></div><div class="knowledge-head"><h1>Meeting knowledge</h1><p>Review what Telu found before it can be used later.</p></div>`;
+    const groupHead = `<div class="group-head"><div class="group-label"><span class="type-dot"></span>Decisions <span class="count">2</span></div><span class="tiny muted">1 needs review</span></div>`;
+    function restingCard(mode) { return `<article class="card"><div class="card-main"><div class="card-top"><span class="type-icon">D</span><div class="claim-wrap"><p class="claim">Pilot will be limited to three customer teams.</p><div class="meta-line"><span class="pill pending">Needs review</span><button class="pill evidence-chip" data-source="turn-1408">Transcript · 14:08</button></div></div><button class="review-button" data-open="${mode}">Review details</button></div></div>${mode==='inline' ? inlineDetail() : ''}</article>`; }
+    const secondCard = `<article class="card"><div class="card-main"><div class="card-top"><span class="type-icon">D</span><div class="claim-wrap"><p class="claim">The launch date remains June 17.</p><div class="meta-line"><span class="pill" style="color:var(--color-success);background:var(--color-success-soft);border-color:#cbeadf">Accepted</span><button class="pill evidence-chip" data-source="turn-1411">Transcript · 14:11</button></div></div><button class="review-button" onclick="toast('Accepted item history would open')">View history</button></div></div></article>`;
+    function detailContents(extra='') { return `<span class="pill pending">Needs review</span><h2>Pilot will be limited to three customer teams.</h2><div class="detail-grid"><div class="field"><span class="field-label">Type</span><span class="field-value">Decision</span></div><div class="field"><span class="field-label">Future use</span><span class="field-value">Not eligible until accepted</span></div></div><div class="quote-block"><button class="pill evidence-chip" data-source="turn-1408">Exact evidence · 14:08</button><p class="quote" style="margin-top:10px">“Let's keep the pilot to three customer teams.”</p><div class="provenance">Final transcript evidence · Derived in run K-0927-01</div></div>${extra}<div class="correct-form"><label class="field-label" for="correction">Corrected wording</label><textarea id="correction">Pilot will include three customer teams in the first round.</textarea><div class="review-actions"><button class="action" onclick="this.closest('.correct-form').classList.remove('open')">Cancel</button><button class="action primary" onclick="saveCorrection(this)">Save revision</button></div></div><div class="review-actions"><button class="action reject" data-action="reject">Reject</button><button class="action" data-action="correct">Correct</button><button class="action primary" data-action="accept">Accept</button></div>`; }
+    function inlineDetail() { return `<div class="expanded">${detailContents('<div class="history"><span class="field-label">History</span><div class="history-row"><span class="muted">Now</span><span>Proposed by Telu · awaiting review</span></div></div>')}</div>`; }
+    const sheet = `<div class="sheet"><div class="sheet-head"><div><strong>Review candidate</strong><div class="tiny muted">Decision · 1 exact source</div></div><button class="icon-button" aria-label="Close" onclick="closeSheet(this.closest('.app'))">×</button></div><div class="sheet-body">${detailContents('<div class="history"><span class="field-label">History</span><div class="history-row"><span class="muted">Now</span><span>Proposed by Telu · awaiting review</span></div></div>')}</div></div>`;
+    const dialog = `<div class="dialog-scrim"><div class="dialog"><div class="dialog-head"><div class="stepper"><span class="step-dot active"></span><span class="step-dot"></span><span>1 of 2 decisions</span></div><button class="icon-button" aria-label="Close" onclick="closeDialog(this.closest('.app'))">×</button></div><div class="dialog-body">${detailContents('')}<div class="review-actions" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--color-border)"><button class="action" onclick="toast('Previous candidate')">← Previous</button><button class="action primary" onclick="toast('Next candidate')">Next →</button></div></div></div></div>`;
+    const values = {'__TRANSCRIPT__':transcript,'__HEADER__':header,'__GROUP_HEAD__':groupHead,'__INLINE_CARD__':restingCard('inline'),'__SHEET_CARD__':restingCard('sheet'),'__DIALOG_CARD__':restingCard('dialog'),'__SECOND_CARD__':secondCard,'__SHEET__':sheet,'__DIALOG__':dialog};
+    document.querySelectorAll('.variant').forEach(section => { let html=section.innerHTML; Object.entries(values).forEach(([token,value]) => html=html.split(token).join(value)); section.innerHTML=html; });
+    function showVariant(id, button) { document.querySelectorAll('.variant').forEach(v => v.classList.toggle('active',v.id==='variant-'+id)); document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active')); button.classList.add('active'); clearHighlights(); }
+    function setViewport(width) { document.getElementById('preview-shell').style.maxWidth=width; toast('Viewport set to '+width); }
+    function toast(message) { const el=document.getElementById('toast'); el.textContent=message; el.classList.add('show'); clearTimeout(window.toastTimer); window.toastTimer=setTimeout(()=>el.classList.remove('show'),1600); }
+    function clearHighlights() { document.querySelectorAll('.turn').forEach(t=>t.classList.remove('is-source')); }
+    function openSheet(app) { app.querySelector('.sheet-scrim').classList.add('open'); app.querySelector('.sheet').classList.add('open'); }
+    function closeSheet(app) { app.querySelector('.sheet-scrim').classList.remove('open'); app.querySelector('.sheet').classList.remove('open'); }
+    function openDialog(app) { app.querySelector('.dialog-scrim').classList.add('open'); }
+    function closeDialog(app) { app.querySelector('.dialog-scrim').classList.remove('open'); }
+    function saveCorrection(button) { button.closest('.correct-form').classList.remove('open'); toast('Revision saved; original preserved'); }
+    document.addEventListener('click', event => {
+      const opener=event.target.closest('[data-open]');
+      if(opener){ const app=opener.closest('.app'); if(opener.dataset.open==='inline'){ opener.closest('.card').classList.toggle('open'); opener.textContent=opener.closest('.card').classList.contains('open')?'Hide details':'Review details'; } if(opener.dataset.open==='sheet') openSheet(app); if(opener.dataset.open==='dialog') openDialog(app); return; }
+      const evidence=event.target.closest('.evidence-chip');
+      if(evidence){ clearHighlights(); const active=document.querySelector('.variant.active'); const target=active.querySelector('#'+evidence.dataset.source); if(target){target.classList.add('is-source');target.scrollIntoView({behavior:'smooth',block:'center'});} toast('Exact transcript evidence highlighted'); return; }
+      const action=event.target.closest('[data-action]');
+      if(action){ if(action.dataset.action==='correct'){ const surface=action.closest('.expanded,.sheet-body,.dialog-body'); surface.querySelector('.correct-form').classList.add('open'); toast('Correction creates a new revision'); } if(action.dataset.action==='accept') toast('Accepted for future context'); if(action.dataset.action==='reject') toast('Rejected and excluded'); }
+    });
+  </script>
+</body>
+</html>

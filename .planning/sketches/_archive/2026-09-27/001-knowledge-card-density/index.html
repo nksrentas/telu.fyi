@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Telu sketch 001 — Knowledge card density</title>
+  <link rel="stylesheet" href="../themes/default.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 58px 24px 72px; background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans); }
+    button, input, select, textarea { font: inherit; }
+    button { color: inherit; }
+    .variant-nav { position: fixed; inset: 0 0 auto; z-index: 50; height: 46px; padding: 7px 14px; display: flex; justify-content: center; gap: 6px; background: rgba(255,255,255,.94); border-bottom: 1px solid var(--color-border); backdrop-filter: blur(14px); }
+    .variant-tab { border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; padding: 7px 12px; color: var(--color-text-muted); cursor: pointer; transition: all .15s ease; }
+    .variant-tab:hover { background: var(--color-bg); color: var(--color-text); }
+    .variant-tab.active { color: var(--color-primary); background: var(--color-primary-soft); border-color: #dcdcff; font-weight: 650; }
+    #preview-shell { margin: 0 auto; max-width: 1280px; transition: max-width .25s ease; }
+    .variant { display: none; }
+    .variant.active { display: block; }
+    .caption { max-width: 880px; margin: 0 auto 14px; color: var(--color-text-muted); font-size: var(--text-sm); text-align: center; }
+    .app { height: min(760px, calc(100vh - 150px)); min-height: 580px; display: grid; grid-template-columns: minmax(290px, 36%) 1fr; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 14px; box-shadow: var(--shadow-md); }
+    .transcript { display: flex; min-width: 0; flex-direction: column; border-right: 1px solid var(--color-border); background: #fcfcfa; }
+    .panel-head { height: 64px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--color-border); }
+    .panel-title { font-size: var(--text-sm); font-weight: 700; }
+    .muted { color: var(--color-text-muted); }
+    .tiny { font-size: var(--text-xs); }
+    .transcript-list { padding: 18px; overflow: auto; }
+    .turn { display: grid; grid-template-columns: 46px 1fr; gap: 10px; padding: 9px 8px; margin-bottom: 5px; border-radius: var(--radius-md); transition: all .15s ease; }
+    .turn time { color: var(--color-text-muted); font: 11px var(--font-mono); padding-top: 3px; }
+    .turn p { margin: 0; color: #41444d; font-size: 13px; line-height: 1.5; }
+    .turn strong { display: block; margin-bottom: 2px; color: var(--color-text); font-size: 12px; }
+    .turn.is-source { background: var(--color-primary-soft); outline: 2px solid rgba(99,102,232,.28); }
+    .knowledge { min-width: 0; display: flex; flex-direction: column; background: var(--color-bg); }
+    .meeting-bar { min-height: 64px; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+    .meeting-title { font-size: var(--text-base); font-weight: 720; }
+    .pane-tabs { display: flex; gap: 4px; padding: 4px; background: var(--color-bg); border-radius: var(--radius-md); }
+    .pane-tab { padding: 6px 11px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-muted); font-size: 12px; }
+    .pane-tab.active { color: var(--color-text); background: var(--color-surface); box-shadow: var(--shadow-sm); font-weight: 650; }
+    .knowledge-head { padding: 18px 24px 14px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+    .knowledge-head h1 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.02em; }
+    .knowledge-head p { margin: 0; color: var(--color-text-muted); font-size: 13px; }
+    .progress { min-width: 120px; text-align: right; }
+    .progress-track { height: 5px; margin-top: 6px; overflow: hidden; border-radius: 999px; background: var(--color-border); }
+    .progress-fill { width: 25%; height: 100%; background: var(--color-primary); }
+    .content { padding: 0 24px 30px; overflow: auto; }
+    .group { margin-top: 18px; }
+    .group-head { margin-bottom: 9px; display: flex; align-items: center; justify-content: space-between; }
+    .group-label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 760; letter-spacing: .05em; text-transform: uppercase; }
+    .type-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); }
+    .count { min-width: 22px; padding: 2px 7px; border-radius: 999px; background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-muted); text-align: center; font-size: 11px; }
+    .card { margin-bottom: 9px; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+    .card:hover { border-color: #cacbf4; box-shadow: 0 4px 16px rgba(23,25,31,.06); }
+    .card-main { padding: 14px 15px; }
+    .card-top { display: flex; align-items: flex-start; gap: 11px; }
+    .type-icon { flex: 0 0 auto; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 12px; font-weight: 800; }
+    .claim-wrap { min-width: 0; flex: 1; }
+    .claim { margin: 1px 0 7px; color: var(--color-text); font-size: 14px; line-height: 1.42; font-weight: 640; }
+    .meta-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .pill { display: inline-flex; align-items: center; gap: 5px; min-height: 23px; padding: 2px 7px; border-radius: 999px; background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text-muted); font-size: 11px; }
+    .pill.pending::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #d49a50; }
+    .pill.accepted { color: var(--color-success); background: var(--color-success-soft); border-color: #cbeadf; }
+    .pill.unresolved { color: var(--color-warning); background: var(--color-warning-soft); border-color: #f0dfbd; }
+    .evidence-chip { border: 1px solid #d9d9fa; background: var(--color-primary-soft); color: #4f52c9; cursor: pointer; }
+    .evidence-chip:hover { border-color: var(--color-primary); background: #e7e7ff; }
+    .chevron { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--color-text-muted); cursor: pointer; transition: all .15s ease; }
+    .chevron:hover { background: var(--color-bg); color: var(--color-text); }
+    .card.open .chevron { transform: rotate(180deg); }
+    .actions { display: flex; gap: 7px; margin-top: 12px; padding-left: 39px; }
+    .action { min-height: 30px; padding: 5px 10px; border-radius: 7px; border: 1px solid var(--color-border); background: var(--color-surface); color: #555a65; font-size: 12px; font-weight: 650; cursor: pointer; transition: all .15s ease; }
+    .action:hover { border-color: #b9baf1; color: var(--color-primary); }
+    .action.primary { background: var(--color-primary); border-color: var(--color-primary); color: white; }
+    .action.primary:hover { background: var(--color-primary-hover); }
+    .action.reject:hover { color: #c44740; border-color: #f0b1ad; background: var(--color-danger-soft); }
+    .progressive-detail { display: none; padding: 14px 15px 15px 54px; background: var(--color-surface-soft); border-top: 1px solid var(--color-border); }
+    .card.open .progressive-detail { display: block; animation: reveal .18s ease; }
+    .detail-label { margin-bottom: 5px; color: var(--color-text-muted); font-size: 10px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+    .quote { margin: 0; padding-left: 11px; border-left: 2px solid var(--color-primary); color: #4f535e; font-size: 12px; line-height: 1.5; }
+    .preview-quote { margin: 10px 0 0 39px; padding: 9px 11px; border-radius: 7px; background: var(--color-bg); color: #5b606b; font-size: 12px; line-height: 1.45; }
+    .rows-layout { display: grid; grid-template-columns: minmax(260px, 42%) 1fr; min-height: 430px; overflow: hidden; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; }
+    .row-list { border-right: 1px solid var(--color-border); }
+    .review-row { width: 100%; padding: 13px 14px; display: grid; grid-template-columns: 24px 1fr 18px; gap: 9px; align-items: start; border: 0; border-bottom: 1px solid var(--color-border); background: transparent; text-align: left; cursor: pointer; transition: all .15s ease; }
+    .review-row:hover, .review-row.active { background: var(--color-primary-soft); }
+    .review-row.active { box-shadow: inset 3px 0 var(--color-primary); }
+    .review-row .claim { margin: 0 0 5px; font-size: 13px; }
+    .focused { padding: 22px; }
+    .focused h2 { margin: 0 0 12px; font-size: 18px; line-height: 1.4; }
+    .focused .quote { margin: 18px 0; }
+    .status-note { display: none; margin: 9px 15px 0 54px; padding: 8px 10px; border-radius: 7px; color: var(--color-success); background: var(--color-success-soft); font-size: 12px; }
+    .status-note.show { display: block; }
+    #toast { position: fixed; left: 50%; bottom: 24px; z-index: 100; transform: translate(-50%, 16px); opacity: 0; pointer-events: none; padding: 9px 13px; border-radius: 8px; background: #252832; color: white; font-size: 12px; box-shadow: var(--shadow-lg); transition: all .2s ease; }
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+    #sketch-tools { position: fixed; right: 12px; bottom: 12px; z-index: 90; display: flex; gap: 5px; align-items: center; padding: 7px 9px; border-radius: 9px; background: rgba(20,22,28,.78); color: white; font: 11px system-ui; opacity: .42; transition: opacity .2s ease; }
+    #sketch-tools:hover { opacity: 1; }
+    #sketch-tools button, #sketch-tools select { padding: 4px 6px; border: 1px solid rgba(255,255,255,.22); border-radius: 5px; background: rgba(255,255,255,.08); color: white; cursor: pointer; }
+    #sketch-tools option { color: black; }
+    .annotated .card, .annotated .panel-head, .annotated .meeting-bar { outline: 1px dashed rgba(255,107,98,.8); outline-offset: -2px; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
+    @media (max-width: 720px) {
+      body { padding-inline: 8px; }
+      .app { grid-template-columns: 1fr; min-height: 650px; }
+      .transcript { display: none; }
+      .knowledge-head { padding-inline: 16px; }
+      .content { padding-inline: 16px; }
+      .rows-layout { grid-template-columns: 1fr; }
+      .focused { display: none; }
+      .row-list { border-right: 0; }
+      .variant-nav { overflow-x: auto; justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="variant-nav" aria-label="Sketch variants">
+    <button class="variant-tab active" onclick="showVariant('a', this)">A: Signal first</button>
+    <button class="variant-tab" onclick="showVariant('b', this)">B: Evidence preview</button>
+    <button class="variant-tab" onclick="showVariant('c', this)">C: Review rows</button>
+  </nav>
+
+  <main id="preview-shell">
+    <section id="variant-a" class="variant active">
+      <p class="caption"><strong>Variant A</strong> keeps resting cards quiet: the claim and trust signals are visible; evidence context and provenance appear only on expansion.</p>
+      <div class="app">
+        <aside class="transcript">__TRANSCRIPT__</aside>
+        <section class="knowledge">__HEADER__
+          <div class="content">
+            <section class="group">
+              <div class="group-head"><div class="group-label"><span class="type-dot"></span>Decisions <span class="count">2</span></div><span class="tiny muted">1 reviewed</span></div>
+              __CARD_A1__
+              __CARD_A2__
+            </section>
+            <section class="group">
+              <div class="group-head"><div class="group-label"><span class="type-dot" style="background:#2e9b79"></span>Commitments & actions <span class="count">1</span></div></div>
+              __CARD_ACTION__
+            </section>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="variant-b" class="variant">
+      <p class="caption"><strong>Variant B</strong> spends more vertical space so every card carries a short quote before expansion.</p>
+      <div class="app">
+        <aside class="transcript">__TRANSCRIPT__</aside>
+        <section class="knowledge">__HEADER__
+          <div class="content">
+            <section class="group">
+              <div class="group-head"><div class="group-label"><span class="type-dot"></span>Decisions <span class="count">2</span></div><span class="tiny muted">1 reviewed</span></div>
+              __CARD_B1__
+              __CARD_B2__
+            </section>
+            <section class="group">
+              <div class="group-head"><div class="group-label"><span class="type-dot" style="background:#2e9b79"></span>Commitments & actions <span class="count">1</span></div></div>
+              __CARD_BACTION__
+            </section>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section id="variant-c" class="variant">
+      <p class="caption"><strong>Variant C</strong> maximizes scanning: select a dense row to inspect and review it in a persistent detail panel.</p>
+      <div class="app">
+        <aside class="transcript">__TRANSCRIPT__</aside>
+        <section class="knowledge">__HEADER__
+          <div class="content">
+            <section class="group">
+              <div class="group-head"><div class="group-label"><span class="type-dot"></span>Decisions & actions <span class="count">3</span></div><span class="tiny muted">Select an item to review</span></div>
+              <div class="rows-layout">
+                <div class="row-list">
+                  <button class="review-row active" data-row="pilot"><span class="type-icon">D</span><span><span class="claim">Pilot will be limited to three customer teams.</span><span class="tiny muted">Pending · 1 source</span></span><span>›</span></button>
+                  <button class="review-row" data-row="launch"><span class="type-icon">D</span><span><span class="claim">The launch date remains June 17.</span><span class="tiny muted">Accepted · 1 source</span></span><span>›</span></button>
+                  <button class="review-row" data-row="recruit"><span class="type-icon" style="color:#26785f;background:#eaf8f3">A</span><span><span class="claim">Nora will share the recruiting list.</span><span class="tiny muted">Pending · due date unresolved</span></span><span>›</span></button>
+                </div>
+                <div class="focused" id="focused-detail">
+                  <span class="pill pending">Needs review</span>
+                  <h2>Pilot will be limited to three customer teams.</h2>
+                  <button class="pill evidence-chip" data-source="turn-1408">Transcript · 14:08</button>
+                  <p class="quote">“Let's keep the pilot to three customer teams.”</p>
+                  <div class="actions" style="padding-left:0"><button class="action primary" data-action="accept">Accept</button><button class="action" data-action="correct">Correct</button><button class="action reject" data-action="reject">Reject</button></div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <div id="sketch-tools">
+    <label>Theme <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Telu</option></select></label>
+    <button onclick="setViewport('375px')">Phone</button><button onclick="setViewport('768px')">Tablet</button><button onclick="setViewport('1280px')">Desktop</button>
+    <button onclick="document.body.classList.toggle('annotated')">Annotate</button>
+  </div>
+
+  <script>
+    const transcript = `
+      <div class="panel-head"><div><div class="panel-title">Transcript</div><div class="tiny muted">Product pilot review · 38 min</div></div><span class="pill">Complete</span></div>
+      <div class="transcript-list">
+        <div class="turn"><time>14:03</time><p><strong>Leon</strong>The support team can join the pilot, but we should keep the first round intentionally small.</p></div>
+        <div class="turn" id="turn-1408"><time>14:08</time><p><strong>Maya</strong>Let's keep the pilot to three customer teams. Nora will own recruiting and share the list by Friday.</p></div>
+        <div class="turn" id="turn-1411"><time>14:11</time><p><strong>Leon</strong>The launch date stays June 17. We are not moving it unless legal finds a blocker.</p></div>
+        <div class="turn"><time>14:16</time><p><strong>Nora</strong>I can share the recruiting list. I need to check whether Friday means this week or next.</p></div>
+        <div class="turn"><time>14:22</time><p><strong>Maya</strong>Let's leave the onboarding owner open until Priya confirms capacity.</p></div>
+      </div>`;
+    const header = `
+      <div class="meeting-bar"><div><div class="meeting-title">Product pilot review</div><div class="tiny muted">September 27 · Complete transcript</div></div><div class="pane-tabs"><button class="pane-tab">Summary</button><button class="pane-tab active">Knowledge</button></div></div>
+      <div class="knowledge-head"><div><h1>Meeting knowledge</h1><p>Review what Telu found before it can be used later.</p></div><div class="progress"><span class="tiny muted">1 of 4 reviewed</span><div class="progress-track"><div class="progress-fill"></div></div></div></div>`;
+    function card({ id, icon='D', claim, source, sourceId, accepted=false, unresolved='', quote='', preview=false }) {
+      return `<article class="card" id="${id}"><div class="card-main"><div class="card-top"><span class="type-icon">${icon}</span><div class="claim-wrap"><p class="claim">${claim}</p><div class="meta-line"><span class="pill ${accepted ? 'accepted' : 'pending'}">${accepted ? 'Accepted' : 'Needs review'}</span>${unresolved ? `<span class="pill unresolved">${unresolved}</span>` : ''}<button class="pill evidence-chip" data-source="${sourceId}">Transcript · ${source}</button></div></div><button class="chevron" aria-label="Show details" onclick="toggleCard(this)">⌄</button></div>${preview ? `<div class="preview-quote">“${quote}”</div>` : ''}<div class="actions">${accepted ? '<button class="action" data-action="restore">Change review</button>' : '<button class="action primary" data-action="accept">Accept</button><button class="action" data-action="correct">Correct</button><button class="action reject" data-action="reject">Reject</button>'}</div><div class="status-note"></div></div><div class="progressive-detail"><div class="detail-label">Supporting transcript</div><p class="quote">“${quote}”</p><div class="detail-label" style="margin-top:12px">Provenance</div><div class="tiny muted">Derived in run K-0927-01 · exact final transcript evidence</div></div></article>`;
+    }
+    const values = {
+      '__TRANSCRIPT__': transcript,
+      '__HEADER__': header,
+      '__CARD_A1__': card({id:'a-pilot', claim:'Pilot will be limited to three customer teams.', source:'14:08', sourceId:'turn-1408', quote:"Let's keep the pilot to three customer teams."}),
+      '__CARD_A2__': card({id:'a-launch', claim:'The launch date remains June 17.', source:'14:11', sourceId:'turn-1411', accepted:true, quote:'The launch date stays June 17.'}),
+      '__CARD_ACTION__': card({id:'a-recruit', icon:'A', claim:'Nora will share the customer recruiting list.', source:'14:08', sourceId:'turn-1408', unresolved:'Due date unresolved', quote:'Nora will own recruiting and share the list by Friday.'}),
+      '__CARD_B1__': card({id:'b-pilot', claim:'Pilot will be limited to three customer teams.', source:'14:08', sourceId:'turn-1408', quote:"Let's keep the pilot to three customer teams.", preview:true}),
+      '__CARD_B2__': card({id:'b-launch', claim:'The launch date remains June 17.', source:'14:11', sourceId:'turn-1411', accepted:true, quote:'The launch date stays June 17.', preview:true}),
+      '__CARD_BACTION__': card({id:'b-recruit', icon:'A', claim:'Nora will share the customer recruiting list.', source:'14:08', sourceId:'turn-1408', unresolved:'Due date unresolved', quote:'Nora will own recruiting and share the list by Friday.', preview:true})
+    };
+    document.querySelectorAll('.variant').forEach(section => {
+      let html = section.innerHTML;
+      Object.entries(values).forEach(([token, value]) => html = html.split(token).join(value));
+      section.innerHTML = html;
+    });
+    function showVariant(id, button) {
+      document.querySelectorAll('.variant').forEach(v => v.classList.toggle('active', v.id === 'variant-' + id));
+      document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+      button.classList.add('active');
+      clearHighlights();
+    }
+    function toggleCard(button) { button.closest('.card').classList.toggle('open'); }
+    function setViewport(width) { document.getElementById('preview-shell').style.maxWidth = width; toast('Viewport set to ' + width); }
+    function toast(message) { const el = document.getElementById('toast'); el.textContent = message; el.classList.add('show'); clearTimeout(window.toastTimer); window.toastTimer = setTimeout(() => el.classList.remove('show'), 1600); }
+    function clearHighlights() { document.querySelectorAll('.turn').forEach(t => t.classList.remove('is-source')); }
+    document.addEventListener('click', event => {
+      const evidence = event.target.closest('.evidence-chip');
+      if (evidence) {
+        clearHighlights();
+        const active = document.querySelector('.variant.active');
+        const target = active.querySelector('#' + evidence.dataset.source);
+        if (target) { target.classList.add('is-source'); target.scrollIntoView({behavior:'smooth', block:'center'}); }
+        toast('Exact transcript evidence highlighted');
+        return;
+      }
+      const action = event.target.closest('[data-action]');
+      if (action) {
+        const cardEl = action.closest('.card');
+        const labels = {accept:'Accepted for future context', correct:'Correction editor would open', reject:'Rejected and excluded', restore:'Review state can be changed'};
+        if (cardEl && action.dataset.action === 'accept') {
+          const pill = cardEl.querySelector('.pill.pending');
+          if (pill) { pill.className='pill accepted'; pill.textContent='Accepted'; }
+          const note = cardEl.querySelector('.status-note'); note.textContent='Accepted · eligible for future context'; note.classList.add('show');
+        }
+        toast(labels[action.dataset.action]);
+      }
+      const row = event.target.closest('.review-row');
+      if (row) {
+        document.querySelectorAll('.review-row').forEach(r => r.classList.remove('active'));
+        row.classList.add('active');
+        const data = {
+          pilot:['Needs review','Pilot will be limited to three customer teams.','14:08',"Let's keep the pilot to three customer teams."],
+          launch:['Accepted','The launch date remains June 17.','14:11','The launch date stays June 17.'],
+          recruit:['Needs review','Nora will share the customer recruiting list.','14:08','Nora will own recruiting and share the list by Friday.']
+        }[row.dataset.row];
+        document.getElementById('focused-detail').innerHTML = `<span class="pill ${data[0]==='Accepted'?'accepted':'pending'}">${data[0]}</span><h2>${data[1]}</h2><button class="pill evidence-chip" data-source="turn-${data[2].replace(':','')}">Transcript · ${data[2]}</button><p class="quote">“${data[3]}”</p><div class="actions" style="padding-left:0"><button class="action primary" data-action="accept">Accept</button><button class="action" data-action="correct">Correct</button><button class="action reject" data-action="reject">Reject</button></div>`;
+      }
+    });
+  </script>
+</body>
+</html>

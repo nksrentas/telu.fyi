@@ -41,6 +41,7 @@ This phase makes the retained Meetily Community Edition foundation measurable an
 - **D-19:** An unavailable selected route fails visibly while preserving the user's choice and local data. Recovery actions are explicit retry, reconfigure, or cancel; Telu never silently switches from local to LAN/remote or between remote providers.
 - **D-20:** The user-facing treatment stays calm and compact: a short boundary label and destination at the point of choice, a clear error when the contract cannot be honored, and deeper technical evidence in a diagnostics view or local run bundle.
 - **D-21:** A network-blocked canary is part of the baseline matrix. Local capture, transcription, persistence, recovery, and evaluation must complete without undisclosed egress; every permitted LAN or remote attempt must be attributable to the active configuration.
+- **D-22 (2026-09-26 scope revision):** Phase 2 readiness is decided only from canonical identity, durable final-transcript evidence, recovery reconciliation, capture completeness, and privacy-route enforcement. The full D-05/D-06/D-21 physical matrix remains required for Phase 4 live readiness, but it does not block Phase 2. Existing automated and packaged evidence is reused; at most one short packaged smoke is added when a prerequisite cannot otherwise be proven.
 
 ### the agent's Discretion
 - Exact Rust type names, SQLite migration layout, telemetry serialization format, and module boundaries, provided the contracts above remain testable and the Rust core stays authoritative.
@@ -56,7 +57,7 @@ This phase makes the retained Meetily Community Edition foundation measurable an
 
 ### Telu Product Intent and Phase Contract
 - `.planning/PROJECT.md` — Product value, local-first constraints, evidence requirements, and decisions carried into the phase.
-- `.planning/REQUIREMENTS.md` — Normative Phase 1 requirements BASE-01 through BASE-06, IDENT-01 through IDENT-03, and PRIV-01 through PRIV-03.
+- `.planning/REQUIREMENTS.md` — Normative Phase 1 requirements BASE-02 through BASE-05, IDENT-01 through IDENT-03, and PRIV-01 through PRIV-03. BASE-01 and BASE-06 remain milestone requirements assigned to Phase 4.
 - `.planning/ROADMAP.md` — Phase 1 goal, non-goals, success criteria, verification approach, exit gates, and stop conditions.
 - `docs/telu/README.md` — Telu's before/during/after product model and calm, evidence-aware behavior.
 - `docs/telu/idea-verification.md` — Product and technical risk analysis, especially transcript freshness and validation-gated live assistance.
@@ -115,7 +116,7 @@ This phase makes the retained Meetily Community Edition foundation measurable an
 <deferred>
 ## Deferred Ideas
 
-None — discussion stayed within phase scope.
+- The full target-hardware physical matrix, repeated continuous/overload runs, battery/power measurement, independent packet capture, and numeric live-readiness threshold declaration are deferred to Phase 4 under BASE-01 and BASE-06. This is an execution-order change, not removal from the milestone.
 
 </deferred>
 

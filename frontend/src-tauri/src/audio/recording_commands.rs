@@ -157,8 +157,7 @@ const RESERVED_FUTURE_STAGES: [&str; 6] = [
 ];
 static DELIVERY_TRACKER: Lazy<DeliveryTracker> = Lazy::new(DeliveryTracker::new);
 
-const TRANSCRIPTION_RUNTIME_START_ERROR_CODE: &str =
-    "TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED";
+const TRANSCRIPTION_RUNTIME_START_ERROR_CODE: &str = "TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED";
 const TRANSCRIPTION_RUNTIME_USER_MESSAGE: &str = "Speech recognition could not initialize. Restart Telu. If the problem continues, repair or reinstall the app.";
 const MEETING_IDENTITY_PERSISTENCE_ERROR_CODE: &str = "MEETING_IDENTITY_PERSISTENCE_FAILED";
 const TERMINAL_EVALUATION_ERROR_SEQUENCE_BASE: u64 = 1_u64 << 62;

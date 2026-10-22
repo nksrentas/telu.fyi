@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Telu sketch 005 — Conversation mental models</title>
+  <link id="theme-link" rel="stylesheet" href="../themes/default.css" />
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      --ease-out: cubic-bezier(.23, 1, .32, 1);
+      --ease-smooth: cubic-bezier(.77, 0, .175, 1);
+      --glass: rgba(255, 255, 255, .74);
+      --ink-soft: rgba(23, 25, 31, .06);
+      --ink-line: rgba(23, 25, 31, .09);
+      --deep-shadow: 0 32px 88px rgba(28, 30, 38, .14), 0 3px 12px rgba(28, 30, 38, .08);
+    }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 8% 0%, rgba(99,102,232,.14), transparent 29%),
+        radial-gradient(circle at 92% 100%, rgba(103,232,197,.11), transparent 26%),
+        var(--color-bg);
+      color: var(--color-text);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    button, select { font: inherit; color: inherit; }
+    button:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+    .variant-nav {
+      position: fixed; inset: 0 0 auto; z-index: 500;
+      display: flex; justify-content: center; gap: 6px;
+      padding: 10px 16px;
+      background: rgba(247,247,244,.82);
+      border-bottom: 1px solid var(--ink-line);
+      backdrop-filter: blur(22px) saturate(1.25);
+    }
+    .variant-tab {
+      min-height: 36px; padding: 0 15px; border: 0; border-radius: 10px;
+      background: transparent; color: var(--color-text-muted);
+      font-size: 13px; font-weight: 650; cursor: pointer;
+    }
+    .variant-tab:hover { color: var(--color-text); background: var(--ink-soft); }
+    .variant-tab.active { color: var(--color-text); background: white; box-shadow: var(--shadow-sm); }
+
+    #viewport-frame { width: calc(100% - 32px); max-width: 1440px; margin: 72px auto 34px; transition: max-width 220ms var(--ease-out); }
+    #viewport-frame[data-viewport="tablet"] { max-width: 840px; }
+    #viewport-frame[data-viewport="phone"] { max-width: 430px; }
+    .variant { display: none; }
+    .variant.active { display: block; }
+    .window {
+      min-height: 830px; overflow: hidden;
+      border: 1px solid rgba(23,25,31,.08); border-radius: 22px;
+      background: var(--color-surface); box-shadow: var(--deep-shadow);
+    }
+    .titlebar {
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+      height: 44px; padding: 0 15px;
+      border-bottom: 1px solid var(--ink-line);
+      background: rgba(250,250,248,.82); backdrop-filter: blur(18px);
+    }
+    .traffic { display: flex; gap: 8px; }
+    .traffic i { width: 12px; height: 12px; border-radius: 999px; }
+    .traffic i:nth-child(1) { background: #ff5f57; }
+    .traffic i:nth-child(2) { background: #febc2e; }
+    .traffic i:nth-child(3) { background: #28c840; }
+    .window-title { font-size: 12px; font-weight: 700; }
+    .privacy { justify-self: end; display: flex; align-items: center; gap: 7px; color: var(--color-text-muted); font-size: 10px; }
+    .privacy i { width: 6px; height: 6px; border-radius: 999px; background: var(--color-success); box-shadow: 0 0 0 3px var(--color-success-soft); }
+
+    .app-header {
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+      min-height: 58px; padding: 0 24px;
+      border-bottom: 1px solid var(--ink-line); background: rgba(255,255,255,.9);
+    }
+    .brand { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 760; letter-spacing: -.03em; }
+    .brand-mark { position: relative; width: 23px; height: 23px; border-radius: 8px 8px 11px 8px; background: var(--color-primary); }
+    .brand-mark::after { content: ''; position: absolute; right: 5px; bottom: 5px; width: 6px; height: 6px; border-radius: 999px; background: var(--color-mint); }
+    .header-center { color: var(--color-text-muted); font-size: 11px; }
+    .header-tools { justify-self: end; display: flex; gap: 7px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 40px; padding: 0 15px;
+      border: 1px solid var(--color-border); border-radius: 11px;
+      background: white; color: var(--color-text);
+      font-size: 13px; font-weight: 650; cursor: pointer;
+      transition: transform 140ms var(--ease-out), background-color 160ms ease, border-color 160ms ease, box-shadow 180ms ease;
+    }
+    .btn:hover { background: var(--color-surface-soft); border-color: var(--color-border-strong); }
+    .btn:active, .pressable:active { transform: scale(.97); }
+    .btn.primary { color: white; border-color: var(--color-primary); background: var(--color-primary); box-shadow: 0 7px 18px rgba(99,102,232,.2); }
+    .btn.primary:hover { background: var(--color-primary-hover); }
+    .btn.record { color: white; border-color: var(--color-danger); background: var(--color-danger); box-shadow: 0 7px 18px rgba(255,107,98,.18); }
+    .btn.small { min-height: 32px; padding: 0 11px; border-radius: 9px; font-size: 11px; }
+    .btn.icon { width: 40px; padding: 0; }
+    .btn.ghost { border-color: transparent; background: transparent; color: var(--color-text-muted); }
+    .glyph { display: inline-grid; place-items: center; width: 16px; height: 16px; }
+    .glyph svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    .chip { display: inline-flex; align-items: center; gap: 6px; min-height: 25px; padding: 0 9px; border: 1px solid var(--color-border); border-radius: 999px; background: white; color: var(--color-text-muted); font-size: 10px; font-weight: 650; white-space: nowrap; }
+    .chip.mint { color: #1f725b; border-color: rgba(103,232,197,.48); background: var(--color-mint-soft); }
+    .chip.coral { color: #a23832; border-color: rgba(255,107,98,.35); background: var(--color-danger-soft); }
+    .muted { color: var(--color-text-muted); }
+    .eyebrow { margin: 0 0 7px; color: var(--color-primary); font-size: 10px; font-weight: 750; letter-spacing: .055em; text-transform: uppercase; }
+    .card { border: 1px solid var(--color-border); border-radius: 16px; background: white; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .section-title h3 { margin: 0; font-size: 13px; }
+    .avatar-stack { display: flex; }
+    .avatar { display: grid; place-items: center; width: 28px; height: 28px; margin-left: -6px; border: 2px solid white; border-radius: 999px; color: white; font-size: 9px; font-weight: 750; }
+    .avatar:first-child { margin-left: 0; }
+    .a1 { background:#7367a8; } .a2 { background:#4d7897; } .a3 { background:#a36b5c; } .a4 { background:#607a6e; }
+    .record-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--color-danger); box-shadow: 0 0 0 4px var(--color-danger-soft); }
+    .timer { font-size: 11px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+    /* A — one workspace, explicit lifecycle */
+    .continuum { min-height: 786px; background: var(--color-bg); }
+    .meeting-switcher {
+      display: grid; grid-template-columns: 1fr minmax(320px, 560px) 1fr; align-items: center;
+      min-height: 64px; padding: 0 26px; border-bottom: 1px solid var(--ink-line);
+    }
+    .meeting-switcher .previous { color: var(--color-text-muted); font-size: 11px; }
+    .meeting-switcher .current { text-align: center; }
+    .meeting-switcher .current b { display: block; font-size: 14px; }
+    .meeting-switcher .current span { display: block; margin-top: 3px; color: var(--color-text-muted); font-size: 10px; }
+    .meeting-switcher .next { justify-self: end; color: var(--color-text-muted); font-size: 11px; }
+    .journey-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; max-width: 900px; margin: 16px auto 0; padding: 4px; border: 1px solid var(--color-border); border-radius: 13px; background: rgba(255,255,255,.72); }
+    .journey-step { position: relative; min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--color-text-muted); font-size: 11px; font-weight: 650; cursor: pointer; }
+    .journey-step:hover { color: var(--color-text); background: var(--ink-soft); }
+    .journey-step.active { color: var(--color-text); background: white; box-shadow: var(--shadow-sm); }
+    .journey-step.done::before { content: '✓'; margin-right: 6px; color: var(--color-success); }
+    .continuum-content { max-width: 1160px; margin: 0 auto; padding: 18px 28px 30px; transition: opacity 110ms ease, filter 110ms ease, transform 140ms var(--ease-out); }
+    .continuum-content.transitioning { opacity: .55; filter: blur(2px); transform: translateY(3px); }
+    .phase-panel { display: none; }
+    .phase-panel.active { display: block; }
+    .prep-grid { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(320px,.7fr); gap: 14px; }
+    .briefing { padding: 27px; }
+    .briefing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    .briefing h1 { margin: 0; max-width: 640px; font-size: clamp(28px,3vw,40px); line-height: 1.04; letter-spacing: -.045em; font-weight: 640; }
+    .briefing-meta { display: flex; gap: 12px; margin-top: 9px; color: var(--color-text-muted); font-size: 11px; }
+    .briefing-actions { display: flex; gap: 8px; margin-top: 22px; }
+    .flow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+    .flow-block { padding: 16px; border-radius: 13px; background: var(--color-surface-soft); }
+    .flow-block small { color: var(--color-text-muted); font-weight: 650; }
+    .flow-block p { margin: 8px 0 0; font-size: 13px; line-height: 1.45; }
+    .carry-panel { padding: 20px; }
+    .carry-item { display: grid; grid-template-columns: 22px 1fr; gap: 9px; padding: 12px 0; border-top: 1px solid var(--ink-line); }
+    .carry-item:first-of-type { border-top: 0; padding-top: 2px; }
+    .carry-kind { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 9px; font-weight: 750; }
+    .carry-item b { display: block; font-size: 11px; line-height: 1.35; }
+    .carry-item button { margin-top: 5px; padding: 0; border: 0; background: transparent; color: var(--color-primary); font-size: 9px; cursor: pointer; }
+    .phase-placeholder { display: grid; place-items: center; min-height: 430px; padding: 40px; text-align: center; }
+    .phase-placeholder h2 { margin: 0; font-size: 30px; letter-spacing: -.035em; }
+    .phase-placeholder p { max-width: 500px; margin: 10px auto 20px; color: var(--color-text-muted); font-size: 13px; line-height: 1.5; }
+    .live-grid { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(320px,.7fr); gap: 14px; min-height: 490px; }
+    .transcript, .assist { overflow: hidden; }
+    .surface-head { display: flex; align-items: center; justify-content: space-between; min-height: 50px; padding: 0 17px; border-bottom: 1px solid var(--ink-line); }
+    .surface-head h3 { margin: 0; font-size: 12px; }
+    .transcript-body { padding: 26px 25px; }
+    .utterance { display: grid; grid-template-columns: 82px 1fr; gap: 14px; margin-bottom: 23px; opacity: .58; }
+    .utterance.latest { opacity: 1; }
+    .speaker { color: var(--color-text-muted); font-size: 10px; font-weight: 650; }
+    .utterance p { margin: 0; font-size: 15px; line-height: 1.52; }
+    .assist-body { display: grid; gap: 11px; padding: 14px; }
+    .signal { padding: 17px; border: 1px solid rgba(103,232,197,.5); border-radius: 14px; background: linear-gradient(145deg,var(--color-mint-soft),white); }
+    .signal small { color: #21745c; font-weight: 700; }
+    .signal h4 { margin: 10px 0 7px; font-size: 14px; line-height: 1.38; }
+    .signal p { margin: 0; color: var(--color-text-muted); font-size: 11px; line-height: 1.45; }
+    .quiet { padding: 15px; border-radius: 13px; background: var(--color-surface-soft); }
+    .quiet p { margin: 7px 0 0; color: var(--color-text-muted); font-size: 10px; line-height: 1.45; }
+    .review-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .review-column { min-height: 370px; padding: 18px; }
+    .review-column h3 { margin: 0 0 15px; font-size: 13px; }
+    .knowledge-row { padding: 13px 0; border-top: 1px solid var(--ink-line); }
+    .knowledge-row:first-of-type { border-top: 0; }
+    .knowledge-row p { margin: 0; font-size: 12px; line-height: 1.42; }
+    .knowledge-row small { display: block; margin-top: 7px; color: var(--color-text-muted); }
+
+    /* B — the day is the navigation */
+    .stream-shell { min-height: 786px; background: linear-gradient(180deg,#fbfbf9,var(--color-bg)); }
+    .stream-head { display: flex; align-items: end; justify-content: space-between; max-width: 1080px; margin: 0 auto; padding: 28px 28px 18px; }
+    .stream-head h1 { margin: 0; font-size: 31px; letter-spacing: -.045em; }
+    .stream-head p { margin: 6px 0 0; color: var(--color-text-muted); font-size: 11px; }
+    .day-stream { max-width: 1080px; margin: 0 auto; padding: 0 28px 40px; }
+    .stream-row { display: grid; grid-template-columns: 76px 18px minmax(0,1fr); min-height: 88px; }
+    .stream-time { padding-top: 18px; color: var(--color-text-muted); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+    .stream-line { position: relative; }
+    .stream-line::before { content: ''; position: absolute; top: 0; bottom: 0; left: 8px; width: 1px; background: var(--color-border); }
+    .stream-line i { position: absolute; top: 21px; left: 4px; width: 9px; height: 9px; border: 2px solid var(--color-bg); border-radius: 999px; background: var(--color-border-strong); }
+    .stream-row.current .stream-line i { background: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-soft); }
+    .stream-card { align-self: start; margin: 6px 0 8px 14px; overflow: hidden; }
+    .stream-card.compact { display: flex; align-items: center; justify-content: space-between; min-height: 66px; padding: 0 18px; background: rgba(255,255,255,.64); }
+    .stream-card.compact b { display: block; font-size: 12px; }
+    .stream-card.compact span { display: block; margin-top: 4px; color: var(--color-text-muted); font-size: 10px; }
+    .stream-focus { padding: 20px; transition: opacity 120ms ease, transform 160ms var(--ease-out), filter 120ms ease; }
+    .stream-focus.transitioning { opacity: .5; transform: translateY(3px); filter: blur(2px); }
+    .stream-focus-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+    .stream-focus h2 { margin: 4px 0 6px; font-size: 25px; letter-spacing: -.035em; }
+    .stream-focus p { margin: 0; color: var(--color-text-muted); font-size: 11px; }
+    .stream-prep-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; margin-top: 17px; }
+    .stream-tile { min-height: 105px; padding: 14px; border-radius: 12px; background: var(--color-surface-soft); }
+    .stream-tile small { color: var(--color-text-muted); font-weight: 650; }
+    .stream-tile b { display: block; margin-top: 13px; font-size: 12px; line-height: 1.35; }
+    .stream-actions { display: flex; gap: 8px; margin-top: 14px; }
+    .stream-live { display: none; grid-template-columns: minmax(0,1.4fr) minmax(260px,.6fr); gap: 12px; margin-top: 16px; }
+    .stream-focus.is-live .stream-prep, .stream-focus.is-review .stream-prep { display: none; }
+    .stream-focus.is-live .stream-live { display: grid; }
+    .mini-transcript { padding: 17px; border-radius: 13px; background: var(--color-surface-soft); }
+    .mini-transcript p { margin: 0 0 12px; color: var(--color-text); font-size: 13px; line-height: 1.48; }
+    .mini-transcript p:last-child { margin-bottom: 0; }
+    .mini-assist { padding: 16px; border: 1px solid rgba(103,232,197,.48); border-radius: 13px; background: var(--color-mint-soft); }
+    .mini-assist h3 { margin: 9px 0 6px; font-size: 13px; }
+    .mini-assist p { color: #417267; font-size: 10px; line-height: 1.44; }
+    .stream-review { display: none; margin-top: 16px; padding: 18px; border-radius: 14px; background: var(--color-surface-soft); }
+    .stream-focus.is-review .stream-review { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .stream-review div { padding-right: 12px; border-right: 1px solid var(--color-border); }
+    .stream-review div:last-child { border-right: 0; }
+    .stream-review .review-context { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 0 0 12px; border-right: 0; border-bottom: 1px solid var(--color-border); }
+    .stream-review .review-context strong { font-size: 13px; }
+    .stream-review .review-context span { color: var(--color-text-muted); font-size: 10px; }
+    .stream-review b { font-size: 11px; }
+    .stream-review p { margin-top: 7px; color: var(--color-text); font-size: 11px; line-height: 1.4; }
+
+    /* C — conversations are persistent places */
+    .spaces-shell { min-height: 786px; background: var(--color-bg); }
+    .space-tabs { display: flex; gap: 7px; padding: 13px 24px; overflow-x: auto; border-bottom: 1px solid var(--ink-line); }
+    .space-tab { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 0 13px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--color-text-muted); font-size: 11px; font-weight: 650; white-space: nowrap; cursor: pointer; }
+    .space-tab:hover { color: var(--color-text); background: var(--ink-soft); }
+    .space-tab.active { color: var(--color-text); border-color: var(--color-border); background: white; box-shadow: var(--shadow-sm); }
+    .space-avatar { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; color: white; background: #6d6ab5; font-size: 9px; }
+    .space-workspace { max-width: 1200px; margin: 0 auto; padding: 20px 26px 34px; transition: opacity 120ms ease, filter 120ms ease, transform 160ms var(--ease-out); }
+    .space-workspace.transitioning { opacity: .5; filter: blur(2px); transform: translateY(3px); }
+    .space-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+    .space-head h1 { margin: 0; font-size: 25px; letter-spacing: -.035em; }
+    .space-head p { margin: 4px 0 0; color: var(--color-text-muted); font-size: 10px; }
+    .space-actions { display: flex; gap: 8px; }
+    .space-grid { display: grid; grid-template-columns: minmax(220px,.56fr) minmax(380px,1.25fr) minmax(260px,.7fr); gap: 12px; min-height: 555px; }
+    .space-column { overflow: hidden; }
+    .space-column > header { display: flex; align-items: center; justify-content: space-between; min-height: 46px; padding: 0 15px; border-bottom: 1px solid var(--ink-line); }
+    .space-column > header h3 { margin: 0; font-size: 11px; }
+    .space-body { padding: 15px; }
+    .pulse { display: grid; gap: 10px; }
+    .pulse-item { padding: 13px; border-radius: 12px; background: var(--color-surface-soft); }
+    .pulse-item small { color: var(--color-text-muted); }
+    .pulse-item b { display: block; margin-top: 7px; font-size: 11px; line-height: 1.35; }
+    .now-card { padding: 24px; border: 1px solid rgba(99,102,232,.12); border-radius: 15px; background: linear-gradient(150deg,#fff,#f8f8ff); }
+    .now-card h2 { margin: 9px 0 8px; font-size: 28px; line-height: 1.06; letter-spacing: -.042em; }
+    .now-card p { color: var(--color-text-muted); font-size: 11px; line-height: 1.48; }
+    .now-actions { display: flex; gap: 8px; margin-top: 18px; }
+    .agenda-list { margin-top: 13px; }
+    .agenda-item { display: grid; grid-template-columns: 22px 1fr; gap: 9px; padding: 11px 0; border-top: 1px solid var(--ink-line); }
+    .agenda-item span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 9px; font-weight: 750; }
+    .agenda-item p { margin: 2px 0 0; color: var(--color-text); font-size: 11px; }
+    .memory-note { padding: 13px 0; border-top: 1px solid var(--ink-line); }
+    .memory-note:first-child { border-top: 0; padding-top: 0; }
+    .memory-note b { display: block; font-size: 11px; line-height: 1.34; }
+    .memory-note span { display: block; margin-top: 5px; color: var(--color-text-muted); font-size: 9px; }
+    .space-workspace.is-live .space-prep-content { display: none; }
+    .space-live-content { display: none; }
+    .space-workspace.is-live .space-live-content { display: block; }
+    .space-live-content .utterance { grid-template-columns: 68px 1fr; }
+    .active-memory { border-left: 2px solid var(--color-mint); padding-left: 11px; }
+
+    .evidence-popover {
+      position: fixed; z-index: 900; width: min(350px,calc(100vw - 28px)); padding: 16px;
+      opacity: 0; visibility: hidden;
+      border: 1px solid var(--color-border); border-radius: 14px;
+      background: rgba(255,255,255,.95); box-shadow: var(--shadow-lg); backdrop-filter: blur(18px);
+      transform: translateY(4px) scale(.97); transform-origin: top left;
+      transition: opacity 150ms var(--ease-out), transform 160ms var(--ease-out);
+    }
+    .evidence-popover.open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+    .evidence-popover small { color: var(--color-primary); font-weight: 700; }
+    .evidence-popover p { margin: 9px 0 11px; font-size: 12px; line-height: 1.48; }
+    .evidence-popover footer { color: var(--color-text-muted); font-size: 9px; }
+    .evidence-trigger { padding: 0; border: 0; background: transparent; color: var(--color-primary); font-size: 10px; font-weight: 700; cursor: pointer; }
+
+    .toast-stack { position: fixed; top: 62px; right: 18px; z-index: 1000; display: grid; gap: 7px; pointer-events: none; }
+    .toast { min-width: 250px; padding: 12px 14px; opacity: 0; border: 1px solid var(--ink-line); border-radius: 12px; background: rgba(255,255,255,.94); box-shadow: var(--shadow-md); font-size: 11px; transform: translateY(-8px) scale(.97); transition: opacity 170ms var(--ease-out), transform 180ms var(--ease-out); }
+    .toast.show { opacity: 1; transform: translateY(0) scale(1); }
+
+    #sketch-tools { position: fixed; right: 12px; bottom: 12px; z-index: 9999; display: flex; align-items: center; gap: 6px; padding: 7px; border-radius: 11px; background: rgba(15,16,20,.8); color: white; font: 11px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; opacity: .42; box-shadow: 0 8px 24px rgba(0,0,0,.18); backdrop-filter: blur(14px); transition: opacity 160ms ease; }
+    #sketch-tools:hover { opacity: 1; }
+    #sketch-tools button, #sketch-tools select { height: 28px; padding: 0 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 7px; background: rgba(255,255,255,.1); color: white; cursor: pointer; }
+    #sketch-tools option { color: #111; }
+    #annotation-tip { position: fixed; z-index: 9998; display: none; max-width: 230px; padding: 7px 9px; border-radius: 8px; background: #121318; color: white; font: 10px/1.45 SFMono-Regular,Consolas,monospace; pointer-events: none; }
+    body.annotating #annotation-tip { display: block; }
+
+    @media (max-width: 920px) {
+      .prep-grid, .live-grid { grid-template-columns: 1fr; }
+      .carry-panel { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+      .carry-panel .section-title { grid-column: 1/-1; }
+      .carry-item { border: 0; padding: 10px; border-radius: 12px; background: var(--color-surface-soft); }
+      .space-grid { grid-template-columns: 1fr 1fr; }
+      .space-grid > :first-child { display: none; }
+      .review-grid { grid-template-columns: 1fr; }
+    }
+    #viewport-frame[data-viewport="phone"] .window { border-radius: 17px; }
+    #viewport-frame[data-viewport="phone"] .app-header { grid-template-columns: 1fr auto; padding: 0 14px; }
+    #viewport-frame[data-viewport="phone"] .header-center { display: none; }
+    #viewport-frame[data-viewport="phone"] .meeting-switcher { grid-template-columns: 1fr; padding: 10px 14px; }
+    #viewport-frame[data-viewport="phone"] .meeting-switcher .previous, #viewport-frame[data-viewport="phone"] .meeting-switcher .next { display: none; }
+    #viewport-frame[data-viewport="phone"] .journey-bar { margin: 10px 10px 0; }
+    #viewport-frame[data-viewport="phone"] .journey-step { font-size: 9px; }
+    #viewport-frame[data-viewport="phone"] .continuum-content { padding: 12px 10px 80px; }
+    #viewport-frame[data-viewport="phone"] .prep-grid, #viewport-frame[data-viewport="phone"] .live-grid { grid-template-columns: 1fr; }
+    #viewport-frame[data-viewport="phone"] .briefing { padding: 20px; }
+    #viewport-frame[data-viewport="phone"] .briefing-head { display: block; }
+    #viewport-frame[data-viewport="phone"] .briefing-head .avatar-stack { margin-top: 14px; }
+    #viewport-frame[data-viewport="phone"] .flow-grid { grid-template-columns: 1fr; }
+    #viewport-frame[data-viewport="phone"] .carry-panel { display: block; }
+    #viewport-frame[data-viewport="phone"] .carry-item { display: grid; padding: 11px 0; border-radius: 0; border-top: 1px solid var(--ink-line); background: transparent; }
+    #viewport-frame[data-viewport="phone"] .utterance { grid-template-columns: 1fr; gap: 5px; }
+    #viewport-frame[data-viewport="phone"] .stream-head, #viewport-frame[data-viewport="phone"] .day-stream { padding-left: 12px; padding-right: 12px; }
+    #viewport-frame[data-viewport="phone"] .stream-row { grid-template-columns: 52px 15px minmax(0,1fr); }
+    #viewport-frame[data-viewport="phone"] .stream-card { margin-left: 8px; }
+    #viewport-frame[data-viewport="phone"] .stream-focus-head { display: block; }
+    #viewport-frame[data-viewport="phone"] .stream-focus-head .btn { margin-top: 12px; }
+    #viewport-frame[data-viewport="phone"] .stream-prep-grid { grid-template-columns: 1fr; }
+    #viewport-frame[data-viewport="phone"] .stream-focus.is-live .stream-live, #viewport-frame[data-viewport="phone"] .stream-focus.is-review .stream-review { grid-template-columns: 1fr; }
+    #viewport-frame[data-viewport="phone"] .space-tabs { padding: 10px; }
+    #viewport-frame[data-viewport="phone"] .space-workspace { padding: 14px 10px 80px; }
+    #viewport-frame[data-viewport="phone"] .space-head { align-items: flex-start; }
+    #viewport-frame[data-viewport="phone"] .space-grid { grid-template-columns: 1fr; }
+    #viewport-frame[data-viewport="phone"] .space-grid > :first-child { display: none; }
+    #viewport-frame[data-viewport="phone"] .space-actions .btn:not(.primary):not(.record) { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: 80ms !important; }
+      .continuum-content, .stream-focus, .space-workspace { transform: none !important; filter: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="variant-nav" aria-label="Prototype variants">
+    <button class="variant-tab active" data-variant="a">A · Meeting Continuum</button>
+    <button class="variant-tab" data-variant="b">B · Day Stream</button>
+    <button class="variant-tab" data-variant="c">C · Conversation Spaces</button>
+  </nav>
+
+  <main id="viewport-frame" data-viewport="desktop">
+    <section id="variant-a" class="variant active">
+      <div class="window">
+        <div class="titlebar"><div class="traffic"><i></i><i></i><i></i></div><div class="window-title">Telu</div><div class="privacy"><i></i> On this Mac</div></div>
+        <div class="continuum">
+          <header class="app-header"><div class="brand"><span class="brand-mark"></span>telu</div><div class="header-center">One conversation · one continuous workspace</div><div class="header-tools"><button class="btn icon"><span class="glyph" data-icon="search"></span></button><button class="btn icon"><span class="glyph" data-icon="settings"></span></button></div></header>
+          <div class="meeting-switcher"><div class="previous">← Weekly product sync</div><div class="current"><b>Product design review</b><span>Studio team · Meeting 4 of 8</span></div><div class="next">Pilot kickoff →</div></div>
+          <nav class="journey-bar" aria-label="Meeting journey">
+            <button class="journey-step active" data-phase="prepare">Prepare</button><button class="journey-step" data-phase="live">Listen live</button><button class="journey-step" data-phase="review">Review</button><button class="journey-step" data-phase="remember">Carry forward</button>
+          </nav>
+          <div class="continuum-content">
+            <section class="phase-panel active" data-panel="prepare">
+              <div class="prep-grid">
+                <article class="card briefing">
+                  <div class="briefing-head"><div><p class="eyebrow">Next · 11:00 in 18 minutes</p><h1>Make the live transition obvious without making Telu feel loud.</h1><div class="briefing-meta"><span>45 minutes</span><span>6 people</span><span>Local context ready</span></div></div><div class="avatar-stack"><span class="avatar a1">MA</span><span class="avatar a2">JL</span><span class="avatar a3">SK</span><span class="avatar a4">+3</span></div></div>
+                  <div class="briefing-actions"><button class="btn primary continuum-start"><span class="glyph" data-icon="wave"></span>Begin this meeting</button><button class="btn evidence-trigger">Why this focus?</button></div>
+                  <div class="flow-grid"><div class="flow-block"><small>Last decision</small><p>Keep onboarding visually quiet and reveal complexity only when needed.</p></div><div class="flow-block"><small>Still unresolved</small><p>Should recording state persist, or is a strong transition enough?</p></div></div>
+                </article>
+                <aside class="card carry-panel"><div class="section-title"><h3>Carry into the room</h3><span class="chip">3 items</span></div><div class="carry-item"><span class="carry-kind">D</span><div><b>Quieter onboarding direction</b><button class="evidence-trigger">View evidence</button></div></div><div class="carry-item"><span class="carry-kind">C</span><div><b>Maya brings revised copy</b><button class="evidence-trigger">View evidence</button></div></div><div class="carry-item"><span class="carry-kind">?</span><div><b>Who owns migration?</b><button class="evidence-trigger">View evidence</button></div></div></aside>
+              </div>
+            </section>
+            <section class="phase-panel" data-panel="live">
+              <div class="live-grid">
+                <article class="card transcript"><div class="surface-head"><div style="display:flex;align-items:center;gap:9px"><span class="record-dot"></span><h3>Product design review</h3><span class="timer">00:00</span></div><span class="chip">Local · This Mac</span></div><div class="transcript-body"><div class="utterance"><span class="speaker">Maya · 00:42</span><p>The quieter direction tested better because people understood what Telu was doing without feeling watched.</p></div><div class="utterance"><span class="speaker">Jon · 01:16</span><p>We still need to make the transition into recording obvious enough.</p></div><div class="utterance latest"><span class="speaker">You · now</span><p>Let’s define what obvious means before we add more interface.</p></div></div></article>
+                <aside class="card assist"><div class="surface-head"><h3>Useful now</h3><span class="chip mint">1 signal</span></div><div class="assist-body"><div class="signal"><small>Worth clarifying</small><h4>Persistent recording state, or a stronger transition?</h4><p>This connects today’s phrase “obvious enough” with the unresolved accessibility note.</p><button class="evidence-trigger" style="margin-top:11px">Inspect evidence</button></div><div class="quiet"><span class="chip">Otherwise quiet</span><p>One suggestion maximum. Stale signals disappear.</p></div><button class="btn record continuum-finish">Finish meeting</button></div></aside>
+              </div>
+            </section>
+            <section class="phase-panel" data-panel="review">
+              <div class="section-title"><div><p class="eyebrow">After the conversation</p><h2 style="margin:0;font-size:25px;letter-spacing:-.035em">Review what Telu heard before it becomes memory.</h2></div><button class="btn primary" onclick="showToast('Reviewed items will carry into the next meeting')">Accept reviewed items</button></div>
+              <div class="review-grid"><article class="card review-column"><h3>Decisions · 2</h3><div class="knowledge-row"><p>Use a persistent compact recording state during live meetings.</p><small>Supported by 3 transcript moments</small></div><div class="knowledge-row"><p>Keep the preparation surface visually quiet.</p><small>Confirmed today</small></div></article><article class="card review-column"><h3>Commitments · 2</h3><div class="knowledge-row"><p>Maya will test the compact recording indicator.</p><small>Owner: Maya · Friday</small></div><div class="knowledge-row"><p>Jon will document reduced-motion behavior.</p><small>Owner: Jon · next review</small></div></article><article class="card review-column"><h3>Open questions · 1</h3><div class="knowledge-row"><p>How should Telu behave when a meeting begins earlier than scheduled?</p><small>Carry to next meeting</small></div></article></div>
+            </section>
+            <section class="phase-panel" data-panel="remember"><div class="card phase-placeholder"><div><p class="eyebrow">Series memory</p><h2>The next meeting starts where this one ended.</h2><p>Two decisions and one open question are now attached to the Studio team series, with their transcript evidence intact.</p><button class="btn primary" onclick="showToast('Series memory opened')">View series memory</button></div></div></section>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="variant-b" class="variant">
+      <div class="window">
+        <div class="titlebar"><div class="traffic"><i></i><i></i><i></i></div><div class="window-title">Telu</div><div class="privacy"><i></i> Private by default</div></div>
+        <div class="stream-shell">
+          <header class="app-header"><div class="brand"><span class="brand-mark"></span>telu</div><div class="header-center">The day is the navigation</div><div class="header-tools"><button class="btn small">All meetings</button><button class="btn icon"><span class="glyph" data-icon="search"></span></button></div></header>
+          <div class="stream-head"><div><p class="eyebrow">Monday, 27 September</p><h1>Your conversations</h1><p>Preparation, listening, and outcomes stay in chronological context.</p></div><span class="chip">3 meetings · 1 complete</span></div>
+          <div class="day-stream">
+            <div class="stream-row"><div class="stream-time">09:30</div><div class="stream-line"><i></i></div><article class="card stream-card compact"><div><b>Weekly product sync</b><span>Complete · 4 decisions · 2 commitments</span></div><button class="btn small" onclick="showToast('Past meeting expanded in place')">View outcomes</button></article></div>
+            <div class="stream-row current"><div class="stream-time">11:00</div><div class="stream-line"><i></i></div><article class="card stream-card stream-focus">
+              <div class="stream-prep"><div class="stream-focus-head"><div><span class="chip">Next · in 18 min</span><h2>Product design review</h2><p>Studio team · 45 minutes · 6 people</p></div><button class="btn primary stream-start"><span class="glyph" data-icon="wave"></span>Begin meeting</button></div><div class="stream-prep-grid"><div class="stream-tile"><small>Last decision</small><b>Keep onboarding visually quiet.</b></div><div class="stream-tile"><small>Open question</small><b>Persistent recording state or stronger transition?</b></div><div class="stream-tile"><small>Expected today</small><b>Revised empty-state copy from Maya.</b></div><div class="stream-actions"><button class="btn small evidence-trigger">Inspect evidence</button><button class="btn small" onclick="showToast('Briefing opened without leaving the day')">Open full briefing</button></div></div></div>
+              <div class="stream-live"><div class="mini-transcript"><div style="display:flex;align-items:center;gap:9px;margin-bottom:16px"><span class="record-dot"></span><b style="font-size:11px">Listening in place</b><span class="timer">00:00</span></div><p><b>Maya:</b> The quieter direction tested better because it never felt like another dashboard.</p><p><b>You:</b> Let’s define the live transition without breaking the day flow.</p></div><div class="mini-assist"><span class="chip mint">Useful now</span><h3>What must remain visible after recording begins?</h3><p>Evidence: previous accessibility note + current discussion.</p><button class="btn small record stream-finish" style="margin-top:14px">Finish</button></div></div>
+              <div class="stream-review"><div class="review-context"><strong>Product design review</strong><span>Finished · outcomes ready</span></div><div><b>Decision</b><p>Keep the live meeting inside the chronological stream.</p></div><div><b>Commitment</b><p>Maya tests the compact indicator by Friday.</p></div><div><b>Open question</b><p>How should early starts appear?</p></div></div>
+            </article></div>
+            <div class="stream-row"><div class="stream-time">14:00</div><div class="stream-line"><i></i></div><article class="card stream-card compact"><div><b>Customer pilot check-in</b><span>Briefing ready · 1 unresolved risk</span></div><button class="btn small" onclick="showToast('Later meeting briefing opened in place')">Prepare</button></article></div>
+            <div class="stream-row"><div class="stream-time">16:30</div><div class="stream-line"><i></i></div><article class="card stream-card compact"><div><b>Research debrief</b><span>No context yet · listening available</span></div><button class="btn small" onclick="showToast('Quick listening is ready')">Start listening</button></article></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="variant-c" class="variant">
+      <div class="window">
+        <div class="titlebar"><div class="traffic"><i></i><i></i><i></i></div><div class="window-title">Telu</div><div class="privacy"><i></i> 3 spaces active</div></div>
+        <div class="spaces-shell">
+          <header class="app-header"><div class="brand"><span class="brand-mark"></span>telu</div><div class="header-center">Return to people and threads, not feature pages</div><div class="header-tools"><button class="btn icon"><span class="glyph" data-icon="search"></span></button><button class="btn">New conversation</button></div></header>
+          <nav class="space-tabs" aria-label="Conversation spaces"><button class="space-tab active"><span class="space-avatar">ST</span>Studio team <span class="chip mint">Next</span></button><button class="space-tab"><span class="space-avatar" style="background:#4d7897">CP</span>Customer pilot</button><button class="space-tab"><span class="space-avatar" style="background:#607a6e">PC</span>Product council</button><button class="space-tab"><span class="space-avatar" style="background:#a36b5c">RD</span>Research debrief</button></nav>
+          <div class="space-workspace">
+            <div class="space-head"><div><p class="eyebrow">Studio team · recurring conversation</p><h1>Product design review</h1><p>Meeting 4 of 8 · 11:00 · context ready</p></div><div class="space-actions"><button class="btn evidence-trigger">Series evidence</button><button class="btn primary space-start"><span class="glyph" data-icon="wave"></span>Enter live room</button></div></div>
+            <div class="space-grid">
+              <aside class="card space-column"><header><h3>Room pulse</h3><span class="chip">This week</span></header><div class="space-body pulse"><div class="pulse-item"><small>Next conversation</small><b>Today · 11:00<br />Product design review</b></div><div class="pulse-item"><small>People</small><b>Maya, Jon, Sara +3</b></div><div class="pulse-item"><small>Unresolved</small><b>2 questions across 3 meetings</b></div><div class="pulse-item"><small>Series health</small><b>All evidence available locally</b></div></div></aside>
+              <main class="card space-column"><header><h3>Now</h3><span class="chip mint">Context ready</span></header><div class="space-body"><div class="space-prep-content"><div class="now-card"><span class="chip">In 18 min</span><h2>Make the live transition obvious without making Telu feel loud.</h2><p>This focus is synthesized from the last review, two unresolved comments, and today’s agenda.</p><div class="now-actions"><button class="btn primary space-start">Begin meeting</button><button class="btn evidence-trigger">Why this focus?</button></div></div><div class="agenda-list"><div class="agenda-item"><span>1</span><p>Review the adaptive home hierarchy.</p></div><div class="agenda-item"><span>2</span><p>Decide persistent recording treatment.</p></div><div class="agenda-item"><span>3</span><p>Assign migration ownership.</p></div></div></div><div class="space-live-content"><div style="display:flex;align-items:center;gap:9px;margin-bottom:19px"><span class="record-dot"></span><b style="font-size:12px">Live in Studio team</b><span class="timer">00:00</span></div><div class="utterance"><span class="speaker">Maya · 00:42</span><p>The quieter direction worked because the space kept all our shared context together.</p></div><div class="utterance"><span class="speaker">Jon · 01:16</span><p>I don’t want to jump into a separate recording screen.</p></div><div class="utterance latest"><span class="speaker">You · now</span><p>Then the room should stay stable while the meeting state changes.</p></div><button class="btn record space-finish">Finish meeting</button></div></div></main>
+              <aside class="card space-column"><header><h3>Room memory</h3><span class="chip">12 items</span></header><div class="space-body"><div class="memory-note active-memory"><b>Quieter onboarding direction</b><span>Decision · meeting 3 · evidence attached</span></div><div class="memory-note"><b>Offline indicator during download</b><span>Open question · meeting 2</span></div><div class="memory-note"><b>Maya brings revised copy</b><span>Commitment · due today</span></div><div class="memory-note"><b>Migration ownership</b><span>Unresolved · two meetings</span></div><div class="signal" style="margin-top:12px"><small>Useful now</small><h4>Do we need a separate recording screen at all?</h4><p>Jon’s current statement conflicts with the inherited layout.</p><button class="evidence-trigger" style="margin-top:10px">Inspect evidence</button></div></div></aside>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div id="evidence-popover" class="evidence-popover" role="dialog" aria-label="Evidence detail"><small>Why Telu surfaced this</small><p>“We should keep the onboarding quiet and let the interface explain itself only when the user needs help.”</p><footer>Design review · 20 September · 14:08–14:17 · local transcript</footer></div>
+  <div id="toast-stack" class="toast-stack"></div>
+  <div id="annotation-tip"></div>
+  <div id="sketch-tools"><select id="theme-switcher" aria-label="Theme"><option value="default.css">Default</option><option value="quiet-editorial.css">Quiet editorial</option></select><button data-view="phone">Phone</button><button data-view="tablet">Tablet</button><button data-view="desktop">Desktop</button><button id="annotation-toggle">Inspect</button></div>
+
+  <script>
+    var icons = {
+      search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16.2 16.2 4 4"/></svg>',
+      settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2.2-.7-.7-1.6 1.1-2-2.1-2.1-2 1.1-1.6-.7L10.5 2h-3l-.7 2.2-1.6.7-2-1.1-2.1 2.1 1.1 2-.7 1.6-2.2.7v3l2.2.7.7 1.6-1.1 2 2.1 2.1 2-1.1 1.6.7.7 2.2h3l.7-2.2 1.6-.7 2 1.1 2.1-2.1-1.1-2 .7-1.6L19 13.5Z" transform="translate(1.5 0) scale(.87)"/></svg>',
+      wave: '<svg viewBox="0 0 24 24"><path d="M5 10v4M9 7v10M13 4v16M17 8v8M21 10v4"/></svg>'
+    };
+    document.querySelectorAll('[data-icon]').forEach(function(node){ node.innerHTML = icons[node.dataset.icon] || ''; });
+
+    document.querySelectorAll('.variant-tab').forEach(function(tab){ tab.addEventListener('click',function(){ document.querySelectorAll('.variant-tab').forEach(function(item){item.classList.remove('active');}); document.querySelectorAll('.variant').forEach(function(item){item.classList.remove('active');}); tab.classList.add('active'); document.getElementById('variant-'+tab.dataset.variant).classList.add('active'); }); });
+
+    var activeTimer = null;
+    function startTimer(root){ clearInterval(activeTimer); var seconds=0; root.querySelectorAll('.timer').forEach(function(node){node.textContent='00:00';}); activeTimer=setInterval(function(){ seconds+=1; var m=Math.floor(seconds/60).toString().padStart(2,'0'); var s=(seconds%60).toString().padStart(2,'0'); root.querySelectorAll('.timer').forEach(function(node){node.textContent=m+':'+s;}); },1000); }
+    function swapState(container, callback){ container.classList.add('transitioning'); setTimeout(function(){ callback(); requestAnimationFrame(function(){container.classList.remove('transitioning');}); },100); }
+    function setPhase(name){ var content=document.querySelector('.continuum-content'); swapState(content,function(){ document.querySelectorAll('.journey-step').forEach(function(step){step.classList.toggle('active',step.dataset.phase===name);}); document.querySelectorAll('.phase-panel').forEach(function(panel){panel.classList.toggle('active',panel.dataset.panel===name);}); }); if(name==='live'){startTimer(document.querySelector('.continuum'));} }
+    document.querySelectorAll('.journey-step').forEach(function(step){step.addEventListener('click',function(){setPhase(step.dataset.phase);});});
+    document.querySelectorAll('.continuum-start').forEach(function(button){button.addEventListener('click',function(){setPhase('live');showToast('Meeting started in the same workspace');});});
+    document.querySelectorAll('.continuum-finish').forEach(function(button){button.addEventListener('click',function(){clearInterval(activeTimer);setPhase('review');showToast('Conversation moved to review');});});
+
+    document.querySelectorAll('.stream-start').forEach(function(button){button.addEventListener('click',function(){var card=button.closest('.stream-focus');swapState(card,function(){card.classList.add('is-live');card.classList.remove('is-review');startTimer(card);});showToast('The meeting expanded inside your day');});});
+    document.querySelectorAll('.stream-finish').forEach(function(button){button.addEventListener('click',function(){var card=button.closest('.stream-focus');clearInterval(activeTimer);swapState(card,function(){card.classList.remove('is-live');card.classList.add('is-review');});showToast('Outcomes stayed in chronological context');});});
+
+    document.querySelectorAll('.space-start').forEach(function(button){button.addEventListener('click',function(){var room=button.closest('.space-workspace');swapState(room,function(){room.classList.add('is-live');startTimer(room);});showToast('Studio team stayed open while the state changed');});});
+    document.querySelectorAll('.space-finish').forEach(function(button){button.addEventListener('click',function(){var room=button.closest('.space-workspace');clearInterval(activeTimer);swapState(room,function(){room.classList.remove('is-live');});showToast('Room returned to preparation with memory intact');});});
+    document.querySelectorAll('.space-tab').forEach(function(tab){tab.addEventListener('click',function(){document.querySelectorAll('.space-tab').forEach(function(item){item.classList.remove('active');});tab.classList.add('active');showToast(tab.textContent.trim()+' space selected');});});
+
+    var popover=document.getElementById('evidence-popover');
+    document.querySelectorAll('.evidence-trigger').forEach(function(button){button.addEventListener('click',function(event){event.stopPropagation();var rect=button.getBoundingClientRect();var left=Math.min(rect.left,window.innerWidth-366);var top=Math.min(rect.bottom+8,window.innerHeight-175);popover.style.left=Math.max(14,left)+'px';popover.style.top=Math.max(58,top)+'px';popover.style.transformOrigin=Math.round(rect.left-Math.max(14,left))+'px 0';popover.classList.toggle('open');});});
+    document.addEventListener('click',function(event){if(!popover.contains(event.target))popover.classList.remove('open');});
+
+    function showToast(message){var stack=document.getElementById('toast-stack');var toast=document.createElement('div');toast.className='toast';toast.textContent=message;stack.appendChild(toast);requestAnimationFrame(function(){toast.classList.add('show');});setTimeout(function(){toast.classList.remove('show');setTimeout(function(){toast.remove();},210);},2200);}
+    document.getElementById('theme-switcher').addEventListener('change',function(event){document.getElementById('theme-link').href='../themes/'+event.target.value;});
+    document.querySelectorAll('[data-view]').forEach(function(button){button.addEventListener('click',function(){document.getElementById('viewport-frame').dataset.viewport=button.dataset.view;});});
+    var tip=document.getElementById('annotation-tip');
+    document.getElementById('annotation-toggle').addEventListener('click',function(){document.body.classList.toggle('annotating');showToast(document.body.classList.contains('annotating')?'Inspect mode on':'Inspect mode off');});
+    document.addEventListener('mousemove',function(event){if(!document.body.classList.contains('annotating'))return;var target=event.target.closest('button,section,article,aside,header,.card');if(!target)return;var style=getComputedStyle(target);tip.textContent=target.tagName.toLowerCase()+' · '+style.fontSize+' · '+style.backgroundColor+' · radius '+style.borderRadius;tip.style.left=Math.min(event.clientX+14,window.innerWidth-245)+'px';tip.style.top=Math.min(event.clientY+14,window.innerHeight-65)+'px';});
+  </script>
+</body>
+</html>

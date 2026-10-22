@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "telu-sketches",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4318", "--bind", "127.0.0.1", "--directory", ".planning/sketches"],
+      "port": 4318
+    },
+    {
+      "name": "telu-frontend",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "frontend", "dev"],
+      "port": 3118
+    }
+  ]
+}
