@@ -152,8 +152,12 @@
         "frontend/src-tauri/src/preparation/**",
         "frontend/src-tauri/src/lib.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "028253d64b45343a29830d8cc1160958011c010c",
+        "ran": "bash .loop/verify.sh (cargo 526 lib tests incl. 10 preparation::selection, integration tests incl. knowledge_deletion, bun, node, typecheck, gallery 150 passed); removing the eligibility check fails 2 selection tests",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "B1",
