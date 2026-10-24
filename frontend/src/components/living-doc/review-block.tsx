@@ -74,32 +74,52 @@ function nextPending(items: KnowledgeItemView[], itemId: string): KnowledgeItemV
   return items.slice(index + 1).find(pending) ?? items.find(pending);
 }
 
+interface LiveUndo extends UndoEntry {
+  toastId: string;
+}
+
+// Module-wide so a remounted block never reuses the id of a toast still on screen.
+let undoToastCount = 0;
+
+// Each Undo toast owns its entry; ⌘Z takes the newest. A toast whose undo no longer applies is dismissed.
 function useUndo(meetingId: string, apply: (view: KnowledgeItemView) => void) {
-  const last = useRef<UndoEntry | null>(null);
-  const undo = useCallback(async () => {
-    const entry = last.current;
-    last.current = null;
+  const live = useRef<LiveUndo[]>([]);
+  const drop = useCallback((stale: (entry: LiveUndo) => boolean) => {
+    live.current = live.current.filter((entry) => {
+      if (!stale(entry)) return true;
+      toast.dismiss(entry.toastId);
+      return false;
+    });
+  }, []);
+  const undo = useCallback(async (toastId: string) => {
+    const entry = live.current.find((candidate) => candidate.toastId === toastId);
     if (!entry) return;
+    drop((candidate) => candidate === entry);
     try {
       for (const itemId of entry.itemIds) apply(await reviewKnowledgeItem(meetingId, itemId, entry.action));
     } catch (error) {
       console.error('Failed to undo the review action:', error);
       toast.error(REVIEW_ERROR);
     }
-  }, [meetingId, apply]);
-  const remember = useCallback((entry: UndoEntry | null) => {
-    last.current = entry;
-  }, []);
-  const canUndo = useCallback(() => last.current !== null, []);
-  useUndoShortcut(canUndo, () => void undo());
-  return { undo, remember };
+  }, [meetingId, apply, drop]);
+  const remember = useCallback((entry: UndoEntry): string => {
+    drop((candidate) => candidate.itemIds.some((itemId) => entry.itemIds.includes(itemId)));
+    undoToastCount += 1;
+    const toastId = `review-undo-${undoToastCount}`;
+    live.current = [...live.current, { ...entry, toastId }];
+    return toastId;
+  }, [drop]);
+  const forgetAll = useCallback(() => drop(() => true), [drop]);
+  const canUndo = useCallback(() => live.current.length > 0, []);
+  useUndoShortcut(canUndo, () => void undo(live.current[live.current.length - 1].toastId));
+  return { undo, remember, forgetAll };
 }
 
 function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-type UndoToast = (entry: UndoEntry) => { action: { label: string; onClick: () => void } };
+type UndoToast = (entry: UndoEntry) => { id: string; action: { label: string; onClick: () => void } };
 
 function useAcceptAll(meetingId: string, items: KnowledgeItemView[], apply: (view: KnowledgeItemView) => void, withUndo: UndoToast) {
   const [acceptingAll, setAcceptingAll] = useState(false);
@@ -124,7 +144,7 @@ function useAcceptAll(meetingId: string, items: KnowledgeItemView[], apply: (vie
   return { acceptingAll, acceptAll };
 }
 
-function useDecisions(items: KnowledgeItemView[], apply: (view: KnowledgeItemView) => void, withUndo: UndoToast, remember: (entry: UndoEntry | null) => void) {
+function useDecisions(items: KnowledgeItemView[], apply: (view: KnowledgeItemView) => void, withUndo: UndoToast, forgetAll: () => void) {
   const rows = useRef(new Map<string, HTMLElement>());
   const onDecided = ({ view, action }: CandidateDecision) => {
     const next = action === 'accept' ? nextPending(items, view.itemId) : undefined;
@@ -135,7 +155,7 @@ function useDecisions(items: KnowledgeItemView[], apply: (view: KnowledgeItemVie
     } else if (action === 'reject') {
       toast.info(REVIEW_TOAST.rejected, withUndo({ itemIds: [view.itemId], action: 'restore' }));
     } else {
-      remember(null);
+      forgetAll();
       if (action === 'correct') toast.success(REVIEW_TOAST.corrected);
       if (action === 'restore') toast.success(REVIEW_TOAST.restored);
     }
@@ -153,13 +173,13 @@ export function ReviewBlock({ meetingId, knowledge, onChange }: ReviewBlockProps
   const latestRun = knowledge.latestRun;
   const runFor = (item: KnowledgeItemView) => (latestRun?.runId === item.originRunId ? latestRun : null);
   const apply = useCallback((view: KnowledgeItemView) => onChange((current) => withItem(current, view)), [onChange]);
-  const { undo, remember } = useUndo(meetingId, apply);
+  const { undo, remember, forgetAll } = useUndo(meetingId, apply);
   const withUndo: UndoToast = (entry) => {
-    remember(entry);
-    return { action: { label: 'Undo', onClick: () => void undo() } };
+    const id = remember(entry);
+    return { id, action: { label: 'Undo', onClick: () => void undo(id) } };
   };
   const { acceptingAll, acceptAll } = useAcceptAll(meetingId, knowledge.items, apply, withUndo);
-  const { rows, onDecided } = useDecisions(knowledge.items, apply, withUndo, remember);
+  const { rows, onDecided } = useDecisions(knowledge.items, apply, withUndo, forgetAll);
   const skipped = latestRun?.status === 'succeeded' ? latestRun.skippedCount : 0;
 
   return (

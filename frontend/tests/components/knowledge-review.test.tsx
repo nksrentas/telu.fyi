@@ -384,6 +384,65 @@ describe('ReviewBlock', () => {
     success.mockRestore();
   });
 
+  test("each toast's Undo reverts its own action; ⌘Z takes the latest; a correction dismisses the rest", async () => {
+    const success = spyOn(toast, 'success');
+    const info = spyOn(toast, 'info');
+    const dismiss = spyOn(toast, 'dismiss');
+    type UndoOptions = { id: string | number; action: { onClick: () => void } };
+    const undoOf = (calls: unknown[][], index: number) => calls[index]?.[1] as UndoOptions;
+    // item-3's evidence changes once accepted, so its row keeps a Reject button.
+    const changed: Partial<KnowledgeItemView> = { evidenceStatus: 'changed', eligibility: false };
+    responses.knowledge_review_item = (args) =>
+      args.action === 'accept'
+        ? accepted({ itemId: String(args.itemId), ...(args.itemId === 'item-3' ? changed : {}) })
+        : item({ itemId: String(args.itemId), reviewState: args.action === 'reject' ? 'rejected' : 'proposed' });
+    responses.knowledge_correct_item = (args) => accepted({ itemId: String(args.itemId), corrected: true });
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' }), item({ itemId: 'item-3' })])} />);
+
+    const decide = async (itemId: string, label: string) => {
+      const row = root().find((node) => node.type === 'div' && node.props['data-item-id'] === itemId);
+      const target = row.find((node) => node.type === 'button' && (textOf(node) === label || node.props['aria-label'] === label));
+      await act(async () => target.props.onClick());
+      await settle();
+    };
+    await decide('item-1', 'Accept');
+    await decide('item-2', 'Reject');
+    const acceptToast = undoOf(success.mock.calls, 0);
+    const rejectToast = undoOf(info.mock.calls, 0);
+
+    const beforeUndo = reviewCalls().length;
+    await act(async () => acceptToast.action.onClick());
+    await settle();
+    expect(reviewCalls().slice(beforeUndo)).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' }]);
+    expect(acceptToast.id).not.toBe(rejectToast.id);
+
+    await decide('item-1', 'Reject');
+    const latestToast = undoOf(info.mock.calls, 1);
+    await pressUndo();
+    expect(reviewCalls().at(-1)).toEqual({ meetingId: 'meeting-a', itemId: 'item-1', action: 'restore' });
+    expect(dismiss).toHaveBeenCalledWith(latestToast.id);
+
+    await decide('item-3', 'Accept');
+    const supersededToast = undoOf(success.mock.calls, 1);
+    await decide('item-3', 'Reject');
+    expect(dismiss).toHaveBeenCalledWith(supersededToast.id);
+    const item3RejectToast = undoOf(info.mock.calls, 2);
+
+    dismiss.mockClear();
+    await click('Correct');
+    await act(async () => root().find((node) => node.type === 'textarea').props.onChange({ target: { value: 'New wording' } }));
+    await click('Save correction');
+    expect(dismiss).toHaveBeenCalledWith(rejectToast.id);
+    expect(dismiss).toHaveBeenCalledWith(item3RejectToast.id);
+    const calls = reviewCalls().length;
+    await act(async () => rejectToast.action.onClick());
+    await pressUndo();
+    expect(reviewCalls()).toHaveLength(calls);
+    success.mockRestore();
+    info.mockRestore();
+    dismiss.mockRestore();
+  });
+
   test('living-doc sources never render raw HTML or the memory label', () => {
     const folder = join(import.meta.dir, '../../src/components/living-doc');
     for (const file of readdirSync(folder)) {
