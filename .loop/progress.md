@@ -23,3 +23,9 @@ Task: Phase 3 build (DOC-01 to DOC-04, PREP-01 to PREP-05) on branch loop/phase3
 ## Open questions
 
 ## Sessions
+
+## P1 · worker 1 · 2026-10-24
+Did: migration 20261024000100_phase3_planned_meetings.sql (planned_meetings: id, title CHECK non-blank, start_utc nullable, purpose, created_utc, updated_utc). Module src/planning/ with models.rs (PlannedMeeting, PlannedMeetingInput, PlanningError codes PLANNED_MEETING_TITLE_REQUIRED / _INVALID_START / _INVALID_DAY / _NOT_FOUND / _STORAGE_FAILED), repository.rs (create, get, list_upcoming, update via UPDATE ... RETURNING, delete; tests inline) and commands.rs; five commands registered in lib.rs.
+Assumptions: 'today' depends on the user's time zone, so planning_list_upcoming takes today_start_utc (RFC3339, start of the local day) from the UI, as agenda_list_day takes its range. 'Newest first' means created_utc DESC, id DESC. planning_update replaces title, start_utc and purpose; it does not patch individual fields. An empty or missing start_utc means undated.
+Learned: start_utc is stored as millisecond UTC 'Z' text (to_rfc3339_opts(Millis, true)), so `start_utc >= ?` compares correctly as text. Bind today_start in the same format. Repository functions take `now: DateTime<Utc>` so tests are deterministic. Nothing logs titles or ids. Commands for U1: planning_create(title, startUtc?, purpose), planning_list_upcoming(todayStartUtc), planning_get(id), planning_update(id, title, startUtc?, purpose), planning_delete(id). The result is camelCase {id, title, startUtc, purpose, createdUtc, updatedUtc}.
+Skipped context skills: bussin-a11y and sketch-findings-telu-fyi, because P1 has no UI.

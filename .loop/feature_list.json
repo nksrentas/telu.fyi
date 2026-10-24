@@ -13,8 +13,12 @@
         "frontend/src-tauri/src/planning/**",
         "frontend/src-tauri/src/lib.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "0d36181",
+        "ran": "cargo test --features coreml planning --lib (5 passed); bash .loop/verify.sh (gate: all steps passed, gallery 146 passed); cargo check clean with commands registered; 3 review passes, last one clean",
+        "dependencies": "none added"
+      }
     },
     {
       "id": "D1",
@@ -37,8 +41,12 @@
       "ui": false,
       "description": "Paste text: documents::ingest_text(title, text) decodes nothing (the text is already a string), normalises CRLF to LF and strips a leading BOM, splits passages on blank lines, and stores version 1 with locators {kind:'paragraph', index, start, end} as character (not byte) offsets into the normalised text. The sha256 is over the normalised UTF-8 bytes. Pasting identical text into the same document creates no new version and returns the existing one.",
       "verify": "cargo test ... documents::ingest --lib: three paragraphs give three passages whose locator start and end slice the normalised text back to each passage exactly; the same text twice yields one version; text that differs by one character yields version 2.",
-      "depends_on": ["D1"],
-      "touches": ["frontend/src-tauri/src/documents/**"],
+      "depends_on": [
+        "D1"
+      ],
+      "touches": [
+        "frontend/src-tauri/src/documents/**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -48,7 +56,9 @@
       "ui": false,
       "description": "Import a local file: only .md, .markdown and .txt, chosen through the Rust dialog (tauri-plugin-dialog, as audio/import.rs does), never through the renderer's fs plugin. The bytes are copied into app-owned storage at <app_data_dir>/documents/<document_id>/<sha256>.<ext> before extraction. Markdown passages get locators {kind:'section', heading_path:[...], paragraph, start, end}; plain text uses paragraph locators as in D2. The parser_version is recorded.",
       "verify": "cargo test ... documents::import --lib with a TempDir as app data: a Markdown fixture with two headings yields passages whose heading_path matches; the managed file exists and its sha256 equals the version's; a .pdf or .docx path is refused with UNSUPPORTED_FORMAT and nothing is written.",
-      "depends_on": ["D2"],
+      "depends_on": [
+        "D2"
+      ],
       "touches": [
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/tests/fixtures/documents/**"
@@ -62,8 +72,12 @@
       "ui": false,
       "description": "Size and resource limits, as named constants in documents: MAX_SOURCE_BYTES 1 MiB, MAX_SOURCE_CHARS 200,000, MAX_PASSAGES 2,000, MAX_PASSAGE_CHARS 4,000 (longer paragraphs split at the last sentence end or whitespace before the cap, with consecutive locators). A file is checked by its metadata size before it is read; text over a limit is refused with SOURCE_TOO_LARGE naming the limit; nothing partial is stored.",
       "verify": "cargo test ... documents::limits --lib: a 1 MiB + 1 byte file is refused without reading it (assert on a counting reader or the metadata path); 200,001 characters is refused; a 9,000-character paragraph becomes 3 passages whose locators are contiguous and cover it exactly; the tables are empty after every refusal.",
-      "depends_on": ["D3"],
-      "touches": ["frontend/src-tauri/src/documents/**"],
+      "depends_on": [
+        "D3"
+      ],
+      "touches": [
+        "frontend/src-tauri/src/documents/**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -73,7 +87,9 @@
       "ui": false,
       "description": "Document commands and the typed service: documents_paste, documents_import (opens the dialog in Rust), documents_list (title, format, latest version, status, size, availability), documents_get_version (passages), documents_replace (paste or import a new version), documents_delete, each returning SCREAMING_SNAKE error codes. frontend/src/lib/document-service.ts wraps them with typed results.",
       "verify": "cargo test ... documents::commands --lib covers each command's success and one error code; bun test --cwd frontend tests/lib/document-service.test.ts asserts the invoke names and argument shapes; cargo check of the whole crate passes with the commands registered in lib.rs.",
-      "depends_on": ["D4"],
+      "depends_on": [
+        "D4"
+      ],
       "touches": [
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/src/lib.rs",
@@ -89,7 +105,9 @@
       "ui": false,
       "description": "Replace and delete: replace adds version N+1 and leaves earlier versions and their passages readable and unchanged. Delete marks the document deleted, removes every version's passages and text in one transaction, then removes the managed files; a startup sweep removes managed files that have no live version (a crash between commit and file removal).",
       "verify": "frontend/src-tauri/tests/document_lifecycle.rs (TempDir database and app data): after replace, version 1's passages are byte-identical; after delete, a scan of every TEXT column in every table finds no passage text of that document, and the managed folder is gone; with a file left behind on purpose, the sweep removes it and leaves another document's files alone.",
-      "depends_on": ["D5"],
+      "depends_on": [
+        "D5"
+      ],
       "touches": [
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/src/lib.rs",
@@ -104,7 +122,10 @@
       "ui": false,
       "description": "Explicit selection for a planned meeting: a preparation_sources table and commands prep_select_sources / prep_list_sources. Entries are either a pinned document version or an accepted knowledge item, read through KnowledgeRepository::list_eligible_items of a chosen past meeting (read only, no change to knowledge/). Caps: at most 12 document versions and 60 knowledge items; an item that is not currently eligible is refused with SOURCE_NOT_ELIGIBLE. Order is the user's order.",
       "verify": "cargo test ... preparation::selection --lib: selecting a version pins it even after the document gets version 2; a proposed (not accepted) knowledge item is refused; 13 documents are refused with SELECTION_TOO_LARGE; the list returns entries in the saved order.",
-      "depends_on": ["P1", "D5"],
+      "depends_on": [
+        "P1",
+        "D5"
+      ],
       "touches": [
         "frontend/src-tauri/migrations/**",
         "frontend/src-tauri/src/preparation/**",
@@ -119,8 +140,12 @@
       "ui": false,
       "description": "Deterministic context budget: preparation::context::build(selection, budget) packs passages and knowledge items in a fixed order (user order, then passage ordinal) under a per-source budget and a total budget in tokens (CHARS_PER_TOKEN 4, constants in preparation, not knowledge/prompt.rs). It returns the packed context plus a manifest with one entry per source: included, truncated (with how many passages kept), omitted (budget), missing (managed file gone), deleted or unavailable, each with a reason code.",
       "verify": "cargo test ... preparation::context --lib: the same selection gives byte-identical context and manifest twice; no source exceeds its budget and the total never exceeds the total budget (a property-style test over generated sizes); a deleted document appears as deleted, not silently dropped; truncation stops at a passage boundary.",
-      "depends_on": ["S1"],
-      "touches": ["frontend/src-tauri/src/preparation/**"],
+      "depends_on": [
+        "S1"
+      ],
+      "touches": [
+        "frontend/src-tauri/src/preparation/**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -130,7 +155,9 @@
       "ui": false,
       "description": "Briefing generation: preparation::briefing::run(context, completer) sends the sources inside delimited source blocks in the user message (system prompt has no source text), asks for JSON statements each citing source refs with a verbatim quote, then verifies every statement: each ref must be in the manifest's included set and its quote must occur verbatim in the cited passage or knowledge item. Unsupported statements are dropped and counted. Briefings and claims are stored (briefings, briefing_claims with source ref, locator and quote) with PREP_PROMPT_VERSION.",
       "verify": "cargo test ... preparation::briefing --lib with staged replies: a reply with 3 statements, one quoting text not in its source and one citing an omitted source, stores 1 claim and reports dropped=2 with reasons; a malformed JSON reply fails the run with PREP_PARSE_FAILED and stores nothing.",
-      "depends_on": ["B1"],
+      "depends_on": [
+        "B1"
+      ],
       "touches": [
         "frontend/src-tauri/migrations/**",
         "frontend/src-tauri/src/preparation/**"
@@ -144,8 +171,12 @@
       "ui": false,
       "description": "Candidate questions: the same run returns up to 5 questions, each with a rationale citing source refs and quotes, verified the same way as statements; a question whose rationale cannot be verified is dropped and counted.",
       "verify": "cargo test ... preparation::questions --lib: staged reply with 6 questions keeps at most 5; a question citing a passage it does not quote is dropped; kept questions load back with their refs.",
-      "depends_on": ["B2"],
-      "touches": ["frontend/src-tauri/src/preparation/**"],
+      "depends_on": [
+        "B2"
+      ],
+      "touches": [
+        "frontend/src-tauri/src/preparation/**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -155,7 +186,9 @@
       "ui": false,
       "description": "Preparation commands: prep_generate (resolves the configured Summary route and validates it the way knowledge runs do through trust/provider_route.rs, returns the route class before dispatch), prep_cancel, prep_get_briefing (latest briefing, claims, questions, manifest, run status), plus a preparation-updated event. One run at a time per planned meeting. A result is discarded as stale when the selection or any selected version changed while it ran. frontend/src/lib/preparation-service.ts wraps them.",
       "verify": "cargo test ... preparation::commands --lib: a second generate while one runs is refused with PREP_ALREADY_RUNNING; changing the selection mid-run (staged completer that waits on a signal) stores no briefing and marks the run stale; cancel marks it cancelled with no claims stored; bun test tests/lib/preparation-service.test.ts asserts invoke names and event subscription cleanup.",
-      "depends_on": ["B3"],
+      "depends_on": [
+        "B3"
+      ],
       "touches": [
         "frontend/src-tauri/src/preparation/**",
         "frontend/src-tauri/src/lib.rs",
@@ -171,7 +204,9 @@
       "ui": true,
       "description": "Plan a meeting from Today: a 'Plan a meeting' control on the Today agenda creates a planned meeting and opens its preparation page (living-doc layout from the sketch skill) with an editable title, optional date and time, and a Purpose field; upcoming planned meetings show on Today.",
       "verify": "bun test for the page component (create, rename, purpose save, error toast on a failed save); new gallery screens in frontend/tests/visual/screens/preparation.json (empty planned meeting, Today with two planned meetings) pass light and dark with no unmocked commands; the screenshots match the sketch's living-doc spacing and tokens.",
-      "depends_on": ["P1"],
+      "depends_on": [
+        "P1"
+      ],
       "touches": [
         "frontend/src/app/**",
         "frontend/src/components/preparation/**",
@@ -190,7 +225,11 @@
       "ui": true,
       "description": "Sources panel on the preparation page: Paste (a dialog with title and text), Import (Markdown or text), and a list of sources with format, size, version, extraction status and an include dot per source. Limit and format errors show their plain-language message from the error code.",
       "verify": "bun test: paste submits documents_paste then prep_select_sources; SOURCE_TOO_LARGE shows 'This source is over 1 MB. Split it or paste a shorter part.'; include toggles call prep_select_sources with the new set. Gallery screens: sources empty, three sources with one failed, paste dialog open, size error.",
-      "depends_on": ["U1", "D5", "S1"],
+      "depends_on": [
+        "U1",
+        "D5",
+        "S1"
+      ],
       "touches": [
         "frontend/src/components/preparation/**",
         "frontend/tests/components/**",
@@ -206,7 +245,9 @@
       "ui": true,
       "description": "Source viewer: opening a source, or a citation, shows that exact version in a drawer like the transcript drawer, scrolled to the locator with the passage highlighted; an older version is labelled 'Version N of M'; a deleted source shows 'This source was deleted' and no text.",
       "verify": "bun test: opening with a locator highlights exactly the passage text from documents_get_version; Escape closes only the drawer. Gallery screens: viewer at a Markdown section, an older version, a deleted source.",
-      "depends_on": ["U2"],
+      "depends_on": [
+        "U2"
+      ],
       "touches": [
         "frontend/src/components/preparation/**",
         "frontend/tests/components/**",
@@ -222,7 +263,9 @@
       "ui": true,
       "description": "Knowledge picker: from the preparation page the user chooses past meetings and includes their accepted decisions, commitments and open questions; only accepted, valid items are offered, each with its type and meeting date.",
       "verify": "bun test: the picker lists only items returned as eligible and saves the chosen ids through prep_select_sources; SOURCE_NOT_ELIGIBLE shows a toast and refreshes the list. Gallery screen: picker with two meetings expanded.",
-      "depends_on": ["U2"],
+      "depends_on": [
+        "U2"
+      ],
       "touches": [
         "frontend/src/components/preparation/**",
         "frontend/tests/components/**",
@@ -238,7 +281,11 @@
       "ui": true,
       "description": "Briefing block ('Next' in the sketch): Prepare shows the route (Local or Remote and its destination) before it runs, then states preparing, brief, failed, cancelled and stale. The brief lists statements and questions; every one carries source chips that open the source viewer at its locator, or the meeting transcript drawer for a knowledge item. A provenance line names what it was prepared from and when.",
       "verify": "bun test: a remote route shows its destination before prep_generate is called; Stop calls prep_cancel and handles its rejection with a toast; a chip opens U3 with the claim's locator. Gallery screens: idle, preparing, brief with 4 statements and 3 questions, failed, stale.",
-      "depends_on": ["B4", "U3", "U4"],
+      "depends_on": [
+        "B4",
+        "U3",
+        "U4"
+      ],
       "touches": [
         "frontend/src/components/preparation/**",
         "frontend/tests/components/**",
@@ -254,7 +301,9 @@
       "ui": true,
       "description": "Source manifest (PREP-03): from the briefing, 'What was used' opens a popover listing every selected source as included, truncated (n of m passages), omitted (over budget), missing, deleted or unavailable, each with its reason in plain words, plus the dropped-statement count.",
       "verify": "bun test renders every manifest status with its sentence. Gallery screen: manifest with one of each status.",
-      "depends_on": ["U5"],
+      "depends_on": [
+        "U5"
+      ],
       "touches": [
         "frontend/src/components/preparation/**",
         "frontend/tests/components/**",
@@ -269,7 +318,10 @@
       "ui": true,
       "description": "Replace and delete in the UI: Replace adds a new version (paste or import); Delete opens an Alert that states how many briefings cite the source and that its text will be removed. Both refresh the briefing state.",
       "verify": "bun test: delete shows the citing-briefing count from the impact query, confirms, calls documents_delete and refreshes; an impact query failure shows Retry. Gallery screens: delete alert with impact, replace flow.",
-      "depends_on": ["U5", "L1"],
+      "depends_on": [
+        "U5",
+        "L1"
+      ],
       "touches": [
         "frontend/src/components/preparation/**",
         "frontend/src-tauri/src/documents/**",
@@ -285,7 +337,10 @@
       "ui": false,
       "description": "Replace and delete propagation to briefings: replacing a selected document marks briefings built from the old version stale (they stay readable and their citations still open the old version); deleting a document turns every claim citing it into source_unavailable and removes the stored quote, and documents_delete_impact reports how many briefings cite it.",
       "verify": "frontend/src-tauri/tests/preparation_lifecycle.rs: after replace, prep_get_briefing reports stale and the claim still resolves to version 1; after delete, the claim is source_unavailable and a scan of every TEXT column finds none of the deleted document's text; the impact count matches.",
-      "depends_on": ["B4", "D6"],
+      "depends_on": [
+        "B4",
+        "D6"
+      ],
       "touches": [
         "frontend/src-tauri/src/preparation/**",
         "frontend/src-tauri/src/documents/**",
@@ -300,7 +355,9 @@
       "ui": false,
       "description": "Knowledge changes after a briefing: a claim citing a knowledge item whose revision changed, that was rejected, or whose meeting was deleted is reported stale or source_unavailable when the briefing is read (compare the revision id recorded at generation). Deleting a meeting through the existing delete path also removes stored quotes of its transcript from briefing_claims, by a call added in database/repositories/meeting.rs or api/api.rs, not in knowledge/.",
       "verify": "frontend/src-tauri/tests/preparation_lifecycle.rs: reject the cited item (through the existing public review API) and the claim reads stale; delete the meeting and the claim reads source_unavailable with no quote text left in any table.",
-      "depends_on": ["L1"],
+      "depends_on": [
+        "L1"
+      ],
       "touches": [
         "frontend/src-tauri/src/preparation/**",
         "frontend/src-tauri/src/database/repositories/meeting.rs",
@@ -316,7 +373,10 @@
       "ui": false,
       "description": "Measurement harness for PREP-05, no thresholds: a small versioned golden corpus (synthetic Markdown and text sources with expected locators, plus staged completions) under frontend/src-tauri/tests/fixtures/preparation/, and preparation::evaluation::score that reports supported-claim rate, source correctness (cited locator equals the expected one), stale or superseded citations and direct-context fit (share of selected text that fit the budget). The report is content-free (counts and ids only).",
       "verify": "cargo test ... preparation::evaluation --lib: the corpus scores to the expected numbers written in the fixture; the report JSON contains no passage text (assert no fixture sentence appears in it); no threshold file is created or read.",
-      "depends_on": ["B3", "L1"],
+      "depends_on": [
+        "B3",
+        "L1"
+      ],
       "touches": [
         "frontend/src-tauri/src/preparation/**",
         "frontend/src-tauri/tests/fixtures/preparation/**"
@@ -330,7 +390,9 @@
       "ui": false,
       "description": "Embedded instructions stay inert: sources containing 'Ignore previous instructions', a fake system block, fake JSON citations, a fake closing source delimiter and a request to switch providers produce prompts where that text sits only inside its source block (delimiters escaped), the system prompt is unchanged, the route is unchanged, and a staged reply that obeys the injected text is dropped by citation verification.",
       "verify": "cargo test ... preparation::injection --lib over a fixture corpus of at least 6 adversarial sources: system prompt byte-identical across all; the fake delimiter cannot close the block; obeying replies store 0 claims.",
-      "depends_on": ["B3"],
+      "depends_on": [
+        "B3"
+      ],
       "touches": [
         "frontend/src-tauri/src/preparation/**",
         "frontend/src-tauri/tests/fixtures/preparation/**"
@@ -344,7 +406,9 @@
       "ui": false,
       "description": "Encoding: Greek, emoji, combining marks and a Turkish dotted I keep locators correct in characters; a UTF-8 BOM is stripped; CRLF and lone CR are normalised; invalid UTF-8 or a NUL byte marks the version failed with EXTRACTION_FAILED and stores no passages; a 0-byte file and whitespace-only text are refused with EMPTY_SOURCE.",
       "verify": "cargo test ... documents::encoding --lib: for each case, slicing the normalised text by every locator returns the passage exactly; the failure cases store the expected status or refusal.",
-      "depends_on": ["D4"],
+      "depends_on": [
+        "D4"
+      ],
       "touches": [
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/tests/fixtures/documents/**"
@@ -358,8 +422,13 @@
       "ui": false,
       "description": "Selection and run edges: Prepare with nothing selected is refused with PREP_NO_SOURCES; a selection whose every source is deleted or missing yields a briefing that says nothing could be used rather than an empty or invented one; a managed file deleted outside Telu shows as missing in the manifest and is never cited.",
       "verify": "cargo test ... preparation::edges --lib: each case gives the named code or manifest status; staged replies citing the missing source store 0 claims.",
-      "depends_on": ["B4", "D6"],
-      "touches": ["frontend/src-tauri/src/preparation/**"],
+      "depends_on": [
+        "B4",
+        "D6"
+      ],
+      "touches": [
+        "frontend/src-tauri/src/preparation/**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -369,7 +438,10 @@
       "ui": false,
       "description": "Privacy: no document text, title, file path or id is sent to analytics or logged at info level or above; import never goes through the renderer's fs plugin; a remote route needs the same explicit confirmation as a knowledge run. Proven by a contract test in .github (like verify-phase1-egress-capabilities) that greps the new modules and components.",
       "verify": "node --test .github/verify-phase3-preparation-privacy.test.cjs passes, and fails when a deliberately added analytics call with a title is present (checked in a scratch edit, not committed).",
-      "depends_on": ["U5", "D5"],
+      "depends_on": [
+        "U5",
+        "D5"
+      ],
       "touches": [
         ".github/verify-phase3-preparation-privacy.cjs",
         ".github/verify-phase3-preparation-privacy.test.cjs"
@@ -383,7 +455,10 @@
       "ui": true,
       "description": "UI edges: long titles truncate with the full title in a tooltip; 12 selected documents still lay out; keyboard-only use reaches Paste, Import, every include toggle, Prepare, Stop and every source chip with a visible focus ring; reduced motion removes the preparing animation.",
       "verify": "bun test for focus order and reduced motion; gallery screens at 1100x700 with 12 sources and a 200-character title, light and dark.",
-      "depends_on": ["U6", "U7"],
+      "depends_on": [
+        "U6",
+        "U7"
+      ],
       "touches": [
         "frontend/src/components/preparation/**",
         "frontend/tests/components/**",
@@ -398,8 +473,18 @@
       "ui": true,
       "description": "Phase 2 still holds: every existing gallery screen passes, the knowledge Rust tests and component tests pass unchanged, the frozen paths are unchanged since the base, and node .github/verify-phase2-know07-status.cjs prints the same status as at the base.",
       "verify": "bash .loop/gate.sh passes; git diff --stat <base> -- frontend/src-tauri/src/knowledge frontend/src-tauri/src/summary is empty; the KNOW-07 status output equals the base's.",
-      "depends_on": ["E5", "M1", "E1", "E2", "E3", "E4", "L2"],
-      "touches": ["**"],
+      "depends_on": [
+        "E5",
+        "M1",
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "L2"
+      ],
+      "touches": [
+        "**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -409,8 +494,12 @@
       "ui": false,
       "description": "Maintainer notes: docs/telu/phase3-preparation.md states the supported formats, every limit and budget constant, the manifest statuses, how to run the measurement harness, and what is not built (no evaluation, no thresholds, no PDF or DOCX, no linking a planned meeting to its recording).",
       "verify": "The file exists and every constant it names matches the code (grep each value).",
-      "depends_on": ["R1"],
-      "touches": ["docs/telu/phase3-preparation.md"],
+      "depends_on": [
+        "R1"
+      ],
+      "touches": [
+        "docs/telu/phase3-preparation.md"
+      ],
       "passes": false,
       "evidence": null
     }
