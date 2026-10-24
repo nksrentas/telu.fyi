@@ -32,8 +32,12 @@
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/src/lib.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "3ea9645",
+        "ran": "cargo test --features coreml documents --lib (7 passed); bash .loop/verify.sh (gate: all steps passed, gallery 146 passed); 2 review passes, last one clean",
+        "dependencies": "none added"
+      }
     },
     {
       "id": "D2",
