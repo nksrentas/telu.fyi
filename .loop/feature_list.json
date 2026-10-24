@@ -190,8 +190,12 @@
         "frontend/src-tauri/migrations/**",
         "frontend/src-tauri/src/preparation/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "189300f",
+        "ran": "cargo test --features coreml preparation::briefing --lib (5 passed); bash .loop/verify.sh (gate: all steps passed, gallery 150 passed); two review subagents, second with no spec/standards findings",
+        "dependencies": "none added (regex, once_cell already in Cargo.toml)"
+      }
     },
     {
       "id": "B3",
