@@ -90,8 +90,11 @@
       "touches": [
         "frontend/src-tauri/src/documents/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "22ac7cdae23a5f869cc300467450730f1d6b1918",
+        "ran": "bash .loop/verify.sh (cargo 508 lib passed incl. 8 documents::limits, bun, node, typecheck, gallery 150 passed); no new dependencies"
+      }
     },
     {
       "id": "D5",
