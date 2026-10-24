@@ -51,8 +51,12 @@
       "touches": [
         "frontend/src-tauri/src/documents/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "565546d",
+        "ran": "cargo test --features coreml documents --lib (12 passed, 5 ingest incl. seeded property test; byte-offset mutation made 2 fail); bash .loop/verify.sh (gate: all steps passed, gallery 146 passed); review subagent: no spec findings, lean fixes applied",
+        "dependencies": "none added"
+      }
     },
     {
       "id": "D3",
