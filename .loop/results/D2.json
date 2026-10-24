@@ -1,0 +1,10 @@
+{
+ "id": "D2",
+ "passes": true,
+ "evidence": {
+  "commit": "565546d",
+  "ran": "cargo test --features coreml documents --lib (12 passed, 5 ingest incl. seeded property test; byte-offset mutation made 2 fail); bash .loop/verify.sh (gate: all steps passed, gallery 146 passed); review subagent: no spec findings, lean fixes applied",
+  "dependencies": "none added"
+ },
+ "notes": "Did: documents/ingest.rs with ingest_text(pool, title, text, now), which creates a text-format document with v1, and ingest_text_into(pool, document_id, text, now), which returns the existing version when the normalised sha256 matches and otherwise creates the next version. Normalisation strips a leading BOM and converts CRLF to LF. Passages split on whitespace-only lines. Locators are {kind:'paragraph', index, start, end}, in char offsets into the normalised text. sha256, byte_size and char_count cover the normalised text. content_hash is the sha256 of the passage text. parser_version is 'paste-text-1'. Text with no paragraph fails with DOCUMENT_TEXT_EMPTY and writes nothing. repository::create_version now takes &mut SqliteConnection plus the passages, so the document, version and passages are written in the caller's one transaction. insert_passages is removed. Added find_version_by_sha256. create_document takes any SqliteExecutor.\nAssumptions: the spec's 'same document' needs an id, so the existing-document path is a separate function, ingest_text_into. Pasted documents are format 'text'. Errors are anyhow, with a SCREAMING_SNAKE message, for the command layer to pass through.\nLearned: proptest and fast-check are not in Rust dev-deps, so the property test uses a seeded xorshift over unicode, whitespace and CRLF pieces. Known gaps for later items: ingest_text_into on an unknown id surfaces a raw FK error, the title is validated only by the DB CHECK, and dedupe read-then-insert is not BEGIN IMMEDIATE, so concurrent identical pastes would hit UNIQUE."
+}
