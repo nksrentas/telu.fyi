@@ -1,6 +1,6 @@
 use crate::documents::models::{
-    Availability, Document, DocumentFormat, DocumentVersion, ExtractionStatus, NewPassage,
-    NewVersion, Passage,
+    Availability, Document, DocumentFormat, DocumentSummary, DocumentVersion, ExtractionStatus,
+    NewPassage, NewVersion, Passage,
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use sqlx::{SqliteConnection, SqliteExecutor, SqlitePool};
@@ -121,6 +121,81 @@ pub async fn list_passages(
     .bind(version_id)
     .fetch_all(pool)
     .await
+}
+
+pub async fn get_document(
+    executor: impl SqliteExecutor<'_>,
+    id: &str,
+) -> Result<Option<Document>, sqlx::Error> {
+    sqlx::query_as::<_, Document>(
+        "SELECT id, title, format, availability, created_utc FROM documents WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(executor)
+    .await
+}
+
+pub async fn get_version(
+    executor: impl SqliteExecutor<'_>,
+    id: &str,
+) -> Result<Option<DocumentVersion>, sqlx::Error> {
+    sqlx::query_as::<_, DocumentVersion>(
+        "SELECT id, document_id, version, sha256, byte_size, char_count, parser_version,
+             extraction_status, failure_code, managed_path, created_utc
+         FROM document_versions WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(executor)
+    .await
+}
+
+pub async fn latest_version_number(
+    executor: impl SqliteExecutor<'_>,
+    document_id: &str,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT COALESCE(MAX(version), 0) FROM document_versions WHERE document_id = ?",
+    )
+    .bind(document_id)
+    .fetch_one(executor)
+    .await
+}
+
+pub async fn list_summaries(pool: &SqlitePool) -> Result<Vec<DocumentSummary>, sqlx::Error> {
+    sqlx::query_as::<_, DocumentSummary>(
+        "SELECT d.id, d.title, d.format, d.availability, d.created_utc,
+             v.id AS latest_version_id, v.version AS latest_version, v.extraction_status,
+             v.failure_code, v.byte_size
+         FROM documents d
+         JOIN document_versions v ON v.document_id = d.id
+         WHERE v.version = (SELECT MAX(version) FROM document_versions WHERE document_id = d.id)
+         ORDER BY d.created_utc DESC, d.id DESC",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn mark_deleted(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let updated = sqlx::query(
+        "UPDATE documents SET availability = 'deleted' WHERE id = ? AND availability = 'available'",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected();
+    if updated == 0 {
+        return Ok(false);
+    }
+    sqlx::query(
+        "DELETE FROM document_passages
+         WHERE version_id IN (SELECT id FROM document_versions WHERE document_id = ?)",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
 }
 
 fn format_utc(value: DateTime<Utc>) -> String {
