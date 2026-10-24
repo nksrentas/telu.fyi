@@ -108,7 +108,12 @@ function useSources(plannedMeetingId: string) {
   return { documents, selection, error, setError, select, add }
 }
 
-export function SourcesPanel({ plannedMeetingId }: { plannedMeetingId: string }) {
+interface SourcesPanelProps {
+  plannedMeetingId: string
+  onOpenSource: (versionId: string) => void
+}
+
+export function SourcesPanel({ plannedMeetingId, onOpenSource }: SourcesPanelProps) {
   const { documents, selection, error, setError, select, add } = useSources(plannedMeetingId)
   const [pasting, setPasting] = useState(false)
   const included = new Set(selection.flatMap((source) => (source.kind === "document" ? [source.versionId] : [])))
@@ -158,6 +163,7 @@ export function SourcesPanel({ plannedMeetingId }: { plannedMeetingId: string })
               document={document}
               included={included.has(document.latestVersionId)}
               onToggle={() => toggle(document.latestVersionId)}
+              onOpen={() => onOpenSource(document.latestVersionId)}
             />
           ))}
         </ul>
@@ -167,7 +173,14 @@ export function SourcesPanel({ plannedMeetingId }: { plannedMeetingId: string })
   )
 }
 
-function SourceRow({ document, included, onToggle }: { document: DocumentSummary; included: boolean; onToggle: () => void }) {
+interface SourceRowProps {
+  document: DocumentSummary
+  included: boolean
+  onToggle: () => void
+  onOpen: () => void
+}
+
+function SourceRow({ document, included, onToggle, onOpen }: SourceRowProps) {
   const failed = document.extractionStatus === "failed"
   const label = included ? `Included in the brief: ${document.title}` : `Not included in the brief: ${document.title}`
 
@@ -177,7 +190,13 @@ function SourceRow({ document, included, onToggle }: { document: DocumentSummary
         {FORMAT_BADGE[document.format]}
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-label">{document.title}</span>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="block min-h-6 max-w-full truncate rounded-[4px] text-left text-label outline-none hover:underline focus-visible:shadow-[0_0_0_2px_var(--accent)]"
+        >
+          {document.title}
+        </button>
         <span className="block tabular-nums text-[11px] text-label-3">
           {FORMAT_LABEL[document.format]} · {formatSize(document.byteSize)} · v{document.latestVersion} ·{" "}
           <span className={cn(failed && "text-coral-ink")}>{STATUS_LABEL[document.extractionStatus]}</span>

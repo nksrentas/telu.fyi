@@ -60,6 +60,7 @@ const version = (id: string, overrides: Partial<DocumentVersion> = {}): Document
 
 const KNOWLEDGE: SelectedSource = { kind: 'knowledge', meetingId: 'm-1', itemId: 'k-1' };
 let renderer: ReactTestRenderer | null = null;
+const openSource = mock((_versionId: string) => {});
 
 beforeAll(() => {
   globalWithWindow.window = { __TAURI_INTERNALS__: { invoke: ipc } };
@@ -72,6 +73,7 @@ afterAll(() => {
 
 beforeEach(() => {
   ipc.mockClear();
+  openSource.mockClear();
   responses = {
     documents_list: () => [],
     prep_list_sources: () => [],
@@ -95,7 +97,7 @@ async function settle() {
 
 async function renderPanel() {
   await act(async () => {
-    renderer = create(<SourcesPanel plannedMeetingId="plan-1" />);
+    renderer = create(<SourcesPanel plannedMeetingId="plan-1" onOpenSource={openSource} />);
   });
   await settle();
   return renderer!.root;
@@ -120,6 +122,13 @@ async function paste(root: ReactTestInstance, title: string, text: string) {
 const commands = () => ipc.mock.calls.map(([command, args]) => [command, args]);
 
 describe('SourcesPanel', () => {
+  test('clicking a source title opens its latest version', async () => {
+    responses.documents_list = () => [summary('a', { title: 'Roadmap notes', latestVersion: 2, latestVersionId: 'a-v2' })];
+    const root = await renderPanel();
+    await act(async () => button(root, 'Roadmap notes').props.onClick());
+    expect(openSource.mock.calls).toEqual([['a-v2']]);
+  });
+
   test('with no sources it explains how to add one', async () => {
     const root = await renderPanel();
     expect(ipc).toHaveBeenCalledWith('prep_list_sources', { plannedMeetingId: 'plan-1' }, undefined);

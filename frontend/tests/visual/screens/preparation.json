@@ -191,5 +191,348 @@
         "waitFor": "#paste-source-error"
       }
     ]
+  },
+  {
+    "name": "preparation-source-section",
+    "path": "/preparation?id=plan-new&source=d-1-v2&start=360&end=438",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ],
+      "documents_get_version": {
+        "document": {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "version": {
+          "id": "d-1-v2",
+          "documentId": "d-1",
+          "version": 2,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "byteSize": 18432,
+          "charCount": 620,
+          "parserVersion": "markdown-1",
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "managedPath": null,
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "latestVersion": 2,
+        "passages": [
+          {
+            "id": "p-0",
+            "versionId": "d-1-v2",
+            "ordinal": 0,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\"], \"paragraph\": 0, \"start\": 0, \"end\": 115}",
+            "text": "The quarter is about shipping the importer and making briefs trustworthy enough to read five minutes before a call.",
+            "contentHash": "h-0"
+          },
+          {
+            "id": "p-1",
+            "versionId": "d-1-v2",
+            "ordinal": 1,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 1, \"start\": 135, \"end\": 217}",
+            "text": "Ship Markdown and plain-text import with immutable versions by the end of January.",
+            "contentHash": "h-1"
+          },
+          {
+            "id": "p-2",
+            "versionId": "d-1-v2",
+            "ordinal": 2,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 2, \"start\": 237, \"end\": 340}",
+            "text": "Every statement in a brief cites the exact passage it came from, so a reader can check it in one click.",
+            "contentHash": "h-2"
+          },
+          {
+            "id": "p-3",
+            "versionId": "d-1-v2",
+            "ordinal": 3,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Hiring\"], \"paragraph\": 3, \"start\": 360, \"end\": 438}",
+            "text": "Hire two engineers by March: one for the Rust core and one for the desktop UI.",
+            "contentHash": "h-3"
+          },
+          {
+            "id": "p-4",
+            "versionId": "d-1-v2",
+            "ordinal": 4,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Risks\"], \"paragraph\": 4, \"start\": 458, \"end\": 544}",
+            "text": "Budget is flat. If hiring slips, the briefing work moves to Q2 and import ships alone.",
+            "contentHash": "h-4"
+          },
+          {
+            "id": "p-5",
+            "versionId": "d-1-v2",
+            "ordinal": 5,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Risks\"], \"paragraph\": 5, \"start\": 564, \"end\": 666}",
+            "text": "Local models are slower on older Macs; staged replies keep the tests honest until the evaluation runs.",
+            "contentHash": "h-5"
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "mark"
+      }
+    ]
+  },
+  {
+    "name": "preparation-source-older-version",
+    "path": "/preparation?id=plan-new&source=d-1-v1",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ],
+      "documents_get_version": {
+        "document": {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "version": {
+          "id": "d-1-v1",
+          "documentId": "d-1",
+          "version": 1,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "byteSize": 18432,
+          "charCount": 620,
+          "parserVersion": "markdown-1",
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "managedPath": null,
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "latestVersion": 2,
+        "passages": [
+          {
+            "id": "p-0",
+            "versionId": "d-1-v2",
+            "ordinal": 0,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\"], \"paragraph\": 0, \"start\": 0, \"end\": 115}",
+            "text": "The quarter is about shipping the importer and making briefs trustworthy enough to read five minutes before a call.",
+            "contentHash": "h-0"
+          },
+          {
+            "id": "p-1",
+            "versionId": "d-1-v2",
+            "ordinal": 1,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 1, \"start\": 135, \"end\": 217}",
+            "text": "Ship Markdown and plain-text import with immutable versions by the end of January.",
+            "contentHash": "h-1"
+          },
+          {
+            "id": "p-2",
+            "versionId": "d-1-v2",
+            "ordinal": 2,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 2, \"start\": 237, \"end\": 340}",
+            "text": "Every statement in a brief cites the exact passage it came from, so a reader can check it in one click.",
+            "contentHash": "h-2"
+          },
+          {
+            "id": "p-3",
+            "versionId": "d-1-v2",
+            "ordinal": 3,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Hiring\"], \"paragraph\": 3, \"start\": 360, \"end\": 438}",
+            "text": "Hire two engineers by March: one for the Rust core and one for the desktop UI.",
+            "contentHash": "h-3"
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "text=Version 1 of 2"
+      }
+    ]
+  },
+  {
+    "name": "preparation-source-deleted",
+    "path": "/preparation?id=plan-new&source=d-1-v2",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ],
+      "documents_get_version": {
+        "document": {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "deleted",
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "version": {
+          "id": "d-1-v2",
+          "documentId": "d-1",
+          "version": 2,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "byteSize": 18432,
+          "charCount": 620,
+          "parserVersion": "markdown-1",
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "managedPath": null,
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "latestVersion": 2,
+        "passages": []
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "text=This source was deleted"
+      }
+    ]
   }
 ]
