@@ -63,21 +63,7 @@ struct Prepared {
 
 fn prepare(text: &str) -> Result<Prepared> {
     let normalised = normalise(text);
-    let chars: Vec<char> = normalised.chars().collect();
-    let passages: Vec<NewPassage> = paragraph_spans(&normalised)
-        .into_iter()
-        .enumerate()
-        .map(|(index, (start, end))| {
-            let text: String = chars[start..end].iter().collect();
-            NewPassage {
-                locator_json:
-                    json!({"kind": "paragraph", "index": index, "start": start, "end": end})
-                        .to_string(),
-                content_hash: sha256_hex(text.as_bytes()),
-                text,
-            }
-        })
-        .collect();
+    let passages = paragraph_passages(&normalised);
     if passages.is_empty() {
         bail!("DOCUMENT_TEXT_EMPTY");
     }
@@ -85,7 +71,7 @@ fn prepare(text: &str) -> Result<Prepared> {
         version: NewVersion {
             sha256: sha256_hex(normalised.as_bytes()),
             byte_size: normalised.len() as i64,
-            char_count: chars.len() as i64,
+            char_count: normalised.chars().count() as i64,
             parser_version: PASTE_PARSER_VERSION.to_string(),
             extraction_status: ExtractionStatus::Extracted,
             failure_code: None,
@@ -95,7 +81,37 @@ fn prepare(text: &str) -> Result<Prepared> {
     })
 }
 
-fn normalise(text: &str) -> String {
+pub(super) fn paragraph_passages(text: &str) -> Vec<NewPassage> {
+    let chars: Vec<char> = text.chars().collect();
+    paragraph_spans(text)
+        .into_iter()
+        .enumerate()
+        .map(|(index, (start, end))| {
+            passage(
+                &chars,
+                json!({"kind": "paragraph", "index": index, "start": start, "end": end}),
+                start,
+                end,
+            )
+        })
+        .collect()
+}
+
+pub(super) fn passage(
+    chars: &[char],
+    locator: serde_json::Value,
+    start: usize,
+    end: usize,
+) -> NewPassage {
+    let text: String = chars[start..end].iter().collect();
+    NewPassage {
+        locator_json: locator.to_string(),
+        content_hash: sha256_hex(text.as_bytes()),
+        text,
+    }
+}
+
+pub(super) fn normalise(text: &str) -> String {
     text.strip_prefix('\u{feff}')
         .unwrap_or(text)
         .replace("\r\n", "\n")
@@ -118,7 +134,7 @@ fn paragraph_spans(text: &str) -> Vec<(usize, usize)> {
     spans
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(super) fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
