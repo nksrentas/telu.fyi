@@ -32,6 +32,7 @@ import {
   useTimelineKeys,
 } from "./agenda-timeline"
 import type { CardSection } from "./event-card"
+import { PlanMeetingButton, PlannedMeetings, usePlannedMeetings } from "./planned-meetings"
 
 const LOAD_ERROR = "Couldn't load today's meetings."
 const SLIDE_PX = 16
@@ -154,6 +155,7 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
   const { peek, closeInstant, openPeek, closePeek } = usePeek(selectedId)
   const { slideOut, cancelSlide } = useDaySlide(listRef, shown)
   const { scrolled, onScroll } = useScrolled(scrollRef)
+  const planned = usePlannedMeetings()
   const isToday = requestedDay === null || isSameDay(requestedDay, new Date())
   const headingDay = shown?.day ?? requestedDay
   const heading = headingDay ? dayHeading(headingDay) : { title: "Today", subtitle: "" }
@@ -205,6 +207,7 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <AgendaToolbar origin="Today" title={heading.title} subtitle={heading.subtitle} scrolled={scrolled}>
+        <PlanMeetingButton />
         <DayStepper
           isToday={isToday}
           onStep={(direction) => requestedDay && goToDay(addDays(requestedDay, direction), true)}
@@ -236,6 +239,7 @@ export function TodayView({ notice }: { notice?: ReactNode }) {
               onOpenPage={(meeting) => router.push(meetingHref(meeting, "Today"))}
             />
           )}
+          {isToday && <PlannedMeetings meetings={planned} />}
         </div>
       </div>
       <PeekLayer peek={peek} closeInstant={closeInstant} origin="Today" onClose={closePeek} />
