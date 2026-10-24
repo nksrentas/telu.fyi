@@ -268,8 +268,12 @@
         "frontend/tests/visual/screens/preparation.json",
         "frontend/tests/visual/fixtures/base-ipc.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "39e5eb5",
+        "ran": "bash .loop/verify.sh (bun 160 tests incl. 11 new, tsc, lint, rust, gallery 158 webkit)",
+        "browser": "WebKit gallery: preparation-sources-empty, preparation-sources-three (one failed), preparation-paste-dialog, preparation-paste-size-error, light and dark PNGs inspected"
+      }
     },
     {
       "id": "U3",
