@@ -1,0 +1,9 @@
+{
+  "id": "D4",
+  "passes": true,
+  "evidence": {
+    "commit": "22ac7cdae23a5f869cc300467450730f1d6b1918",
+    "ran": "bash .loop/verify.sh (cargo 508 lib passed incl. 8 documents::limits, bun, node, typecheck, gallery 150 passed); no new dependencies"
+  },
+  "notes": "Did: documents/limits.rs with pub MAX_SOURCE_BYTES (1 MiB), MAX_SOURCE_CHARS (200,000), MAX_PASSAGES (2,000), MAX_PASSAGE_CHARS (4,000), plus ensure_source_bytes / ensure_source_chars / ensure_passage_count and split_span. import_file checks tokio::fs::metadata(source).len() before reading, and checks bytes.len() again after the read in case the file grew. Both ingest (paste) and import check the char count of the normalised text before splitting, and the passage count after. A paragraph or section over 4,000 chars is split by split_span. The cut goes after the whitespace that follows the last . ! or ? at or before the cap, else after the last whitespace, else hard at the cap. Pieces are contiguous and cover the span exactly. Each piece gets its own consecutive index (text) or paragraph (markdown section) number. Errors read 'SOURCE_TOO_LARGE:<LIMIT_NAME>', e.g. SOURCE_TOO_LARGE:MAX_SOURCE_BYTES. 8 tests in documents::limits; the unreadable (chmod 000) 1 MiB + 1 sparse file proves the metadata check comes first.\nAssumptions: the limit is named after a colon in the error string, so the UI (D5) maps the SOURCE_TOO_LARGE prefix and can name the limit from the suffix. Paste has no byte check because 200,000 chars is at most 800,000 bytes in UTF-8. A split piece ends with its trailing whitespace and the next piece starts at the following char.\nLearned: the gate's rustfmt check covers ingest.rs and import.rs too (they are new since base), so run rustfmt on every touched documents/*.rs file. The import char check runs after the managed copy is written (the D3 order); the existing failure cleanup removes the folder."
+}
