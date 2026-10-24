@@ -592,6 +592,7 @@ pub fn run() {
                 database::setup::initialize_database_on_startup(&_app.handle()).await
             })
             .expect("Failed to initialize database");
+            documents::sweep::sweep_on_startup(_app.handle());
 
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");

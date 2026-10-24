@@ -176,7 +176,11 @@ async fn replace_with_file(
         .map_err(error_code)
 }
 
-async fn delete(pool: &SqlitePool, app_data_dir: &Path, document_id: &str) -> Result<(), String> {
+pub async fn delete(
+    pool: &SqlitePool,
+    app_data_dir: &Path,
+    document_id: &str,
+) -> Result<(), String> {
     let deleted = repository::mark_deleted(pool, document_id)
         .await
         .map_err(|error| error_code(error.into()))?;

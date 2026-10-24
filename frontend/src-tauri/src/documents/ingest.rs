@@ -40,6 +40,9 @@ pub async fn ingest_text_into(
 ) -> Result<DocumentVersion> {
     let prepared = prepare(text)?;
     let mut tx = pool.begin().await?;
+    if !repository::is_available(&mut *tx, document_id).await? {
+        bail!("DOCUMENT_NOT_FOUND");
+    }
     if let Some(existing) =
         repository::find_version_by_sha256(&mut *tx, document_id, &prepared.version.sha256).await?
     {

@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_dialog::DialogExt;
 
-const DOCUMENTS_DIR: &str = "documents";
+pub(super) const DOCUMENTS_DIR: &str = "documents";
 const IMPORT_EXTENSIONS: [&str; 3] = ["md", "markdown", "txt"];
 const MARKDOWN_PARSER_VERSION: &str = "import-markdown-1";
 const TEXT_PARSER_VERSION: &str = "import-text-1";
@@ -66,6 +66,9 @@ pub async fn import_file_into(
         bail!("DOCUMENT_FORMAT_MISMATCH");
     }
     let mut tx = pool.begin().await?;
+    if !repository::is_available(&mut *tx, &document.id).await? {
+        bail!("DOCUMENT_NOT_FOUND");
+    }
     if let Some(existing) =
         repository::find_version_by_sha256(&mut *tx, &document.id, &source.sha256).await?
     {
