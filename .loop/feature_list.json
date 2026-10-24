@@ -131,8 +131,11 @@
         "frontend/src-tauri/src/lib.rs",
         "frontend/src-tauri/tests/document_lifecycle.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "9f5adb3",
+        "ran": "bash .loop/verify.sh (cargo 559 passed incl. tests/document_lifecycle.rs 6/6, bun 149 pass, node and typecheck green, gallery 150 passed); two read-only review subagents, findings fixed (sweep continues past a failing folder, import-replace-after-delete test)"
+      }
     },
     {
       "id": "S1",
