@@ -209,8 +209,12 @@
       "touches": [
         "frontend/src-tauri/src/preparation/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "3548967",
+        "ran": "cargo test --features coreml preparation:: --lib (25 passed, 4 in preparation::questions); bash .loop/verify.sh (gate: all steps passed, gallery 158 passed); review subagent: no spec or lean findings, MAX_QUESTIONS made private and the claim kind made explicit",
+        "dependencies": "none added"
+      }
     },
     {
       "id": "B4",
