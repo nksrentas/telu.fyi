@@ -52,6 +52,7 @@ pub mod anthropic;
 pub mod groq;
 pub mod openrouter;
 pub mod parakeet_engine;
+pub mod planning;
 pub mod state;
 pub mod summary;
 pub mod trust;
@@ -774,6 +775,11 @@ pub fn run() {
             knowledge::commands::knowledge_item_history,
             knowledge::commands::knowledge_list_runs,
             knowledge::commands::knowledge_deletion_impact,
+            planning::commands::planning_create,
+            planning::commands::planning_list_upcoming,
+            planning::commands::planning_get,
+            planning::commands::planning_update,
+            planning::commands::planning_delete,
             summary::commands::api_get_summary,
             summary::commands::api_save_meeting_summary,
             summary::commands::api_get_meeting_summary_language,
