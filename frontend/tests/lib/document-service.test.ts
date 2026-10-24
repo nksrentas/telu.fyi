@@ -2,16 +2,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from 'b
 import type { DocumentSummary } from '../../src/lib/document-service';
 
 const ipcInvoke = mock(async (_command: string, _args?: unknown): Promise<unknown> => null);
-const globalWithWindow = globalThis as { window?: unknown };
-const originalWindow = globalWithWindow.window;
+const originalCore = { ...await import('@tauri-apps/api/core') };
+mock.module('@tauri-apps/api/core', () => ({ ...originalCore, invoke: ipcInvoke }));
 const service = await import('../../src/lib/document-service');
 
 beforeAll(() => {
-  globalWithWindow.window = { __TAURI_INTERNALS__: { invoke: ipcInvoke } };
+  mock.module('@tauri-apps/api/core', () => ({ ...originalCore, invoke: ipcInvoke }));
 });
 
 afterAll(() => {
-  globalWithWindow.window = originalWindow;
+  mock.module('@tauri-apps/api/core', () => originalCore);
 });
 
 beforeEach(() => {
@@ -20,7 +20,8 @@ beforeEach(() => {
 });
 
 function lastCall() {
-  return ipcInvoke.mock.calls.at(-1)?.slice(0, 2);
+  const [command, args] = ipcInvoke.mock.calls.at(-1) ?? [];
+  return [command, args ?? {}];
 }
 
 describe('document-service', () => {

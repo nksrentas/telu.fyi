@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { CalendarDays, ChevronLeft, Lock, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { SourcesPanel } from "@/components/preparation/sources-panel"
 import { Button } from "@/components/ui/button"
 import {
   getPlannedMeeting,
@@ -201,6 +202,7 @@ function PlannedMeetingDoc({ meeting, onBack }: { meeting: PlannedMeeting; onBac
               className={cn(EDITABLE, "block resize-none text-[15px] leading-[1.55] tracking-[-0.005em]")}
             />
           </section>
+          <SourcesPanel plannedMeetingId={meeting.id} />
         </div>
       </main>
     </>

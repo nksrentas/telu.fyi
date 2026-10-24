@@ -12,9 +12,7 @@ const ipc = mock(async (command: string, args: Record<string, unknown> = {}): Pr
   return respond(args);
 });
 
-const originalCore = { ...await import('@tauri-apps/api/core') };
 const originalNavigation = { ...await import('next/navigation') };
-mock.module('@tauri-apps/api/core', () => ({ ...originalCore, invoke: ipc }));
 mock.module('next/navigation', () => ({ ...originalNavigation, useRouter: () => ({ push }) }));
 
 const { toast } = await import('sonner');
@@ -34,7 +32,7 @@ let renderer: ReactTestRenderer | null = null;
 const originalTimeZone = process.env.TZ;
 const globals = globalThis as unknown as { window?: unknown };
 const originalWindow = globals.window;
-const windowEvents = new EventTarget();
+const windowEvents = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: { invoke: ipc } });
 const changes = mock(() => {});
 
 beforeAll(() => {
@@ -46,7 +44,6 @@ beforeAll(() => {
 afterAll(() => {
   process.env.TZ = originalTimeZone;
   globals.window = originalWindow;
-  mock.module('@tauri-apps/api/core', () => originalCore);
   mock.module('next/navigation', () => originalNavigation);
 });
 
@@ -54,6 +51,8 @@ beforeEach(() => {
   ipc.mockClear();
   responses = {
     planning_get: () => PLANNED,
+    documents_list: () => [],
+    prep_list_sources: () => [],
     planning_update: (args) => ({ ...PLANNED, title: args.title, startUtc: args.startUtc, purpose: args.purpose }),
   };
 });
@@ -92,7 +91,7 @@ function button(root: ReactTestInstance, label: string): ReactTestInstance {
 }
 
 function updates() {
-  return ipc.mock.calls.filter(([command]) => command === 'planning_update');
+  return ipc.mock.calls.filter(([command]) => command === 'planning_update').map((call) => call.slice(0, 2));
 }
 
 function textOf(node: ReactTestInstance): string {
@@ -103,7 +102,7 @@ describe('PreparationPage', () => {
   test('loads the planned meeting into an editable title, date and purpose', async () => {
     responses.planning_get = () => ({ ...PLANNED, title: 'Roadmap sync', purpose: 'Agree the Q1 plan' });
     const root = await renderPage();
-    expect(ipc).toHaveBeenCalledWith('planning_get', { id: 'plan-1' });
+    expect(ipc).toHaveBeenCalledWith('planning_get', { id: 'plan-1' }, undefined);
     expect(field(root, 'Meeting title').props.value).toBe('Roadmap sync');
     expect(field(root, 'purpose-why').props.value).toBe('Agree the Q1 plan');
     expect(root.findAll((node) => node.type === 'input' && node.props.type === 'datetime-local')).toHaveLength(0);

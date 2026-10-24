@@ -54,5 +54,142 @@
         }
       ]
     }
+  },
+  {
+    "name": "preparation-sources-empty",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      }
+    }
+  },
+  {
+    "name": "preparation-sources-three",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ]
+    }
+  },
+  {
+    "name": "preparation-paste-dialog",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      }
+    },
+    "steps": [
+      {
+        "click": "button:has-text(\"Paste\")"
+      },
+      {
+        "waitFor": "[role=dialog]"
+      }
+    ]
+  },
+  {
+    "name": "preparation-paste-size-error",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_paste": {
+        "$error": "SOURCE_TOO_LARGE:MAX_SOURCE_BYTES"
+      }
+    },
+    "steps": [
+      {
+        "click": "button:has-text(\"Paste\")"
+      },
+      {
+        "waitFor": "[role=dialog]"
+      },
+      {
+        "click": "#paste-source-title"
+      },
+      {
+        "type": "Board pack"
+      },
+      {
+        "click": "#paste-source-text"
+      },
+      {
+        "type": "A very long export"
+      },
+      {
+        "click": "button:has-text(\"Add source\")"
+      },
+      {
+        "waitFor": "#paste-source-error"
+      }
+    ]
   }
 ]
