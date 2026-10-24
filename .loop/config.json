@@ -1,0 +1,45 @@
+{
+  "task": "Telu Phase 3, sources and briefings (DOC-01 to DOC-04, PREP-01 to PREP-05 build only): planned meetings; pasted and imported Markdown or plain-text sources with immutable versions, hashes and locators under size limits; an explicit bounded selection of document versions and accepted knowledge; deterministic per-source and total context budgets with a source manifest; a briefing and candidate questions whose every statement cites its exact source; replace and delete propagation; a content-free measurement harness. Proven with staged model replies. No evaluation run and no thresholds.",
+  "name": "Telu P3 sources",
+  "mode": "standard",
+  "new_project": false,
+  "base": "7c13d69b97eb42a71bb0074cb492571f0cc2629b",
+  "commands": {
+    "test": "bash .loop/gate.sh",
+    "rust": "cargo test --manifest-path frontend/src-tauri/Cargo.toml --features coreml",
+    "rust_check": "cargo check --manifest-path frontend/src-tauri/Cargo.toml --features coreml",
+    "rustfmt": "rustfmt --edition 2021",
+    "tool": "bash .loop/tool.sh"
+  },
+  "mutation_paths": [
+    "frontend/src-tauri/src/documents/**/*.rs",
+    "frontend/src-tauri/src/preparation/**/*.rs",
+    "frontend/src-tauri/src/planning/**/*.rs",
+    "frontend/src/components/preparation/**/*.tsx",
+    "frontend/src/lib/*-service.ts"
+  ],
+  "gates": {
+    "tests": true,
+    "mutation": false,
+    "browser": true
+  },
+  "skills": {
+    "context": ["bussin-lean", "bussin-a11y", "sketch-findings-telu-fyi"],
+    "implement": [],
+    "review": [],
+    "end": []
+  },
+  "checkpoint": true,
+  "constraints": [
+    "Work only inside this worktree, /Users/nrentas/dev/telu.fyi-phase3, on branch loop/phase3-sources. Never edit /Users/nrentas/dev/telu.fyi or /Users/nrentas/dev/telu.fyi-trust. Never push, merge or rebase: this branch merges only after 02-44 has run on the M4.",
+    "Frozen paths, checked by .loop/gate.sh: frontend/src-tauri/src/knowledge/, frontend/src-tauri/src/summary/, frontend/src/lib/onboarding-summary-model.ts and its test, frontend/src-tauri/tests/fixtures/knowledge-eval/, .planning/phases/02-evidence-linked-post-meeting-knowledge/eval/ and .github/verify-phase2-know07-status*. Read knowledge through its public functions (KnowledgeRepository::list_eligible_items, item_view, the review API). If an item cannot be done without changing a frozen path, write 'Blocked: <id>' with the reason in .loop/progress.md and stop.",
+    "Model calls: only through a completer closure (the same seam as knowledge::extraction::run_extraction), with staged replies in tests. Preparation has its own prompt and PREP_PROMPT_VERSION in frontend/src-tauri/src/preparation/; never import or change knowledge/prompt.rs constants. Never call a real model, the network or the llama-helper sidecar from a test.",
+    "Never launch the Tauri app, run tauri:dev or touch ~/Library/Application Support/com.meetily.ai: dev and the installed app share that data folder. Rust tests use sqlite::memory: or a TempDir.",
+    "Browser verification is the WebKit gallery: add screens to frontend/tests/visual/screens/preparation.json, run bash .loop/tool.sh gallery <screen name>, then look at the PNGs in frontend/tests/visual/.output in light and dark. New commands must be stubbed in the screen's ipc or in fixtures/base-ipc.json, because an unmocked command fails the gallery. Never set GALLERY_LABEL (it writes into .planning).",
+    "Formats are Markdown and plain text only. PDF, DOCX and any other format need the user's approval: write it under Open questions in progress.md instead of adding a parser.",
+    "No thresholds: do not create or edit any threshold file, declare target values or run an evaluation on real documents or meetings. M1 builds the scorer and a synthetic corpus only.",
+    "UI items load the sketch-findings-telu-fyi skill first (.claude/skills in this repo) and follow its living-doc, side-peek and Next-block specs.",
+    "Do not edit .planning/ except to read it. GSD bookkeeping (STATE, ROADMAP, SUMMARY files) is left to the user's GSD workflow after merge.",
+    "Commit subjects use feat(p3): / test(p3): / fix(p3): and never contain (02-44) or (02-43). Stage files by path, never git add -A, and never use git stash."
+  ]
+}
