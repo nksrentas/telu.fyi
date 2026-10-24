@@ -1,0 +1,10 @@
+{
+  "id": "B3",
+  "passes": true,
+  "evidence": {
+    "commit": "3548967",
+    "ran": "cargo test --features coreml preparation:: --lib (25 passed, 4 in preparation::questions); bash .loop/verify.sh (gate: all steps passed, gallery 158 passed); review subagent: no spec or lean findings, MAX_QUESTIONS made private and the claim kind made explicit",
+    "dependencies": "none added"
+  },
+  "notes": "Did: migration 20261025000300_phase3_briefing_questions.sql adds briefing_claims.kind ('statement'|'question', default statement) and briefing_claims.rationale, and briefings.dropped_question_count. preparation/questions.rs: Question {claim: Claim, rationale}, verify_questions (each question goes through briefing::verify like a statement, plus a non-blank rationale; the first 5 verified are kept, later verified ones are dropped as QUESTION_LIMIT; others drop as MALFORMED_QUESTION / SOURCE_NOT_INCLUDED / QUOTE_NOT_FOUND), load_questions(pool, briefing_id). briefing::run now parses {statements, questions}, returns BriefingOutcome.questions and dropped_questions, and stores both in one transaction; questions take the ordinals after the statements. load_claims filters kind='statement'. The system prompt asks for up to 5 questions with {text, rationale, source, quote}; PREP_PROMPT_VERSION is now prep-briefing-v2. 4 tests in preparation::questions.\nAssumptions: one citation per question rationale (source + quote), the same as statements. A reply without a 'questions' key gives zero questions; a 'questions' value that is not an array fails with PREP_PARSE_FAILED. Questions over the cap are counted in dropped_question_count with reason QUESTION_LIMIT. Questions share briefing_claims, so L1/L2 replace/delete propagation covers them with no extra work.\nLearned: load_questions has no caller outside tests yet; B4 wires it into prep_get_briefing. The gallery screen peek-inline-transcript light failed twice under full-gate load ('element is outside of the viewport') and passed alone and on the third full run: it is flaky under load, not broken. This item made no frontend change."
+}
