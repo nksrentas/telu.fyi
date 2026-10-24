@@ -1,3 +1,4 @@
+use crate::documents::limits::{ensure_passage_count, ensure_source_chars, split_span};
 use crate::documents::models::{
     DocumentFormat, DocumentVersion, ExtractionStatus, NewPassage, NewVersion,
 };
@@ -63,15 +64,18 @@ struct Prepared {
 
 fn prepare(text: &str) -> Result<Prepared> {
     let normalised = normalise(text);
+    let char_count = normalised.chars().count();
+    ensure_source_chars(char_count)?;
     let passages = paragraph_passages(&normalised);
     if passages.is_empty() {
         bail!("DOCUMENT_TEXT_EMPTY");
     }
+    ensure_passage_count(passages.len())?;
     Ok(Prepared {
         version: NewVersion {
             sha256: sha256_hex(normalised.as_bytes()),
             byte_size: normalised.len() as i64,
-            char_count: normalised.chars().count() as i64,
+            char_count: char_count as i64,
             parser_version: PASTE_PARSER_VERSION.to_string(),
             extraction_status: ExtractionStatus::Extracted,
             failure_code: None,
@@ -85,6 +89,7 @@ pub(super) fn paragraph_passages(text: &str) -> Vec<NewPassage> {
     let chars: Vec<char> = text.chars().collect();
     paragraph_spans(text)
         .into_iter()
+        .flat_map(|(start, end)| split_span(&chars, start, end))
         .enumerate()
         .map(|(index, (start, end))| {
             passage(

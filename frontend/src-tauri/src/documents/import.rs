@@ -1,4 +1,7 @@
 use crate::documents::ingest::{normalise, paragraph_passages, passage, sha256_hex};
+use crate::documents::limits::{
+    ensure_passage_count, ensure_source_bytes, ensure_source_chars, split_span,
+};
 use crate::documents::models::{
     Document, DocumentFormat, DocumentVersion, ExtractionStatus, NewPassage, NewVersion,
 };
@@ -34,7 +37,9 @@ pub async fn import_file(
     now: DateTime<Utc>,
 ) -> Result<DocumentVersion> {
     let (format, extension) = source_format(source)?;
+    ensure_source_bytes(tokio::fs::metadata(source).await?.len())?;
     let bytes = tokio::fs::read(source).await?;
+    ensure_source_bytes(bytes.len() as u64)?;
     let title = source
         .file_stem()
         .and_then(|stem| stem.to_str())
@@ -82,6 +87,8 @@ async fn store_and_extract(
     tokio::fs::write(folder.join(&file_name), bytes).await?;
     let text = std::str::from_utf8(bytes).map_err(|_| anyhow!("DOCUMENT_NOT_UTF8"))?;
     let normalised = normalise(text);
+    let char_count = normalised.chars().count();
+    ensure_source_chars(char_count)?;
     let (passages, parser_version) = match document.format {
         DocumentFormat::Markdown => (markdown_passages(&normalised), MARKDOWN_PARSER_VERSION),
         DocumentFormat::Text => (paragraph_passages(&normalised), TEXT_PARSER_VERSION),
@@ -89,10 +96,11 @@ async fn store_and_extract(
     if passages.is_empty() {
         bail!("DOCUMENT_TEXT_EMPTY");
     }
+    ensure_passage_count(passages.len())?;
     let new = NewVersion {
         sha256,
         byte_size: bytes.len() as i64,
-        char_count: normalised.chars().count() as i64,
+        char_count: char_count as i64,
         parser_version: parser_version.to_string(),
         extraction_status: ExtractionStatus::Extracted,
         failure_code: None,
@@ -166,16 +174,18 @@ impl Sections {
             .iter()
             .map(|(_, title)| title.as_str())
             .collect();
-        let locator = json!({
-            "kind": "section",
-            "heading_path": heading_path,
-            "paragraph": self.paragraph,
-            "start": start,
-            "end": end,
-        });
-        self.passages
-            .push(passage(&self.chars, locator, start, end));
-        self.paragraph += 1;
+        for (start, end) in split_span(&self.chars, start, end) {
+            let locator = json!({
+                "kind": "section",
+                "heading_path": heading_path,
+                "paragraph": self.paragraph,
+                "start": start,
+                "end": end,
+            });
+            self.passages
+                .push(passage(&self.chars, locator, start, end));
+            self.paragraph += 1;
+        }
     }
 }
 
