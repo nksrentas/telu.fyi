@@ -2,13 +2,14 @@ use crate::preparation::briefing::{
     claim_from_row, storage, verify, BriefingError, Claim, ClaimRow, DroppedStatement,
 };
 use crate::preparation::context::ContextPiece;
+use serde::Serialize;
 use serde_json::Value;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
 
 const MAX_QUESTIONS: usize = 5;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Question {
     pub claim: Claim,
     pub rationale: String,
@@ -112,6 +113,9 @@ mod tests {
         let source = SelectedSource::Document {
             version_id: version.id,
         };
+        crate::preparation::selection::select(pool, &plan, vec![source.clone()])
+            .await
+            .expect("selection");
         let app_data = tempfile::tempdir().expect("app data");
         let budget = Budget {
             per_source_tokens: 1_000,
