@@ -3,11 +3,11 @@ use crate::documents::models::{
     NewVersion, Passage,
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqliteExecutor, SqlitePool};
 use uuid::Uuid;
 
 pub async fn create_document(
-    pool: &SqlitePool,
+    executor: impl SqliteExecutor<'_>,
     title: &str,
     format: DocumentFormat,
     now: DateTime<Utc>,
@@ -28,23 +28,39 @@ pub async fn create_document(
     .bind(document.format)
     .bind(document.availability)
     .bind(&document.created_utc)
-    .execute(pool)
+    .execute(executor)
     .await?;
     Ok(document)
 }
 
+pub async fn find_version_by_sha256(
+    executor: impl SqliteExecutor<'_>,
+    document_id: &str,
+    sha256: &str,
+) -> Result<Option<DocumentVersion>, sqlx::Error> {
+    sqlx::query_as::<_, DocumentVersion>(
+        "SELECT id, document_id, version, sha256, byte_size, char_count, parser_version,
+             extraction_status, failure_code, managed_path, created_utc
+         FROM document_versions WHERE document_id = ? AND sha256 = ?",
+    )
+    .bind(document_id)
+    .bind(sha256)
+    .fetch_optional(executor)
+    .await
+}
+
 pub async fn create_version(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     document_id: &str,
     new: NewVersion,
+    passages: Vec<NewPassage>,
     now: DateTime<Utc>,
 ) -> Result<DocumentVersion, sqlx::Error> {
-    let mut tx = pool.begin().await?;
     let version: i64 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(version), 0) + 1 FROM document_versions WHERE document_id = ?",
     )
     .bind(document_id)
-    .fetch_one(&mut *tx)
+    .fetch_one(&mut *conn)
     .await?;
     let row = DocumentVersion {
         id: Uuid::new_v4().to_string(),
@@ -75,33 +91,23 @@ pub async fn create_version(
     .bind(&row.failure_code)
     .bind(&row.managed_path)
     .bind(&row.created_utc)
-    .execute(&mut *tx)
+    .execute(&mut *conn)
     .await?;
-    tx.commit().await?;
-    Ok(row)
-}
-
-pub async fn insert_passages(
-    pool: &SqlitePool,
-    version_id: &str,
-    passages: Vec<NewPassage>,
-) -> Result<(), sqlx::Error> {
-    let mut tx = pool.begin().await?;
     for (ordinal, passage) in passages.into_iter().enumerate() {
         sqlx::query(
             "INSERT INTO document_passages (id, version_id, ordinal, locator_json, text, content_hash)
              VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(Uuid::new_v4().to_string())
-        .bind(version_id)
+        .bind(&row.id)
         .bind(ordinal as i64)
         .bind(passage.locator_json)
         .bind(passage.text)
         .bind(passage.content_hash)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     }
-    tx.commit().await
+    Ok(row)
 }
 
 pub async fn list_passages(
@@ -149,6 +155,23 @@ mod tests {
         }
     }
 
+    async fn version_with(
+        pool: &SqlitePool,
+        document_id: &str,
+        sha256: &str,
+        passages: Vec<NewPassage>,
+    ) -> Result<DocumentVersion, sqlx::Error> {
+        let mut conn = pool.acquire().await.expect("connection");
+        create_version(
+            &mut conn,
+            document_id,
+            new_version(sha256),
+            passages,
+            Utc::now(),
+        )
+        .await
+    }
+
     async fn document(pool: &SqlitePool) -> Document {
         create_document(pool, "Notes", DocumentFormat::Markdown, Utc::now())
             .await
@@ -159,10 +182,10 @@ mod tests {
     async fn documents_migrations_apply_and_versions_are_numbered_per_document() {
         let pool = migrated_pool().await;
         let doc = document(&pool).await;
-        let first = create_version(&pool, &doc.id, new_version(SHA_A), Utc::now())
+        let first = version_with(&pool, &doc.id, SHA_A, vec![])
             .await
             .expect("first version");
-        let second = create_version(&pool, &doc.id, new_version(SHA_B), Utc::now())
+        let second = version_with(&pool, &doc.id, SHA_B, vec![])
             .await
             .expect("second version");
         assert_eq!((first.version, second.version), (1, 2));
@@ -173,10 +196,10 @@ mod tests {
     async fn documents_refuse_two_versions_with_the_same_sha256() {
         let pool = migrated_pool().await;
         let doc = document(&pool).await;
-        create_version(&pool, &doc.id, new_version(SHA_A), Utc::now())
+        version_with(&pool, &doc.id, SHA_A, vec![])
             .await
             .expect("first version");
-        let error = create_version(&pool, &doc.id, new_version(SHA_A), Utc::now())
+        let error = version_with(&pool, &doc.id, SHA_A, vec![])
             .await
             .expect_err("duplicate sha256");
         assert!(error.to_string().contains("UNIQUE"), "{error}");
@@ -186,7 +209,7 @@ mod tests {
     async fn documents_freeze_a_versions_sha256_and_byte_size() {
         let pool = migrated_pool().await;
         let doc = document(&pool).await;
-        let version = create_version(&pool, &doc.id, new_version(SHA_A), Utc::now())
+        let version = version_with(&pool, &doc.id, SHA_A, vec![])
             .await
             .expect("version");
         for statement in [
@@ -214,12 +237,14 @@ mod tests {
     async fn documents_freeze_passage_text() {
         let pool = migrated_pool().await;
         let doc = document(&pool).await;
-        let version = create_version(&pool, &doc.id, new_version(SHA_A), Utc::now())
-            .await
-            .expect("version");
-        insert_passages(&pool, &version.id, vec![passage(r#"{"line":1}"#, "Hello")])
-            .await
-            .expect("passages");
+        let version = version_with(
+            &pool,
+            &doc.id,
+            SHA_A,
+            vec![passage(r#"{"line":1}"#, "Hello")],
+        )
+        .await
+        .expect("version");
         let error =
             sqlx::query("UPDATE document_passages SET text = 'Changed' WHERE version_id = ?")
                 .bind(&version.id)
@@ -238,7 +263,7 @@ mod tests {
     async fn documents_passages_load_in_ordinal_order_with_locators_intact() {
         let pool = migrated_pool().await;
         let doc = document(&pool).await;
-        let version = create_version(&pool, &doc.id, new_version(SHA_A), Utc::now())
+        let version = version_with(&pool, &doc.id, SHA_A, vec![])
             .await
             .expect("version");
         let locators = [
@@ -278,19 +303,17 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn documents_insert_passages_numbers_them_in_input_order() {
+    async fn documents_create_version_numbers_passages_in_input_order() {
         let pool = migrated_pool().await;
         let doc = document(&pool).await;
-        let version = create_version(&pool, &doc.id, new_version(SHA_A), Utc::now())
-            .await
-            .expect("version");
-        insert_passages(
+        let version = version_with(
             &pool,
-            &version.id,
+            &doc.id,
+            SHA_A,
             vec![passage(r#"{"line":1}"#, "a"), passage(r#"{"line":2}"#, "b")],
         )
         .await
-        .expect("passages");
+        .expect("version");
 
         let loaded = list_passages(&pool, &version.id).await.expect("list");
         let summary: Vec<(i64, &str)> = loaded
