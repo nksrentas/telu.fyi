@@ -224,8 +224,12 @@
         "frontend/tests/visual/screens/preparation.json",
         "frontend/tests/visual/fixtures/base-ipc.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "de1e44e",
+        "ran": "bash .loop/verify.sh (bun 25 tests across preparation-page and today-view incl. create/rename/purpose/date save, blank title, save ordering, failed-save toast; full gate green: cargo, bun, node, tsc at base 36, gallery 150 passed); palette 0 offending classes; no new dependencies",
+        "browser": "WebKit gallery preparation-empty and today-planned, light and dark, no unmocked commands; checked PNGs: 720px doc column, large title, chips row, PURPOSE eyebrow, Why we meet field; Today shows Plan a meeting in toolbar and a Planned section with two cards"
+      }
     },
     {
       "id": "U2",
