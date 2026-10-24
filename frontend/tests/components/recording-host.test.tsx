@@ -195,6 +195,7 @@ beforeEach(() => {
     get_current_provider_route: () => validatedRoute,
     validate_provider_route: () => validatedRoute,
     agenda_list_day: () => [],
+    planning_list_upcoming: () => [],
   };
   Object.assign(recording, { isRecording: false, isStopping: false, isProcessing: false, isSaving: false, isStartingRecording: false, status: 'idle' });
 });

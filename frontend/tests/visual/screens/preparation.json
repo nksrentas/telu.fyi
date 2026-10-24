@@ -1,0 +1,58 @@
+[
+  {
+    "name": "preparation-empty",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "New meeting",
+        "startUtc": null,
+        "purpose": "",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      }
+    }
+  },
+  {
+    "name": "today-planned",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "m-reviewed",
+          "title": "Daily standup",
+          "startedAtUtc": "2026-09-27T07:00:00Z",
+          "endedAtUtc": "2026-09-27T07:15:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 24,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 0,
+          "acceptedCount": 4,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "reviewed"
+        }
+      ],
+      "planning_list_upcoming": [
+        {
+          "id": "plan-a",
+          "title": "Roadmap sync with design",
+          "startUtc": "2026-09-29T08:00:00.000Z",
+          "purpose": "",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "updatedUtc": "2026-09-27T06:00:00.000Z"
+        },
+        {
+          "id": "plan-b",
+          "title": "Hiring loop debrief",
+          "startUtc": null,
+          "purpose": "",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "updatedUtc": "2026-09-27T06:00:00.000Z"
+        }
+      ]
+    }
+  }
+]
