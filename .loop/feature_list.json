@@ -298,8 +298,12 @@
         "frontend/tests/visual/screens/preparation.json",
         "frontend/tests/visual/fixtures/base-ipc.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "ff9b9ca",
+        "ran": "bun tests/components/source-viewer.test.tsx (12 pass) and preparation-sources.test.tsx (12 pass); bash .loop/verify.sh: all steps passed (typecheck 36 in tests/ = base, gallery 164 passed); 4 read-only review passes, the last with no Spec or Lean findings",
+        "browser": "WebKit gallery preparation-source-section (Hiring passage highlighted under Goals/Hiring/Risks headings), preparation-source-older-version ('Version 1 of 2'), preparation-source-deleted ('This source was deleted', no text), checked in light and dark"
+      }
     },
     {
       "id": "U4",
