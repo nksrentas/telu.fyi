@@ -12,8 +12,13 @@
         "frontend/src/components/living-doc/review-block.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "eaaf712",
+        "ran": "bash .loop/verify.sh green (cargo 477 lib + integration, bun 131 pass, node 70 pass, typecheck 0 src / 36 tests, gallery 146 passed); new test \"each toast's Undo reverts its own action; ⌘Z takes the latest; a correction dismisses the rest\" in tests/components/knowledge-review.test.tsx",
+        "base_failure": "On base 7c13d69 the new test failed at the first toast's onClick: expected {itemId: item-1, action: reopen}, received {itemId: item-2, action: restore} (the CR-40 bug)",
+        "browser": "not required (ui: false)"
+      }
     },
     {
       "id": "T2",

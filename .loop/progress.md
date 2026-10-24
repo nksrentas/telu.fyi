@@ -26,3 +26,12 @@ Task: fix the open Phase 2 review findings outside knowledge/ and summary/, tigh
 ## Open questions
 
 ## Sessions
+
+## Session 1 · T1 · 2026-10-24
+Did: CR-40. useUndo in review-block.tsx now keeps a list of live entries keyed by a module-wide toast id (`review-undo-N`, passed as sonner `id`). Each toast's Undo undoes its own entry, ⌘Z the newest, and a new undoable decision on an item dismisses older toasts for that item. correct, restore and reopen call forgetAll(), which dismisses every live Undo toast; this keeps the old "those actions clear undo" behaviour, now visibly. New test in knowledge-review.test.tsx; on base it got item-2 restore instead of item-1 reopen. Two review passes: fixed toast-id reuse across remounts (the counter is module-level, not per instance), a double filter, and weak asserts.
+Learned:
+- A valid accepted row has no Reject button, only the "More" menu (Correct…, Move back to review = reopen). Only accepted rows with an evidence problem show Reject. Test helpers that index `buttons('Reject')[n]` hit the wrong row; pick the row by `data-item-id` (see `decide` in the new test).
+- The typecheck gate allows at most 36 errors in tests/, and the base already has exactly 36. Every `x.mock.calls[i]?.[1] as {...}` cast on a sonner toast adds TS2352 errors. Cast through `unknown` (the test's `undoOf` helper) and type override objects as `Partial<KnowledgeItemView>`.
+- The gate's long output is truncated in the tool view; it is saved under tool-results and `tail`/`grep` on that file show the result. Shell pipes and redirects need approval in loop sessions.
+- forgetAll() also fires on reopen ("Move back to review"). T3 (an undo entry expires when its toast closes) can hook into the same `live` list via sonner's onDismiss/onAutoClose.
+Next: T2
