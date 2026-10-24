@@ -265,7 +265,7 @@ mod tests {
         );
         assert_eq!(
             paste(&pool, "Empty", " \n\n ").await.unwrap_err(),
-            "DOCUMENT_TEXT_EMPTY"
+            "EMPTY_SOURCE"
         );
     }
 

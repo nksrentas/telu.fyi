@@ -1,7 +1,6 @@
-use crate::documents::limits::{ensure_passage_count, ensure_source_chars, split_span};
-use crate::documents::models::{
-    DocumentFormat, DocumentVersion, ExtractionStatus, NewPassage, NewVersion,
-};
+use crate::documents::encoding::extract;
+use crate::documents::limits::split_span;
+use crate::documents::models::{DocumentFormat, DocumentVersion, NewPassage, NewVersion};
 use crate::documents::repository;
 use anyhow::{bail, Result};
 use chrono::{DateTime, Utc};
@@ -66,25 +65,20 @@ struct Prepared {
 }
 
 fn prepare(text: &str) -> Result<Prepared> {
-    let normalised = normalise(text);
-    let char_count = normalised.chars().count();
-    ensure_source_chars(char_count)?;
-    let passages = paragraph_passages(&normalised);
-    if passages.is_empty() {
-        bail!("DOCUMENT_TEXT_EMPTY");
-    }
-    ensure_passage_count(passages.len())?;
+    let extraction = extract(text.as_bytes(), paragraph_passages)?;
+    let stored = extraction.normalised.as_deref().unwrap_or(text);
+    let (sha256, byte_size) = (sha256_hex(stored.as_bytes()), stored.len() as i64);
     Ok(Prepared {
         version: NewVersion {
-            sha256: sha256_hex(normalised.as_bytes()),
-            byte_size: normalised.len() as i64,
-            char_count: char_count as i64,
+            sha256,
+            byte_size,
+            char_count: extraction.char_count as i64,
             parser_version: PASTE_PARSER_VERSION.to_string(),
-            extraction_status: ExtractionStatus::Extracted,
-            failure_code: None,
+            extraction_status: extraction.status,
+            failure_code: extraction.failure_code,
             managed_path: None,
         },
-        passages,
+        passages: extraction.passages,
     })
 }
 
@@ -119,12 +113,6 @@ pub(super) fn passage(
     }
 }
 
-pub(super) fn normalise(text: &str) -> String {
-    text.strip_prefix('\u{feff}')
-        .unwrap_or(text)
-        .replace("\r\n", "\n")
-}
-
 fn paragraph_spans(text: &str) -> Vec<(usize, usize)> {
     let mut spans = Vec::new();
     let mut current: Option<(usize, usize)> = None;
@@ -149,6 +137,7 @@ pub(super) fn sha256_hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::documents::encoding::normalise;
     use crate::documents::repository::list_passages;
     use crate::knowledge::test_support::migrated_pool;
 
@@ -238,7 +227,7 @@ mod tests {
         let error = ingest_text(&pool, "Notes", "\u{feff} \r\n\t\n", Utc::now())
             .await
             .expect_err("empty");
-        assert_eq!(error.to_string(), "DOCUMENT_TEXT_EMPTY");
+        assert_eq!(error.to_string(), "EMPTY_SOURCE");
         let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM documents")
             .fetch_one(&pool)
             .await
@@ -248,7 +237,9 @@ mod tests {
 
     #[test]
     fn ingest_locators_slice_back_for_generated_text() {
-        let pieces = ["a", "é", "—", "😀", " ", "\t", "\n", "\r\n", "\n\n", " \n"];
+        let pieces = [
+            "a", "é", "—", "😀", "e\u{301}", "İ", " ", "\t", "\n", "\r", "\r\n", "\n\n", " \n",
+        ];
         let mut seed: u64 = 0x9e3779b97f4a7c15;
         for _ in 0..500 {
             let mut raw = String::new();

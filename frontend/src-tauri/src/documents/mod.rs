@@ -1,4 +1,5 @@
 pub mod commands;
+mod encoding;
 pub mod import;
 pub mod ingest;
 pub mod limits;

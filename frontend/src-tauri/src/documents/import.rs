@@ -1,10 +1,7 @@
-use crate::documents::ingest::{normalise, paragraph_passages, passage, sha256_hex};
-use crate::documents::limits::{
-    ensure_passage_count, ensure_source_bytes, ensure_source_chars, split_span,
-};
-use crate::documents::models::{
-    Document, DocumentFormat, DocumentVersion, ExtractionStatus, NewPassage, NewVersion,
-};
+use crate::documents::encoding::extract;
+use crate::documents::ingest::{paragraph_passages, passage, sha256_hex};
+use crate::documents::limits::{ensure_source_bytes, split_span};
+use crate::documents::models::{Document, DocumentFormat, DocumentVersion, NewPassage, NewVersion};
 use crate::documents::repository;
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
@@ -157,28 +154,22 @@ async fn store_and_extract(
     let folder = managed_folder(app_data_dir, &document.id);
     tokio::fs::create_dir_all(&folder).await?;
     tokio::fs::write(folder.join(&file_name), &source.bytes).await?;
-    let text = std::str::from_utf8(&source.bytes).map_err(|_| anyhow!("DOCUMENT_NOT_UTF8"))?;
-    let normalised = normalise(text);
-    let char_count = normalised.chars().count();
-    ensure_source_chars(char_count)?;
-    let (passages, parser_version) = match document.format {
-        DocumentFormat::Markdown => (markdown_passages(&normalised), MARKDOWN_PARSER_VERSION),
-        DocumentFormat::Text => (paragraph_passages(&normalised), TEXT_PARSER_VERSION),
+    let (split, parser_version): (fn(&str) -> Vec<NewPassage>, _) = match document.format {
+        DocumentFormat::Markdown => (markdown_passages, MARKDOWN_PARSER_VERSION),
+        DocumentFormat::Text => (paragraph_passages, TEXT_PARSER_VERSION),
     };
-    if passages.is_empty() {
-        bail!("DOCUMENT_TEXT_EMPTY");
-    }
-    ensure_passage_count(passages.len())?;
+    let extraction = extract(&source.bytes, split)?;
     let new = NewVersion {
         sha256: source.sha256.clone(),
         byte_size: source.bytes.len() as i64,
-        char_count: char_count as i64,
+        char_count: extraction.char_count as i64,
         parser_version: parser_version.to_string(),
-        extraction_status: ExtractionStatus::Extracted,
-        failure_code: None,
+        extraction_status: extraction.status,
+        failure_code: extraction.failure_code,
         managed_path: Some(format!("{DOCUMENTS_DIR}/{}/{file_name}", document.id)),
     };
-    let version = repository::create_version(&mut tx, &document.id, new, passages, now).await?;
+    let version =
+        repository::create_version(&mut tx, &document.id, new, extraction.passages, now).await?;
     tx.commit().await?;
     Ok(version)
 }
@@ -463,18 +454,12 @@ mod tests {
         let app_data = TempDir::new().expect("tempdir");
         let empty = app_data.path().join("empty.md");
         std::fs::write(&empty, "# Only a heading\n\n").expect("write");
-        let binary = app_data.path().join("binary.txt");
-        std::fs::write(&binary, [0xff, 0xfe, 0x00]).expect("write");
 
         let empty_error = import_file(&pool, app_data.path(), &empty, Utc::now())
             .await
             .expect_err("empty");
-        let binary_error = import_file(&pool, app_data.path(), &binary, Utc::now())
-            .await
-            .expect_err("binary");
 
-        assert_eq!(empty_error.to_string(), "DOCUMENT_TEXT_EMPTY");
-        assert_eq!(binary_error.to_string(), "DOCUMENT_NOT_UTF8");
+        assert_eq!(empty_error.to_string(), "EMPTY_SOURCE");
         assert_eq!(table_count(&pool, "documents").await, 0);
         let documents_dir = app_data.path().join("documents");
         assert!(
