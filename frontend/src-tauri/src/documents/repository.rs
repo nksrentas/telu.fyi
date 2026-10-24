@@ -135,6 +135,18 @@ pub async fn get_document(
     .await
 }
 
+pub async fn is_available(
+    executor: impl SqliteExecutor<'_>,
+    id: &str,
+) -> Result<bool, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM documents WHERE id = ? AND availability = 'available')",
+    )
+    .bind(id)
+    .fetch_one(executor)
+    .await
+}
+
 pub async fn get_version(
     executor: impl SqliteExecutor<'_>,
     id: &str,
