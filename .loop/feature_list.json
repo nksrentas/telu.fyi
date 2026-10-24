@@ -111,8 +111,11 @@
         "frontend/src/lib/document-service.ts",
         "frontend/tests/lib/document-service.test.ts"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "7d7ffa4c22fe534341783d3d890443fd90896ca4",
+        "ran": "bash .loop/verify.sh (cargo 516 lib passed incl. 8 documents::commands; bun 149 pass incl. 3 document-service; node; typecheck; gallery 150 passed); cargo check via the gate's cargo test with commands registered in lib.rs; review subagent findings fixed (paste-replace format check, mark_deleted no-op on unknown)"
+      }
     },
     {
       "id": "D6",
