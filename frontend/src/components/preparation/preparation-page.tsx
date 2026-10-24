@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { CalendarDays, ChevronLeft, Lock, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { SourceViewer, type SourceTarget } from "@/components/preparation/source-viewer"
 import { SourcesPanel } from "@/components/preparation/sources-panel"
 import { Button } from "@/components/ui/button"
 import {
@@ -150,8 +151,16 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
   )
 }
 
-function PlannedMeetingDoc({ meeting, onBack }: { meeting: PlannedMeeting; onBack: () => void }) {
+interface PlannedMeetingDocProps {
+  meeting: PlannedMeeting
+  initialSource: SourceTarget | null
+  onBack: () => void
+}
+
+function PlannedMeetingDoc({ meeting, initialSource, onBack }: PlannedMeetingDocProps) {
   const { draft, status, change } = useAutosave(meeting)
+  const [source, setSource] = useState<SourceTarget | null>(initialSource)
+  const closeSource = useCallback(() => setSource(null), [])
   const titleMissing = !draft.title.trim()
 
   return (
@@ -202,9 +211,10 @@ function PlannedMeetingDoc({ meeting, onBack }: { meeting: PlannedMeeting; onBac
               className={cn(EDITABLE, "block resize-none text-[15px] leading-[1.55] tracking-[-0.005em]")}
             />
           </section>
-          <SourcesPanel plannedMeetingId={meeting.id} />
+          <SourcesPanel plannedMeetingId={meeting.id} onOpenSource={(versionId) => setSource({ versionId })} />
         </div>
       </main>
+      <SourceViewer target={source} onClose={closeSource} />
     </>
   )
 }
@@ -222,7 +232,7 @@ function PreparationToolbar({ onBack, children }: { onBack: () => void; children
   )
 }
 
-export function PreparationPage({ id }: { id: string }) {
+export function PreparationPage({ id, initialSource = null }: { id: string; initialSource?: SourceTarget | null }) {
   const router = useRouter()
   const [meeting, setMeeting] = useState<PlannedMeeting | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -244,7 +254,7 @@ export function PreparationPage({ id }: { id: string }) {
   return (
     <div className="relative flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-content">
       {meeting ? (
-        <PlannedMeetingDoc key={meeting.id} meeting={meeting} onBack={goBack} />
+        <PlannedMeetingDoc key={meeting.id} meeting={meeting} initialSource={initialSource} onBack={goBack} />
       ) : (
         <>
           <PreparationToolbar onBack={goBack} />
