@@ -442,8 +442,11 @@
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/tests/fixtures/documents/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "79b8bbd47976f845551a811f30bfb5364f8a4f84",
+        "ran": "bash .loop/verify.sh (gate: cargo lib and integration tests, bun, node, typecheck, gallery 150 passed); cargo test --lib documents::encoding 7 passed, documents:: 40 passed"
+      }
     },
     {
       "id": "E3",

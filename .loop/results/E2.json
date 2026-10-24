@@ -1,9 +1,0 @@
-{
-  "id": "E2",
-  "passes": true,
-  "evidence": {
-    "commit": "79b8bbd47976f845551a811f30bfb5364f8a4f84",
-    "ran": "bash .loop/verify.sh (gate: cargo lib and integration tests, bun, node, typecheck, gallery 150 passed); cargo test --lib documents::encoding 7 passed, documents:: 40 passed"
-  },
-  "notes": "Did: documents/encoding.rs owns extract(bytes, split) and normalise; paste (ingest.rs) and import (import.rs) both go through extract. normalise now also turns a lone CR into LF (after CRLF). Invalid UTF-8 or any NUL byte stores a version with extraction_status failed, failure_code EXTRACTION_FAILED, char_count 0 and no passages; import keeps the managed copy (so the sweep keeps it), and paste hashes the raw text for a failed version. Error codes renamed: DOCUMENT_TEXT_EMPTY -> EMPTY_SOURCE (0-byte, BOM-only, whitespace-only, and Markdown with only headings); DOCUMENT_NOT_UTF8 is gone. 7 tests in documents::encoding: Greek, emoji with ZWJ, combining marks and Turkish İ/ı keep char locators; BOM/CRLF/lone CR import; failed import for Latin-1, truncated UTF-8 and NUL; failed paste with NUL; replace with invalid bytes adds a failed v2 and leaves v1's passages; EMPTY_SOURCE refusals write nothing. The ingest property test now also generates lone CR, combining marks and İ.\nAssumptions: a NUL in pasted text is handled like an imported NUL (failed version, no passages) rather than refused. A failed version is a real version: dedupe by sha256 returns it, and a failed replace becomes the document's latest version. Later selection and briefing items must skip versions whose extraction_status is not extracted.\nLearned: the gallery screen peek-inline-transcript light failed once more in the full gate and passed on the rerun."
-}
