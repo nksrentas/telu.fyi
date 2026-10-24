@@ -71,8 +71,12 @@
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/tests/fixtures/documents/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "4c0d38e30d2c1960adab98704b83d7579b4dac96",
+        "ran": "bash .loop/verify.sh (cargo 18 documents:: tests incl. 7 documents::import, full lib and integration tests, bun, node, typecheck, gallery 150 passed); three review subagents, final one clean",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "D4",
