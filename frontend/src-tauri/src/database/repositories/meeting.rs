@@ -1195,6 +1195,7 @@ enum DeleteScope {
 }
 
 const MEETING_SCOPED_DELETE_ORDER: &[(&str, DeleteScope)] = &[
+    ("preparation_sources", DeleteScope::Meeting),
     ("knowledge_suppressions", DeleteScope::Meeting),
     ("knowledge_reviews", DeleteScope::Meeting),
     ("knowledge_revisions", DeleteScope::Meeting),

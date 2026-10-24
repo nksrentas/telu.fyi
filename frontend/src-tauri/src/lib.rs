@@ -54,6 +54,7 @@ pub mod openrouter;
 pub mod parakeet_engine;
 pub mod documents;
 pub mod planning;
+pub mod preparation;
 pub mod state;
 pub mod summary;
 pub mod trust;
@@ -782,6 +783,8 @@ pub fn run() {
             planning::commands::planning_get,
             planning::commands::planning_update,
             planning::commands::planning_delete,
+            preparation::commands::prep_select_sources,
+            preparation::commands::prep_list_sources,
             documents::commands::documents_paste,
             documents::commands::documents_import,
             documents::commands::documents_list,

@@ -181,6 +181,20 @@ async fn populate_meeting_a(pool: &SqlitePool) {
     append_review(pool, MEETING_A, first_item, ReviewAction::Reject).await.expect("reject");
     insert_run_with_items(pool, MEETING_A, "018f5e27-2f68-7e27-9c90-7c7212317202", vec![item("018f5e27-2f68-7e27-9c90-7c7212317302", evidence_two, false)], Some(first_item)).await;
     populate_phase_one_rows(pool, MEETING_A, "evaluation-run-a", evidence_one).await;
+    insert_preparation_source(pool, MEETING_A, first_item).await;
+}
+
+async fn insert_preparation_source(pool: &SqlitePool, meeting_id: &str, item_id: &str) {
+    sqlx::query("INSERT INTO planned_meetings (id, title, created_utc, updated_utc) VALUES ('plan-a', 'Next sync', '', '')")
+        .execute(pool)
+        .await
+        .expect("planned meeting");
+    sqlx::query("INSERT INTO preparation_sources (planned_meeting_id, position, kind, meeting_id, knowledge_item_id) VALUES ('plan-a', 0, 'knowledge', ?, ?)")
+        .bind(meeting_id)
+        .bind(item_id)
+        .execute(pool)
+        .await
+        .expect("preparation source");
 }
 
 async fn populate_phase_one_rows(pool: &SqlitePool, meeting_id: &str, evaluation_run: &str, evidence_id: &str) {
