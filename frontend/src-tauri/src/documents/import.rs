@@ -21,13 +21,19 @@ const TEXT_PARSER_VERSION: &str = "import-text-1";
 const FENCE_CHARS: [char; 2] = ['`', '~'];
 const MIN_FENCE_RUN: usize = 3;
 
-pub fn pick_source<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.dialog()
+pub fn pick_source<R: Runtime>(app: &AppHandle<R>) -> Result<Option<PathBuf>> {
+    let Some(picked) = app
+        .dialog()
         .file()
         .add_filter("Markdown or text", &IMPORT_EXTENSIONS)
-        .blocking_pick_file()?
+        .blocking_pick_file()
+    else {
+        return Ok(None);
+    };
+    picked
         .into_path()
-        .ok()
+        .map(Some)
+        .map_err(|_| anyhow!("SOURCE_UNREADABLE"))
 }
 
 pub async fn import_file(
@@ -36,25 +42,90 @@ pub async fn import_file(
     source: &Path,
     now: DateTime<Utc>,
 ) -> Result<DocumentVersion> {
+    let source = read_source(source).await?;
+    let mut tx = pool.begin().await?;
+    let document = repository::create_document(&mut *tx, &source.title, source.format, now).await?;
+    let result = store_and_extract(tx, app_data_dir, &document, &source, now).await;
+    if result.is_err() {
+        remove_after_failure(
+            tokio::fs::remove_dir_all(managed_folder(app_data_dir, &document.id)).await,
+        );
+    }
+    result
+}
+
+pub async fn import_file_into(
+    pool: &SqlitePool,
+    app_data_dir: &Path,
+    document: &Document,
+    source: &Path,
+    now: DateTime<Utc>,
+) -> Result<DocumentVersion> {
+    let source = read_source(source).await?;
+    if source.format != document.format {
+        bail!("DOCUMENT_FORMAT_MISMATCH");
+    }
+    let mut tx = pool.begin().await?;
+    if let Some(existing) =
+        repository::find_version_by_sha256(&mut *tx, &document.id, &source.sha256).await?
+    {
+        return Ok(existing);
+    }
+    let result = store_and_extract(tx, app_data_dir, document, &source, now).await;
+    if result.is_err() {
+        let file = managed_folder(app_data_dir, &document.id).join(source.file_name());
+        remove_after_failure(tokio::fs::remove_file(file).await);
+    }
+    result
+}
+
+pub fn managed_folder(app_data_dir: &Path, document_id: &str) -> PathBuf {
+    app_data_dir.join(DOCUMENTS_DIR).join(document_id)
+}
+
+fn remove_after_failure(result: std::io::Result<()>) {
+    if let Err(error) = result {
+        log::warn!("documents import: could not remove a managed file: {error}");
+    }
+}
+
+struct Source {
+    format: DocumentFormat,
+    extension: String,
+    title: String,
+    sha256: String,
+    bytes: Vec<u8>,
+}
+
+impl Source {
+    fn file_name(&self) -> String {
+        format!("{}.{}", self.sha256, self.extension)
+    }
+}
+
+async fn read_source(source: &Path) -> Result<Source> {
     let (format, extension) = source_format(source)?;
-    ensure_source_bytes(tokio::fs::metadata(source).await?.len())?;
-    let bytes = tokio::fs::read(source).await?;
+    let metadata = tokio::fs::metadata(source)
+        .await
+        .map_err(|_| anyhow!("SOURCE_UNREADABLE"))?;
+    ensure_source_bytes(metadata.len())?;
+    let bytes = tokio::fs::read(source)
+        .await
+        .map_err(|_| anyhow!("SOURCE_UNREADABLE"))?;
     ensure_source_bytes(bytes.len() as u64)?;
     let title = source
         .file_stem()
         .and_then(|stem| stem.to_str())
         .filter(|stem| !stem.trim().is_empty())
-        .unwrap_or("Imported document");
-    let mut tx = pool.begin().await?;
-    let document = repository::create_document(&mut *tx, title, format, now).await?;
-    let result = store_and_extract(tx, app_data_dir, &document, &extension, &bytes, now).await;
-    if result.is_err() {
-        if let Err(error) = tokio::fs::remove_dir_all(managed_folder(app_data_dir, &document)).await
-        {
-            log::warn!("documents import: could not remove a managed folder: {error}");
-        }
-    }
-    result
+        .unwrap_or("Imported document")
+        .to_string();
+    Ok(Source {
+        format,
+        extension,
+        title,
+        sha256: sha256_hex(&bytes),
+        bytes,
+    })
 }
 
 fn source_format(source: &Path) -> Result<(DocumentFormat, String)> {
@@ -76,16 +147,14 @@ async fn store_and_extract(
     mut tx: Transaction<'_, Sqlite>,
     app_data_dir: &Path,
     document: &Document,
-    extension: &str,
-    bytes: &[u8],
+    source: &Source,
     now: DateTime<Utc>,
 ) -> Result<DocumentVersion> {
-    let sha256 = sha256_hex(bytes);
-    let file_name = format!("{sha256}.{extension}");
-    let folder = managed_folder(app_data_dir, document);
+    let file_name = source.file_name();
+    let folder = managed_folder(app_data_dir, &document.id);
     tokio::fs::create_dir_all(&folder).await?;
-    tokio::fs::write(folder.join(&file_name), bytes).await?;
-    let text = std::str::from_utf8(bytes).map_err(|_| anyhow!("DOCUMENT_NOT_UTF8"))?;
+    tokio::fs::write(folder.join(&file_name), &source.bytes).await?;
+    let text = std::str::from_utf8(&source.bytes).map_err(|_| anyhow!("DOCUMENT_NOT_UTF8"))?;
     let normalised = normalise(text);
     let char_count = normalised.chars().count();
     ensure_source_chars(char_count)?;
@@ -98,8 +167,8 @@ async fn store_and_extract(
     }
     ensure_passage_count(passages.len())?;
     let new = NewVersion {
-        sha256,
-        byte_size: bytes.len() as i64,
+        sha256: source.sha256.clone(),
+        byte_size: source.bytes.len() as i64,
         char_count: char_count as i64,
         parser_version: parser_version.to_string(),
         extraction_status: ExtractionStatus::Extracted,
@@ -109,10 +178,6 @@ async fn store_and_extract(
     let version = repository::create_version(&mut tx, &document.id, new, passages, now).await?;
     tx.commit().await?;
     Ok(version)
-}
-
-fn managed_folder(app_data_dir: &Path, document: &Document) -> PathBuf {
-    app_data_dir.join(DOCUMENTS_DIR).join(&document.id)
 }
 
 fn markdown_passages(text: &str) -> Vec<NewPassage> {

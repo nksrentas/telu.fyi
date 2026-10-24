@@ -1,3 +1,4 @@
+pub mod commands;
 pub mod import;
 pub mod ingest;
 pub mod limits;

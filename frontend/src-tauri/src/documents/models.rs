@@ -52,6 +52,21 @@ pub struct DocumentVersion {
     pub created_utc: String,
 }
 
+#[derive(Debug, Serialize, FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentSummary {
+    pub id: String,
+    pub title: String,
+    pub format: DocumentFormat,
+    pub availability: Availability,
+    pub created_utc: String,
+    pub latest_version_id: String,
+    pub latest_version: i64,
+    pub extraction_status: ExtractionStatus,
+    pub failure_code: Option<String>,
+    pub byte_size: i64,
+}
+
 pub struct NewVersion {
     pub sha256: String,
     pub byte_size: i64,
