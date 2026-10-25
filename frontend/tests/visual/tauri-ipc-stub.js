@@ -1,5 +1,5 @@
 (() => {
-  const frozenNow = new Date('2026-09-27T10:46:00').getTime();
+  const frozenNow = new Date('2026-09-27T10:46:00+03:00').getTime();
   const RealDate = Date;
   class FrozenDate extends RealDate {
     constructor(...args) {

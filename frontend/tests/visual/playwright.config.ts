@@ -7,6 +7,8 @@ const galleryBrowser = {
   ...devices['Desktop Safari'],
   viewport: { width: 1100, height: 700 },
   reducedMotion: 'reduce' as const,
+  timezoneId: 'Europe/Athens',
+  locale: 'en-GB',
   baseURL: `http://localhost:${port}`,
 };
 
