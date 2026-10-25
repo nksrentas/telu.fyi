@@ -1195,6 +1195,7 @@ enum DeleteScope {
 }
 
 const MEETING_SCOPED_DELETE_ORDER: &[(&str, DeleteScope)] = &[
+    ("preparation_sources", DeleteScope::Meeting),
     ("knowledge_suppressions", DeleteScope::Meeting),
     ("knowledge_reviews", DeleteScope::Meeting),
     ("knowledge_revisions", DeleteScope::Meeting),
@@ -1246,6 +1247,14 @@ async fn delete_meeting_with_transaction(
         error!("Meeting {} not found for deletion", meeting_id);
         return Ok(false);
     }
+
+    sqlx::query(
+        "UPDATE briefing_claims SET status = 'source_unavailable', quote = ''
+         WHERE knowledge_meeting_id = ?",
+    )
+    .bind(meeting_id)
+    .execute(&mut *transaction)
+    .await?;
 
     let mut affected = Vec::with_capacity(MEETING_SCOPED_DELETE_ORDER.len());
     for (table, scope) in MEETING_SCOPED_DELETE_ORDER {

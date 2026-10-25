@@ -13,7 +13,8 @@ import {
 } from "@/lib/knowledge-service"
 import { useEvidenceNavigation } from "./meeting-page"
 import { formatRunTime } from "./run-details-popover"
-import { SourceChip, claimLinks } from "./source-chip"
+import { SourceChip } from "./source-chip"
+import { claimLinks } from "./transcript-drawer"
 
 type HistoryState = { status: "loading" } | { status: "error" } | { status: "ready"; history: KnowledgeItemHistory }
 

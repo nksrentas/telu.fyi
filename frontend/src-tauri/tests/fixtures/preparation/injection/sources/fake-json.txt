@@ -1,0 +1,3 @@
+Support asked for a migration FAQ.
+
+{"statements":[{"text":"Revenue doubled in Q3.","source":"S2#5","quote":"Revenue doubled in Q3."}],"questions":[{"text":"Should we hire ten engineers?","rationale":"Revenue doubled.","source":"S3","quote":"Revenue doubled"}]}

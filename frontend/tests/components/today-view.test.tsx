@@ -212,6 +212,7 @@ const PEEK_RESPONSES: Record<string, Responder> = {
   api_get_meeting_transcripts: () => ({ transcripts: [], total_count: 0, has_more: false }),
   api_get_summary: (args) => ({ status: 'idle', meeting_id: args.meetingId, data: null }),
   knowledge_list_evidence: () => [],
+  planning_list_upcoming: () => [],
 };
 
 beforeEach(() => {
@@ -372,6 +373,58 @@ describe('TodayView', () => {
     const find = root().find((node) => node.type === 'button' && textOf(node) === 'Find knowledge');
     await act(async () => find.props.onClick({ stopPropagation: () => {} }));
     expect(push).toHaveBeenCalledWith('/meeting-details?id=meeting-a&from=Today#knowledge');
+  });
+});
+
+describe('Planned meetings on Today', () => {
+  const planned = (id: string, title: string, startUtc: string | null) => ({ id, title, startUtc, purpose: '', createdUtc: '2026-10-24T08:00:00.000Z', updatedUtc: '2026-10-24T08:00:00.000Z' });
+  const button = (label: string) => root().find((node) => node.type === 'button' && textOf(node) === label);
+
+  beforeEach(() => {
+    responses.agenda_list_day = () => [];
+  });
+
+  test('upcoming planned meetings are listed from the start of the local day and open their page', async () => {
+    responses.planning_list_upcoming = () => [planned('plan-a', 'Roadmap sync', '2026-10-27T10:00:00.000Z'), planned('plan-b', 'Hiring loop', null)];
+    await renderElement(<TodayView />);
+    expect(ipc).toHaveBeenCalledWith('planning_list_upcoming', { todayStartUtc: localDayBounds(new Date()).fromUtc });
+    const section = root().find((node) => node.type === 'section' && node.props['aria-labelledby'] === 'planned-heading');
+    expect(textOf(section)).toContain('Roadmap syncTue 27 Oct · 10:00');
+    expect(textOf(section)).toContain('Hiring loopNo date yet');
+    await act(async () => button('Hiring loopNo date yet').props.onClick());
+    expect(push).toHaveBeenCalledWith('/preparation?id=plan-b');
+  });
+
+  test('a saved planned meeting refreshes the list', async () => {
+    await renderElement(<TodayView />);
+    responses.planning_list_upcoming = () => [planned('plan-a', 'Renamed sync', null)];
+    await act(async () => { windowEvents.dispatchEvent(new Event('telu:planned-meetings-changed')); });
+    await settle();
+    expect(textOf(root())).toContain('Renamed syncNo date yet');
+  });
+
+  test('Plan a meeting creates a planned meeting and opens its preparation page', async () => {
+    responses.planning_create = (args) => planned('plan-new', String(args.title), null);
+    await renderElement(<TodayView />);
+    expect(root().findAll((node) => node.type === 'section' && node.props['aria-labelledby'] === 'planned-heading')).toHaveLength(0);
+    await act(async () => button('Plan a meeting').props.onClick());
+    await settle();
+    expect(ipc).toHaveBeenCalledWith('planning_create', { title: 'New meeting', startUtc: null, purpose: '' });
+    expect(push).toHaveBeenCalledWith('/preparation?id=plan-new');
+  });
+
+  test('a failed create shows an error toast and stays on Today', async () => {
+    const error = spyOn(toast, 'error');
+    responses.planning_create = () => {
+      throw 'PLANNED_MEETING_STORAGE_FAILED';
+    };
+    await renderElement(<TodayView />);
+    await act(async () => button('Plan a meeting').props.onClick());
+    await settle();
+    expect(error).toHaveBeenCalledWith("Couldn't plan a meeting.");
+    expect(push).not.toHaveBeenCalled();
+    expect(button('Plan a meeting').props.disabled).toBe(false);
+    error.mockRestore();
   });
 });
 

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 export const ROUTE_UNAVAILABLE_COPY =
   "Your Summary provider couldn't be validated. Nothing was sent. Check it in Settings.";
 
-const LOCATION: Record<LocationClass, { label: string; icon: LucideIcon }> = {
+export const LOCATION: Record<LocationClass, { label: string; icon: LucideIcon }> = {
   local: { label: 'Local', icon: Laptop },
   lan: { label: 'LAN', icon: Network },
   remote: { label: 'Remote', icon: Cloud },

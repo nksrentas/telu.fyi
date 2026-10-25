@@ -1,0 +1,3865 @@
+[
+  {
+    "name": "preparation-empty",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "New meeting",
+        "startUtc": null,
+        "purpose": "",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      }
+    }
+  },
+  {
+    "name": "today-planned",
+    "path": "/",
+    "ipc": {
+      "agenda_list_day": [
+        {
+          "id": "m-reviewed",
+          "title": "Daily standup",
+          "startedAtUtc": "2026-09-27T07:00:00Z",
+          "endedAtUtc": "2026-09-27T07:15:00Z",
+          "lifecycle": "complete",
+          "completeness": "complete",
+          "gapCount": 0,
+          "evidenceCount": 24,
+          "legacyTranscriptCount": 0,
+          "pendingCount": 0,
+          "acceptedCount": 4,
+          "rejectedCount": 0,
+          "latestRunStatus": "succeeded",
+          "cardState": "reviewed"
+        }
+      ],
+      "planning_list_upcoming": [
+        {
+          "id": "plan-a",
+          "title": "Roadmap sync with design",
+          "startUtc": "2026-09-29T08:00:00.000Z",
+          "purpose": "",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "updatedUtc": "2026-09-27T06:00:00.000Z"
+        },
+        {
+          "id": "plan-b",
+          "title": "Hiring loop debrief",
+          "startUtc": null,
+          "purpose": "",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "updatedUtc": "2026-09-27T06:00:00.000Z"
+        }
+      ]
+    }
+  },
+  {
+    "name": "preparation-sources-empty",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      }
+    }
+  },
+  {
+    "name": "preparation-sources-three",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ]
+    }
+  },
+  {
+    "name": "preparation-paste-dialog",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      }
+    },
+    "steps": [
+      {
+        "click": "button:has-text(\"Paste\")"
+      },
+      {
+        "waitFor": "[role=dialog]"
+      }
+    ]
+  },
+  {
+    "name": "preparation-paste-size-error",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_paste": {
+        "$error": "SOURCE_TOO_LARGE:MAX_SOURCE_BYTES"
+      }
+    },
+    "steps": [
+      {
+        "click": "button:has-text(\"Paste\")"
+      },
+      {
+        "waitFor": "[role=dialog]"
+      },
+      {
+        "click": "#paste-source-title"
+      },
+      {
+        "type": "Board pack"
+      },
+      {
+        "click": "#paste-source-text"
+      },
+      {
+        "type": "A very long export"
+      },
+      {
+        "click": "button:has-text(\"Add source\")"
+      },
+      {
+        "waitFor": "#paste-source-error"
+      }
+    ]
+  },
+  {
+    "name": "preparation-source-section",
+    "path": "/preparation?id=plan-new&source=d-1-v2&start=360&end=438",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ],
+      "documents_get_version": {
+        "document": {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "version": {
+          "id": "d-1-v2",
+          "documentId": "d-1",
+          "version": 2,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "byteSize": 18432,
+          "charCount": 620,
+          "parserVersion": "markdown-1",
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "managedPath": null,
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "latestVersion": 2,
+        "passages": [
+          {
+            "id": "p-0",
+            "versionId": "d-1-v2",
+            "ordinal": 0,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\"], \"paragraph\": 0, \"start\": 0, \"end\": 115}",
+            "text": "The quarter is about shipping the importer and making briefs trustworthy enough to read five minutes before a call.",
+            "contentHash": "h-0"
+          },
+          {
+            "id": "p-1",
+            "versionId": "d-1-v2",
+            "ordinal": 1,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 1, \"start\": 135, \"end\": 217}",
+            "text": "Ship Markdown and plain-text import with immutable versions by the end of January.",
+            "contentHash": "h-1"
+          },
+          {
+            "id": "p-2",
+            "versionId": "d-1-v2",
+            "ordinal": 2,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 2, \"start\": 237, \"end\": 340}",
+            "text": "Every statement in a brief cites the exact passage it came from, so a reader can check it in one click.",
+            "contentHash": "h-2"
+          },
+          {
+            "id": "p-3",
+            "versionId": "d-1-v2",
+            "ordinal": 3,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Hiring\"], \"paragraph\": 3, \"start\": 360, \"end\": 438}",
+            "text": "Hire two engineers by March: one for the Rust core and one for the desktop UI.",
+            "contentHash": "h-3"
+          },
+          {
+            "id": "p-4",
+            "versionId": "d-1-v2",
+            "ordinal": 4,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Risks\"], \"paragraph\": 4, \"start\": 458, \"end\": 544}",
+            "text": "Budget is flat. If hiring slips, the briefing work moves to Q2 and import ships alone.",
+            "contentHash": "h-4"
+          },
+          {
+            "id": "p-5",
+            "versionId": "d-1-v2",
+            "ordinal": 5,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Risks\"], \"paragraph\": 5, \"start\": 564, \"end\": 666}",
+            "text": "Local models are slower on older Macs; staged replies keep the tests honest until the evaluation runs.",
+            "contentHash": "h-5"
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "mark"
+      }
+    ]
+  },
+  {
+    "name": "preparation-source-older-version",
+    "path": "/preparation?id=plan-new&source=d-1-v1",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ],
+      "documents_get_version": {
+        "document": {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "version": {
+          "id": "d-1-v1",
+          "documentId": "d-1",
+          "version": 1,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "byteSize": 18432,
+          "charCount": 620,
+          "parserVersion": "markdown-1",
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "managedPath": null,
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "latestVersion": 2,
+        "passages": [
+          {
+            "id": "p-0",
+            "versionId": "d-1-v2",
+            "ordinal": 0,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\"], \"paragraph\": 0, \"start\": 0, \"end\": 115}",
+            "text": "The quarter is about shipping the importer and making briefs trustworthy enough to read five minutes before a call.",
+            "contentHash": "h-0"
+          },
+          {
+            "id": "p-1",
+            "versionId": "d-1-v2",
+            "ordinal": 1,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 1, \"start\": 135, \"end\": 217}",
+            "text": "Ship Markdown and plain-text import with immutable versions by the end of January.",
+            "contentHash": "h-1"
+          },
+          {
+            "id": "p-2",
+            "versionId": "d-1-v2",
+            "ordinal": 2,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Goals\"], \"paragraph\": 2, \"start\": 237, \"end\": 340}",
+            "text": "Every statement in a brief cites the exact passage it came from, so a reader can check it in one click.",
+            "contentHash": "h-2"
+          },
+          {
+            "id": "p-3",
+            "versionId": "d-1-v2",
+            "ordinal": 3,
+            "locatorJson": "{\"kind\": \"section\", \"heading_path\": [\"Q1 roadmap\", \"Hiring\"], \"paragraph\": 3, \"start\": 360, \"end\": 438}",
+            "text": "Hire two engineers by March: one for the Rust core and one for the desktop UI.",
+            "contentHash": "h-3"
+          }
+        ]
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "text=Version 1 of 2"
+      }
+    ]
+  },
+  {
+    "name": "preparation-source-deleted",
+    "path": "/preparation?id=plan-new&source=d-1-v2",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ],
+      "documents_get_version": {
+        "document": {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "deleted",
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "version": {
+          "id": "d-1-v2",
+          "documentId": "d-1",
+          "version": 2,
+          "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "byteSize": 18432,
+          "charCount": 620,
+          "parserVersion": "markdown-1",
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "managedPath": null,
+          "createdUtc": "2026-09-27T06:00:00.000Z"
+        },
+        "latestVersion": 2,
+        "passages": []
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "text=This source was deleted"
+      }
+    ]
+  },
+  {
+    "name": "preparation-knowledge-picker",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "prep_list_sources": [
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+          "itemId": "k-2"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "$byArg": "meetingId",
+        "cases": {
+          "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d": {
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "latestRun": null,
+            "items": [
+              {
+                "itemId": "k-dec",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "decision",
+                "text": "Ship the beta to design partners on Oct 6",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-com",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "commitment",
+                "text": "Ana sends the pricing draft before Friday",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-q",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "question",
+                "text": "Do we need SSO for the launch customers?",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-p",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "decision",
+                "text": "Move standup to 9:30",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "proposed",
+                "eligibility": false,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              }
+            ],
+            "rejected": [],
+            "pendingCount": 0,
+            "acceptedCount": 4,
+            "skippedCount": 0
+          },
+          "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e": {
+            "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+            "latestRun": null,
+            "items": [
+              {
+                "itemId": "k-2",
+                "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+                "originRunId": "run-1",
+                "itemType": "decision",
+                "text": "Keep the translucent sidebar in dark mode",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-3",
+                "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+                "originRunId": "run-1",
+                "itemType": "question",
+                "text": "Should the Island show a timer?",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              }
+            ],
+            "rejected": [],
+            "pendingCount": 0,
+            "acceptedCount": 2,
+            "skippedCount": 0
+          }
+        },
+        "default": {
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "latestRun": null,
+          "items": [],
+          "rejected": [],
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "skippedCount": 0
+        }
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-expanded]:has-text(\"Weekly product sync\")"
+      },
+      {
+        "waitFor": "text=Ship the beta to design partners"
+      },
+      {
+        "click": "button[aria-expanded]:has-text(\"Design review\")"
+      },
+      {
+        "waitFor": "text=Keep the translucent sidebar"
+      }
+    ]
+  },
+  {
+    "name": "preparation-brief-idle",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": null,
+        "briefing": null
+      },
+      "get_current_provider_route": {
+        "capability": "summary",
+        "providerId": "openrouter",
+        "modelId": "anthropic/claude-sonnet",
+        "locationClass": "remote",
+        "sanitizedOrigin": "openrouter.ai",
+        "encrypted": true,
+        "validationState": "validated",
+        "resolvedAddresses": []
+      },
+      "validate_provider_route": {
+        "capability": "summary",
+        "providerId": "openrouter",
+        "modelId": "anthropic/claude-sonnet",
+        "locationClass": "remote",
+        "sanitizedOrigin": "openrouter.ai",
+        "encrypted": true,
+        "validationState": "validated",
+        "resolvedAddresses": []
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-preparing",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "running",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": null,
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": null
+        },
+        "briefing": null
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-ready",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": false,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 420
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "truncated",
+              "kept": 2,
+              "total": 5,
+              "reason": "SOURCE_BUDGET",
+              "tokens": 300
+            },
+            {
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 12
+            }
+          ],
+          "claims": [
+            {
+              "text": "Markdown and plain-text import ships with immutable versions by the end of January.",
+              "status": "cited",
+              "sourceRef": "S1#1",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Every statement in a brief must cite the exact passage it came from.",
+              "status": "cited",
+              "sourceRef": "S1#2",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 237, \"end\": 340}",
+              "quote": "q"
+            },
+            {
+              "text": "The design partner beta goes out on Oct 6.",
+              "status": "cited",
+              "sourceRef": "S3",
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "passageId": null,
+              "locatorJson": null,
+              "quote": "q"
+            },
+            {
+              "text": "Two senior engineer offers are still open, and one closes next week.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 0, \"end\": 80}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v2"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            },
+            {
+              "claim": {
+                "text": "Who reviews the briefs before design partners see them?",
+                "status": "cited",
+                "sourceRef": "S3",
+                "source": {
+                  "kind": "knowledge",
+                  "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                  "itemId": "k-dec"
+                },
+                "passageId": null,
+                "locatorJson": null,
+                "quote": "q"
+              },
+              "rationale": "The beta date was agreed without naming a reviewer."
+            },
+            {
+              "claim": {
+                "text": "Can the second offer wait until the beta ships?",
+                "status": "cited",
+                "sourceRef": "S2#0",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-2-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 0, \"end\": 80}",
+                "quote": "q"
+              },
+              "rationale": "One offer closes the week before the beta."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-manifest",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-3-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-4-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-5-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-3-v1": {
+            "document": {
+              "id": "d-3",
+              "title": "Board pack",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-3-v1",
+              "documentId": "d-3",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-4-v1": {
+            "document": {
+              "id": "d-4",
+              "title": "Old pricing",
+              "format": "text",
+              "availability": "deleted",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-4-v1",
+              "documentId": "d-4",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-5-v1": {
+            "document": {
+              "id": "d-5",
+              "title": "Budget export",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-5-v1",
+              "documentId": "d-5",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 2,
+          "droppedQuestionCount": 0,
+          "stale": false,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 420
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "truncated",
+              "kept": 2,
+              "total": 5,
+              "reason": "SOURCE_BUDGET",
+              "tokens": 300
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "status": "omitted",
+              "reason": "TOTAL_BUDGET",
+              "tokens": 0
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "status": "deleted",
+              "reason": "DOCUMENT_DELETED",
+              "tokens": 0
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "status": "missing",
+              "reason": "MANAGED_FILE_MISSING",
+              "tokens": 0
+            },
+            {
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "status": "unavailable",
+              "reason": "KNOWLEDGE_NOT_ELIGIBLE",
+              "tokens": 0
+            }
+          ],
+          "claims": [
+            {
+              "text": "Markdown and plain-text import ships with immutable versions by the end of January.",
+              "status": "cited",
+              "sourceRef": "S1#1",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Every statement in a brief must cite the exact passage it came from.",
+              "status": "cited",
+              "sourceRef": "S1#2",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 237, \"end\": 340}",
+              "quote": "q"
+            },
+            {
+              "text": "Two senior engineer offers are still open, and one closes next week.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 0, \"end\": 80}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v2"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            },
+            {
+              "claim": {
+                "text": "Can the second offer wait until the beta ships?",
+                "status": "cited",
+                "sourceRef": "S2#0",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-2-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 0, \"end\": 80}",
+                "quote": "q"
+              },
+              "rationale": "One offer closes the week before the beta."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      },
+      {
+        "click": "[data-manifest-trigger]"
+      },
+      {
+        "waitFor": "[data-dropped]"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-failed",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "failed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": null,
+          "failureCode": "PREP_MODEL_FAILED",
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": null
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-stale",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": true,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 420
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "truncated",
+              "kept": 2,
+              "total": 5,
+              "reason": "SOURCE_BUDGET",
+              "tokens": 300
+            },
+            {
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 12
+            }
+          ],
+          "claims": [
+            {
+              "text": "Markdown and plain-text import ships with immutable versions by the end of January.",
+              "status": "cited",
+              "sourceRef": "S1#1",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Every statement in a brief must cite the exact passage it came from.",
+              "status": "cited",
+              "sourceRef": "S1#2",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 237, \"end\": 340}",
+              "quote": "q"
+            },
+            {
+              "text": "The design partner beta goes out on Oct 6.",
+              "status": "cited",
+              "sourceRef": "S3",
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "passageId": null,
+              "locatorJson": null,
+              "quote": "q"
+            },
+            {
+              "text": "Two senior engineer offers are still open, and one closes next week.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 0, \"end\": 80}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v2"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            },
+            {
+              "claim": {
+                "text": "Who reviews the briefs before design partners see them?",
+                "status": "cited",
+                "sourceRef": "S3",
+                "source": {
+                  "kind": "knowledge",
+                  "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                  "itemId": "k-dec"
+                },
+                "passageId": null,
+                "locatorJson": null,
+                "quote": "q"
+              },
+              "rationale": "The beta date was agreed without naming a reviewer."
+            },
+            {
+              "claim": {
+                "text": "Can the second offer wait until the beta ships?",
+                "status": "cited",
+                "sourceRef": "S2#0",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-2-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 0, \"end\": 80}",
+                "quote": "q"
+              },
+              "rationale": "One offer closes the week before the beta."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-source-menu",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "click": "[aria-label=\"More for Q1 roadmap\"]"
+      },
+      {
+        "waitFor": "[role=menu]"
+      }
+    ]
+  },
+  {
+    "name": "preparation-delete-source-alert",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ],
+      "documents_delete_impact": 2
+    },
+    "steps": [
+      {
+        "click": "[aria-label=\"More for Q1 roadmap\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Delete\")"
+      },
+      {
+        "waitFor": "[role=alertdialog] :text(\"2 briefs cite this source\")"
+      }
+    ]
+  },
+  {
+    "name": "preparation-replace-source",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        },
+        {
+          "id": "d-3",
+          "title": "Exported chat",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "failed",
+          "failureCode": "EXTRACTION_FAILED",
+          "byteSize": 64000
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        }
+      ]
+    },
+    "steps": [
+      {
+        "click": "[aria-label=\"More for Q1 roadmap\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Replace with pasted text\")"
+      },
+      {
+        "waitFor": "[role=dialog]"
+      }
+    ]
+  },
+  {
+    "name": "preparation-edge-twelve-sources",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and p",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 2048
+        },
+        {
+          "id": "d-2",
+          "title": "Source 2",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 4096
+        },
+        {
+          "id": "d-3",
+          "title": "Source 3",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 6144
+        },
+        {
+          "id": "d-4",
+          "title": "Source 4",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-4-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 8192
+        },
+        {
+          "id": "d-5",
+          "title": "Source 5",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-5-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 10240
+        },
+        {
+          "id": "d-6",
+          "title": "Source 6",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-6-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 12288
+        },
+        {
+          "id": "d-7",
+          "title": "Source 7",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-7-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 14336
+        },
+        {
+          "id": "d-8",
+          "title": "Source 8",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-8-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 16384
+        },
+        {
+          "id": "d-9",
+          "title": "Source 9",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-9-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-10",
+          "title": "Source 10",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-10-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 20480
+        },
+        {
+          "id": "d-11",
+          "title": "Source 11",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-11-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 22528
+        },
+        {
+          "id": "d-12",
+          "title": "Source 12",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-12-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 24576
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-3-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-4-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-5-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-6-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-7-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-8-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-9-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-10-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-11-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-12-v1"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v1": {
+            "document": {
+              "id": "d-1",
+              "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v1",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Source 2",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-3-v1": {
+            "document": {
+              "id": "d-3",
+              "title": "Source 3",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-3-v1",
+              "documentId": "d-3",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-4-v1": {
+            "document": {
+              "id": "d-4",
+              "title": "Source 4",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-4-v1",
+              "documentId": "d-4",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-5-v1": {
+            "document": {
+              "id": "d-5",
+              "title": "Source 5",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-5-v1",
+              "documentId": "d-5",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-6-v1": {
+            "document": {
+              "id": "d-6",
+              "title": "Source 6",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-6-v1",
+              "documentId": "d-6",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-7-v1": {
+            "document": {
+              "id": "d-7",
+              "title": "Source 7",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-7-v1",
+              "documentId": "d-7",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-8-v1": {
+            "document": {
+              "id": "d-8",
+              "title": "Source 8",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-8-v1",
+              "documentId": "d-8",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-9-v1": {
+            "document": {
+              "id": "d-9",
+              "title": "Source 9",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-9-v1",
+              "documentId": "d-9",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-10-v1": {
+            "document": {
+              "id": "d-10",
+              "title": "Source 10",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-10-v1",
+              "documentId": "d-10",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-11-v1": {
+            "document": {
+              "id": "d-11",
+              "title": "Source 11",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-11-v1",
+              "documentId": "d-11",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-12-v1": {
+            "document": {
+              "id": "d-12",
+              "title": "Source 12",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-12-v1",
+              "documentId": "d-12",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": false,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            }
+          ],
+          "claims": [
+            {
+              "text": "Point 1 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S1#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 2 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 3 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S3#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 4 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S4#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 5 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S5#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 6 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S6#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 7 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S7#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 8 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S8#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 9 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S9#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 10 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S10#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 11 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S11#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 12 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S12#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 700
+    }
+  },
+  {
+    "name": "preparation-edge-twelve-brief",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and p",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 2048
+        },
+        {
+          "id": "d-2",
+          "title": "Source 2",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 4096
+        },
+        {
+          "id": "d-3",
+          "title": "Source 3",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 6144
+        },
+        {
+          "id": "d-4",
+          "title": "Source 4",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-4-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 8192
+        },
+        {
+          "id": "d-5",
+          "title": "Source 5",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-5-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 10240
+        },
+        {
+          "id": "d-6",
+          "title": "Source 6",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-6-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 12288
+        },
+        {
+          "id": "d-7",
+          "title": "Source 7",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-7-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 14336
+        },
+        {
+          "id": "d-8",
+          "title": "Source 8",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-8-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 16384
+        },
+        {
+          "id": "d-9",
+          "title": "Source 9",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-9-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-10",
+          "title": "Source 10",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-10-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 20480
+        },
+        {
+          "id": "d-11",
+          "title": "Source 11",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-11-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 22528
+        },
+        {
+          "id": "d-12",
+          "title": "Source 12",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-12-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 24576
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-3-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-4-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-5-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-6-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-7-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-8-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-9-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-10-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-11-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-12-v1"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v1": {
+            "document": {
+              "id": "d-1",
+              "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v1",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Source 2",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-3-v1": {
+            "document": {
+              "id": "d-3",
+              "title": "Source 3",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-3-v1",
+              "documentId": "d-3",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-4-v1": {
+            "document": {
+              "id": "d-4",
+              "title": "Source 4",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-4-v1",
+              "documentId": "d-4",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-5-v1": {
+            "document": {
+              "id": "d-5",
+              "title": "Source 5",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-5-v1",
+              "documentId": "d-5",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-6-v1": {
+            "document": {
+              "id": "d-6",
+              "title": "Source 6",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-6-v1",
+              "documentId": "d-6",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-7-v1": {
+            "document": {
+              "id": "d-7",
+              "title": "Source 7",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-7-v1",
+              "documentId": "d-7",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-8-v1": {
+            "document": {
+              "id": "d-8",
+              "title": "Source 8",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-8-v1",
+              "documentId": "d-8",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-9-v1": {
+            "document": {
+              "id": "d-9",
+              "title": "Source 9",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-9-v1",
+              "documentId": "d-9",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-10-v1": {
+            "document": {
+              "id": "d-10",
+              "title": "Source 10",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-10-v1",
+              "documentId": "d-10",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-11-v1": {
+            "document": {
+              "id": "d-11",
+              "title": "Source 11",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-11-v1",
+              "documentId": "d-11",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-12-v1": {
+            "document": {
+              "id": "d-12",
+              "title": "Source 12",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-12-v1",
+              "documentId": "d-12",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": false,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            }
+          ],
+          "claims": [
+            {
+              "text": "Point 1 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S1#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 2 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 3 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S3#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 4 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S4#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 5 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S5#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 6 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S6#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 7 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S7#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 8 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S8#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 9 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S9#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 10 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S10#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 11 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S11#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 12 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S12#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      },
+      {
+        "hover": "[data-manifest-trigger]"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 700
+    }
+  }
+]

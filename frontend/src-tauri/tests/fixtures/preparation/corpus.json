@@ -1,0 +1,102 @@
+{
+  "version": "prep-corpus-v1",
+  "cases": [
+    {
+      "id": "roomy-budget",
+      "select": ["roadmap.md", "notes.txt"],
+      "budget": { "perSourceTokens": 1000, "totalTokens": 10000 },
+      "reply": {
+        "statements": [
+          { "text": "Atlas reaches beta customers on March 3.", "source": "S1#0", "quote": "Atlas ships to beta customers on March 3" },
+          { "text": "Beta feedback is reviewed every week.", "source": "S2#2", "quote": "Atlas beta feedback" },
+          { "text": "Atlas ships in February.", "source": "S1#0", "quote": "ships in February" },
+          { "text": "Maya owns the ledger export.", "source": "S2#0", "quote": "Maya owns the ledger export" },
+          { "text": "Pricing changes need sign-off.", "source": "S1#1", "quote": "The pricing page" }
+        ],
+        "questions": [
+          { "text": "Is the migration FAQ ready?", "rationale": "Support asked for it before the switch.", "source": "S2#1", "quote": "a migration FAQ" }
+        ]
+      },
+      "expected": {
+        "statements": [
+          { "source": "roadmap.md", "locator": { "kind": "section", "heading_path": ["Roadmap"], "paragraph": 0, "start": 11, "end": 52 } },
+          { "source": "roadmap.md", "locator": { "kind": "section", "heading_path": ["Roadmap", "Risks"], "paragraph": 1, "start": 205, "end": 257 } },
+          null,
+          { "source": "notes.txt", "locator": { "kind": "paragraph", "index": 0, "start": 0, "end": 60 } },
+          null
+        ],
+        "questions": [
+          { "source": "notes.txt", "locator": { "kind": "paragraph", "index": 1, "start": 62, "end": 131 } }
+        ]
+      },
+      "after": [],
+      "score": {
+        "supportedClaims": { "hit": 5, "of": 6 },
+        "sourceCorrectness": { "hit": 3, "of": 5 },
+        "staleCitations": 0,
+        "supersededCitations": 0,
+        "directContextFit": { "hit": 105, "of": 105 }
+      }
+    },
+    {
+      "id": "tight-budget",
+      "select": ["roadmap.md", "notes.txt"],
+      "budget": { "perSourceTokens": 30, "totalTokens": 50 },
+      "reply": {
+        "statements": [
+          { "text": "Atlas reaches beta customers on March 3.", "source": "S1#0", "quote": "on March 3" },
+          { "text": "Billing depends on the ledger export.", "source": "S1#2", "quote": "the ledger export" }
+        ],
+        "questions": [
+          { "text": "When will the ledger export be done?", "rationale": "Maya owns it.", "source": "S2#0", "quote": "Maya owns the ledger export" }
+        ]
+      },
+      "expected": {
+        "statements": [
+          { "source": "roadmap.md", "locator": { "kind": "section", "heading_path": ["Roadmap"], "paragraph": 0, "start": 11, "end": 52 } },
+          { "source": "roadmap.md", "locator": { "kind": "section", "heading_path": ["Roadmap", "Risks"], "paragraph": 0, "start": 124, "end": 203 } }
+        ],
+        "questions": [
+          { "source": "notes.txt", "locator": { "kind": "paragraph", "index": 0, "start": 0, "end": 60 } }
+        ]
+      },
+      "after": [],
+      "score": {
+        "supportedClaims": { "hit": 2, "of": 3 },
+        "sourceCorrectness": { "hit": 2, "of": 2 },
+        "staleCitations": 0,
+        "supersededCitations": 0,
+        "directContextFit": { "hit": 41, "of": 105 }
+      }
+    },
+    {
+      "id": "replaced-and-deleted",
+      "select": ["roadmap.md", "notes.txt"],
+      "budget": { "perSourceTokens": 1000, "totalTokens": 10000 },
+      "reply": {
+        "statements": [
+          { "text": "Atlas reaches beta customers on March 3.", "source": "S1#0", "quote": "Atlas ships to beta customers on March 3" },
+          { "text": "Maya owns the ledger export.", "source": "S2#0", "quote": "Maya owns the ledger export" }
+        ]
+      },
+      "expected": {
+        "statements": [
+          { "source": "roadmap.md", "locator": { "kind": "section", "heading_path": ["Roadmap"], "paragraph": 0, "start": 11, "end": 52 } },
+          { "source": "notes.txt", "locator": { "kind": "paragraph", "index": 0, "start": 0, "end": 60 } }
+        ],
+        "questions": []
+      },
+      "after": [
+        { "replace": "notes.txt", "with": "notes-v2.txt" },
+        { "delete": "roadmap.md" }
+      ],
+      "score": {
+        "supportedClaims": { "hit": 2, "of": 2 },
+        "sourceCorrectness": { "hit": 2, "of": 2 },
+        "staleCitations": 1,
+        "supersededCitations": 1,
+        "directContextFit": { "hit": 105, "of": 105 }
+      }
+    }
+  ]
+}

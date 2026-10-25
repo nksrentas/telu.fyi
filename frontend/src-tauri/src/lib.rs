@@ -52,6 +52,9 @@ pub mod anthropic;
 pub mod groq;
 pub mod openrouter;
 pub mod parakeet_engine;
+pub mod documents;
+pub mod planning;
+pub mod preparation;
 pub mod state;
 pub mod summary;
 pub mod trust;
@@ -590,6 +593,7 @@ pub fn run() {
                 database::setup::initialize_database_on_startup(&_app.handle()).await
             })
             .expect("Failed to initialize database");
+            documents::sweep::sweep_on_startup(_app.handle());
 
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");
@@ -774,6 +778,23 @@ pub fn run() {
             knowledge::commands::knowledge_item_history,
             knowledge::commands::knowledge_list_runs,
             knowledge::commands::knowledge_deletion_impact,
+            planning::commands::planning_create,
+            planning::commands::planning_list_upcoming,
+            planning::commands::planning_get,
+            planning::commands::planning_update,
+            planning::commands::planning_delete,
+            preparation::commands::prep_select_sources,
+            preparation::commands::prep_list_sources,
+            preparation::commands::prep_generate,
+            preparation::commands::prep_cancel,
+            preparation::commands::prep_get_briefing,
+            documents::commands::documents_paste,
+            documents::commands::documents_import,
+            documents::commands::documents_list,
+            documents::commands::documents_get_version,
+            documents::commands::documents_replace,
+            documents::commands::documents_delete,
+            documents::commands::documents_delete_impact,
             summary::commands::api_get_summary,
             summary::commands::api_save_meeting_summary,
             summary::commands::api_get_meeting_summary_language,
