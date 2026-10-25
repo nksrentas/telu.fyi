@@ -2800,5 +2800,40 @@
         "waitFor": "text=Proposed by Telu"
       }
     ]
+  },
+  {
+    "name": "knowledge-load-failed",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "$error": "KNOWLEDGE_INVALID_REQUEST"
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=Couldn't load knowledge for this meeting."
+      }
+    ]
   }
 ]

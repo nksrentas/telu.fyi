@@ -25,6 +25,7 @@ export const KNOWLEDGE_COPY = {
   running: 'Reading the transcript…',
   malformed: "Telu couldn't use the model's answer. Your transcript is unchanged.",
   generic: "Telu couldn't finish reading this meeting. Your transcript is unchanged.",
+  loadFailed: "Couldn't load knowledge for this meeting.",
   abstentionTooltip: REVIEW_COPY.abstentionTooltip,
 };
 
@@ -78,6 +79,20 @@ export function FailedCard({ run, notice }: { run: KnowledgeRunView; notice: Rea
         <span>{failureCopy(run.failureCode)}</span>
       </p>
       {notice}
+    </SunkenCard>
+  );
+}
+
+export function LoadFailedCard({ onRetry }: { onRetry: () => void }) {
+  return (
+    <SunkenCard>
+      <p role="alert" className="m-0 flex items-start gap-2 text-[13px] text-label">
+        <Icon icon={CircleX} size={16} className="mt-px shrink-0 text-coral-ink" />
+        <span>{KNOWLEDGE_COPY.loadFailed}</span>
+      </p>
+      <Button variant="plain" size="sm" onClick={onRetry}>
+        Try again
+      </Button>
     </SunkenCard>
   );
 }
