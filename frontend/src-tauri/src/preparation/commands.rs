@@ -27,6 +27,7 @@ const RESERVED_OUTPUT_TOKENS: usize = 2_000;
 const MIN_CONTEXT_TOKENS: usize = 1_000;
 const MAX_CONTEXT_TOKENS: usize = 12_000;
 const STORAGE_FAILED: &str = "PREPARATION_STORAGE_FAILED";
+const NO_SOURCES: &str = "PREP_NO_SOURCES";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -45,6 +46,7 @@ pub struct StoredBriefing {
     pub dropped_count: i64,
     pub dropped_question_count: i64,
     pub stale: bool,
+    pub nothing_used: bool,
     pub manifest: Value,
     pub claims: Vec<Claim>,
     pub questions: Vec<Question>,
@@ -93,9 +95,13 @@ pub async fn begin(
 ) -> Result<(PreparationRun, CancellationToken), String> {
     validate_route_contract(expected_route, fresh_route).map_err(|error| error.code)?;
     let location_class = location_label(fresh_route)?;
-    selection::ensure_planned_meeting(pool, planned_meeting_id)
+    if selection::list(pool, planned_meeting_id)
         .await
-        .map_err(selection_code)?;
+        .map_err(selection_code)?
+        .is_empty()
+    {
+        return Err(NO_SOURCES.to_string());
+    }
     let run_id = Uuid::new_v4().to_string();
     let token = runs::register(planned_meeting_id, &run_id)
         .ok_or_else(|| "PREP_ALREADY_RUNNING".to_string())?;
@@ -236,7 +242,7 @@ pub async fn get_briefing(
 
 async fn stored_briefing(pool: &SqlitePool, row: BriefingRow) -> Result<StoredBriefing, String> {
     let code = |error: BriefingError| error.code().to_string();
-    let manifest = serde_json::from_str(&row.manifest_json).map_err(|error| {
+    let manifest: Value = serde_json::from_str(&row.manifest_json).map_err(|error| {
         warn!(error = %error, "stored briefing manifest is not JSON");
         STORAGE_FAILED.to_string()
     })?;
@@ -262,7 +268,13 @@ async fn stored_briefing(pool: &SqlitePool, row: BriefingRow) -> Result<StoredBr
         .iter()
         .chain(questions.iter().map(|question| &question.claim))
         .any(|claim| claim.status == ClaimStatus::Stale);
+    let nothing_used = !manifest.as_array().is_some_and(|entries| {
+        entries
+            .iter()
+            .any(|entry| matches!(entry["status"].as_str(), Some("included" | "truncated")))
+    });
     Ok(StoredBriefing {
+        nothing_used,
         claims,
         questions,
         id: row.id,

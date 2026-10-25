@@ -1,6 +1,8 @@
 pub mod briefing;
 pub mod commands;
 pub mod context;
+#[cfg(test)]
+mod edges;
 pub mod evaluation;
 pub mod freshness;
 #[cfg(test)]

@@ -76,10 +76,7 @@ fn ensure_bounded_and_unique(sources: &[SelectedSource]) -> Result<(), Selection
     }
 }
 
-pub(super) async fn ensure_planned_meeting(
-    pool: &SqlitePool,
-    id: &str,
-) -> Result<(), SelectionError> {
+async fn ensure_planned_meeting(pool: &SqlitePool, id: &str) -> Result<(), SelectionError> {
     let exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM planned_meetings WHERE id = ?)")
             .bind(id)
