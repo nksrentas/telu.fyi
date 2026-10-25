@@ -49,10 +49,18 @@ impl BriefingError {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimStatus {
+    Cited,
+    SourceUnavailable,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Claim {
     pub text: String,
+    pub status: ClaimStatus,
     pub source_ref: String,
     pub source: SelectedSource,
     pub passage_id: Option<String>,
@@ -85,6 +93,7 @@ pub(super) struct ClaimRow {
     knowledge_item_id: Option<String>,
     locator_json: Option<String>,
     quote: String,
+    status: String,
     pub(super) rationale: Option<String>,
 }
 
@@ -186,7 +195,7 @@ pub async fn load_claims(
 ) -> Result<Vec<Claim>, BriefingError> {
     sqlx::query_as::<_, ClaimRow>(
         "SELECT text, source_ref, document_version_id, passage_id, knowledge_meeting_id,
-                knowledge_item_id, locator_json, quote, rationale
+                knowledge_item_id, locator_json, quote, status, rationale
          FROM briefing_claims WHERE briefing_id = ? AND kind = 'statement' ORDER BY ordinal",
     )
     .bind(briefing_id)
@@ -274,6 +283,7 @@ pub(super) fn verify(
     };
     Ok(Claim {
         text: text.to_string(),
+        status: ClaimStatus::Cited,
         source_ref: source_ref.to_string(),
         source: piece_source(piece),
         passage_id,
@@ -403,8 +413,14 @@ pub(super) fn claim_from_row(row: ClaimRow) -> Result<Claim, BriefingError> {
         },
         _ => return Err(BriefingError::Storage),
     };
+    let status = match row.status.as_str() {
+        "cited" => ClaimStatus::Cited,
+        "source_unavailable" => ClaimStatus::SourceUnavailable,
+        _ => return Err(BriefingError::Storage),
+    };
     Ok(Claim {
         text: row.text,
+        status,
         source_ref: row.source_ref,
         source,
         passage_id: row.passage_id,

@@ -206,8 +206,26 @@ pub async fn mark_deleted(pool: &SqlitePool, id: &str) -> Result<bool, sqlx::Err
     .bind(id)
     .execute(&mut *tx)
     .await?;
+    sqlx::query(
+        "UPDATE briefing_claims SET status = 'source_unavailable', quote = ''
+         WHERE document_version_id IN (SELECT id FROM document_versions WHERE document_id = ?)",
+    )
+    .bind(id)
+    .execute(&mut *tx)
+    .await?;
     tx.commit().await?;
     Ok(true)
+}
+
+pub async fn citing_briefing_count(pool: &SqlitePool, id: &str) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT COUNT(DISTINCT c.briefing_id) FROM briefing_claims c
+         JOIN document_versions v ON v.id = c.document_version_id
+         WHERE v.document_id = ?",
+    )
+    .bind(id)
+    .fetch_one(pool)
+    .await
 }
 
 fn format_utc(value: DateTime<Utc>) -> String {
