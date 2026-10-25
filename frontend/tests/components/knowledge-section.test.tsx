@@ -30,7 +30,13 @@ mock.module('../../src/components/ui/popover', () => ({
 
 const notify = mock(() => {});
 mock.module('sonner', () => ({ toast: { info: notify, error: notify, success: notify, warning: notify } }));
-mock.module('@tauri-apps/api/event', () => ({ listen: async () => () => {} }));
+const listeners = new Map<string, (event: { payload: unknown }) => void>();
+mock.module('@tauri-apps/api/event', () => ({
+  listen: async (name: string, handler: (event: { payload: unknown }) => void) => {
+    listeners.set(name, handler);
+    return () => listeners.delete(name);
+  },
+}));
 
 const route = (validationState: EffectiveRoute['validationState']): EffectiveRoute => ({
   capability: 'summary',
@@ -83,9 +89,10 @@ const knowledge: MeetingKnowledgeView = {
 };
 
 let currentRoute = route('validated');
+let getMeeting: () => Promise<MeetingKnowledgeView> = async () => knowledge;
 const invoke = mock(async (command: string): Promise<unknown> => {
   if (command === 'get_current_provider_route') return currentRoute;
-  if (command === 'knowledge_get_meeting') return knowledge;
+  if (command === 'knowledge_get_meeting') return getMeeting();
   if (command === 'knowledge_list_runs') return [];
   if (command === 'validate_provider_route') return currentRoute;
   if (command === 'knowledge_cancel_extraction') return true;
@@ -113,6 +120,27 @@ describe('KnowledgeSection', () => {
   beforeEach(() => {
     invoke.mockClear();
     currentRoute = route('validated');
+    getMeeting = async () => knowledge;
+  });
+
+  test('ignores an older knowledge reply that arrives after a newer one', async () => {
+    const pending: Array<(view: MeetingKnowledgeView) => void> = [];
+    getMeeting = () => new Promise((resolve) => pending.push(resolve));
+    const stale = { ...knowledge, items: [{ ...knowledge.items[0], itemId: 'item-stale', text: 'Stale reply' }] };
+    const fresh = { ...knowledge, items: [{ ...knowledge.items[0], itemId: 'item-fresh', text: 'Fresh reply' }] };
+
+    const renderer = await renderSection();
+    await act(async () => {
+      listeners.get('knowledge-updated')?.({ payload: { meetingId: 'meeting-a' } });
+    });
+    expect(pending).toHaveLength(2);
+    await act(async () => pending[1](fresh));
+    await act(async () => pending[0](stale));
+
+    const itemIds = renderer.root.findAll((node) => typeof node.type === 'string' && node.props['data-item-id'] !== undefined)
+      .map((node) => node.props['data-item-id']);
+    expect(itemIds).toContain('item-fresh');
+    expect(itemIds).not.toContain('item-stale');
   });
 
   test('renders the candidate row text and its evidence quote as plain text', async () => {

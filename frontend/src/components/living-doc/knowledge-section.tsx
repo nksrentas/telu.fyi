@@ -64,10 +64,14 @@ function regenerateToast(run: KnowledgeRunView): string {
 
 function useMeetingKnowledge(meetingId: string) {
   const [knowledge, setKnowledge] = useState<MeetingKnowledgeView | null>(null);
+  const latestRequest = useRef(0);
   const reload = useCallback(async () => {
+    const request = ++latestRequest.current;
     try {
-      setKnowledge(await getMeetingKnowledge(meetingId));
+      const view = await getMeetingKnowledge(meetingId);
+      if (request === latestRequest.current) setKnowledge(view);
     } catch (error) {
+      if (request !== latestRequest.current) return;
       console.error('Failed to load meeting knowledge:', error);
       toast.error(KNOWLEDGE_COPY.generic);
     }
