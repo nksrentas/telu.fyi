@@ -401,8 +401,11 @@
         "frontend/src-tauri/src/documents/**",
         "frontend/src-tauri/tests/preparation_lifecycle.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "c2fe634",
+        "ran": "bash .loop/verify.sh (cargo test incl. tests/preparation_lifecycle.rs 3/3, bun, node, typecheck, gallery 164 passed)"
+      }
     },
     {
       "id": "L2",
