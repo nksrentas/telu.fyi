@@ -96,3 +96,18 @@ Learned:
 - ProviderBoundary emits new loading and validated objects on every refreshKey change, so a `[routeState]` effect sees each re-check.
 - The summary model's refreshKey from page-content.tsx is still not passed into KnowledgeSection, so a model change does not re-check the knowledge route by itself. Check again covers the stuck case.
 Next: T7
+
+## Session 7 · T7 · 2026-10-25
+Did: WR-46 and WR-47 in candidate-row.tsx.
+- Draft carries basedOnRevisionId, taken from the item when the editor opens. correct() sends it, not the item's revision at save time.
+- Enter saves only when not composing: nativeEvent.isComposing, or keyCode 229. WebKit (WKWebView) fires compositionend before the confirming Enter keydown, so isComposing alone misses it there.
+- 2 new tests in knowledge-review.test.tsx: the revision changes mid-edit via renderer.update, and Enter with isComposing, Enter with keyCode 229, then a plain Enter as the positive control. Both failed on base.
+Learned:
+- Run bun tests through tool.sh with a path relative to frontend/ (tests/components/...), not frontend/tests/...; otherwise nothing matches.
+- KnowledgeItemView.latestRevisionId is string | null.
+- A revision conflict (KNOWLEDGE_REVISION_CONFLICT) still shows the generic REVIEW_ERROR toast, and the draft stays open with the stale revision, so retries keep conflicting until the user discards and reopens. This is outside T7.
+- Edge left as is: if a concurrent change makes the item equal the user's draft, save treats it as unchanged and accepts or closes without a conflict. The content is what the user wanted.
+Lesson: [tests] the first gate failed typecheck: Draft.basedOnRevisionId was typed string but latestRevisionId is nullable → copy the field type from the service type, don't assume it.
+Lesson: [bussin-a11y] review found that isComposing alone misses IME Enter in WebKit, the app's only runtime → IME Enter guards check isComposing || keyCode === 229.
+Lesson: [tests] a guard computed at the top of a keydown handler broke an existing Escape test that passed no nativeEvent → read event fields only in the branch that needs them.
+Next: T8

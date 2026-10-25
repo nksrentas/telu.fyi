@@ -133,8 +133,13 @@
         "frontend/src/components/living-doc/candidate-row.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "a2a76b0",
+        "ran": "bash .loop/verify.sh (cargo test, bun tests, node/contract tests, typecheck 0 outside tests/ and 36 in tests/, 148 gallery passed); bun knowledge-review.test.tsx 18 pass",
+        "base_failure": "on base the revision test got basedOnRevisionId rev-2 (expected rev-1) and the IME test saw knowledge_correct_item called on Enter with isComposing true; the keyCode 229 case failed the same way before the WebKit guard",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "T8",
