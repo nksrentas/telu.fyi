@@ -35,8 +35,40 @@
     return value;
   };
 
+  const state = {};
+  const reviewedState = { accept: 'accepted', reject: 'rejected', restore: 'proposed', reopen: 'proposed' };
+
+  const readState = (entry) => {
+    if (!(entry.$state in state)) state[entry.$state] = expand(entry.initial);
+    return state[entry.$state];
+  };
+
+  const reviewInState = (key, { itemId, action }) => {
+    const meeting = state[key];
+    const current = meeting && [...meeting.items, ...meeting.rejected].find((item) => item.itemId === itemId);
+    if (!current) throw new Error(`unknown item in $review state ${key}: ${itemId}`);
+    const reviewState = reviewedState[action];
+    const view = { ...current, reviewState, eligibility: reviewState === 'accepted' && current.evidenceStatus === 'valid' };
+    const others = (list) => list.filter((item) => item.itemId !== itemId);
+    const upsert = (list) => (list.some((item) => item.itemId === itemId) ? list.map((item) => (item.itemId === itemId ? view : item)) : [...list, view]);
+    const rejected = reviewState === 'rejected';
+    const items = rejected ? others(meeting.items) : upsert(meeting.items);
+    state[key] = {
+      ...meeting,
+      items,
+      rejected: rejected ? upsert(meeting.rejected) : others(meeting.rejected),
+      pendingCount: items.filter((item) => item.reviewState === 'proposed').length,
+      acceptedCount: items.filter((item) => item.reviewState === 'accepted').length,
+    };
+    return view;
+  };
+
+  const isDirective = (entry, key) => entry && typeof entry === 'object' && !Array.isArray(entry) && key in entry;
+
   const resolveEntry = (entry, args) => {
-    if (entry && typeof entry === 'object' && !Array.isArray(entry) && '$byArg' in entry) {
+    if (isDirective(entry, '$state')) return readState(entry);
+    if (isDirective(entry, '$review')) return reviewInState(entry.$review, args || {});
+    if (isDirective(entry, '$byArg')) {
       const key = String((args || {})[entry.$byArg]);
       return expand(key in entry.cases ? entry.cases[key] : entry.default);
     }

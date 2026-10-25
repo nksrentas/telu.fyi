@@ -189,6 +189,225 @@
     ]
   },
   {
+    "name": "knowledge-review-undo",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000001",
+          "sequence": 0,
+          "text": "Good morning, let's start the weekly product sync.",
+          "audioStartTime": 4.0,
+          "audioEndTime": 8.5,
+          "captureCompleteness": "complete"
+        },
+        {
+          "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+          "sequence": 1,
+          "text": "We decided to ship the beta on Friday.",
+          "audioStartTime": 12.0,
+          "audioEndTime": 15.8,
+          "captureCompleteness": "complete"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "$state": "meeting",
+        "initial": {
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "latestRun": {
+            "runId": "0197a1b2-0002-7000-8000-000000000001",
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "triggerKind": "user",
+            "status": "succeeded",
+            "providerId": "builtin-ai",
+            "modelId": "qwen3.5:4b",
+            "locationClass": "local",
+            "sanitizedOrigin": "This device",
+            "promptVersion": "knowledge-extract-v2",
+            "inputEvidenceCount": 2,
+            "proposedCount": 4,
+            "skippedCount": 0,
+            "suppressedCount": 0,
+            "reconfirmedCount": 0,
+            "duplicateCount": 0,
+            "failureCode": null,
+            "startedAtUtc": "2026-09-27T09:46:00Z",
+            "finishedAtUtc": "2026-09-27T09:46:40Z"
+          },
+          "items": [
+            {
+              "itemId": "0197a1b2-0003-7000-8000-000000000001",
+              "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+              "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+              "itemType": "decision",
+              "text": "Ship the beta on Friday",
+              "ownerText": null,
+              "ownerSupport": "not_stated",
+              "dueText": "Friday",
+              "dueSupport": "stated",
+              "reviewState": "proposed",
+              "eligibility": false,
+              "evidenceStatus": "valid",
+              "corrected": false,
+              "latestRevisionId": null,
+              "unresolved": true,
+              "createdAtUtc": "2026-09-27T09:46:40Z",
+              "evidence": [
+                {
+                  "linkId": "0197a1b2-0004-7000-8000-000000000001",
+                  "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                  "role": "claim",
+                  "quoteText": "ship the beta on Friday",
+                  "rawStart": 14,
+                  "rawEnd": 37,
+                  "sequence": 1,
+                  "audioStartTime": 12.0,
+                  "audioEndTime": 15.8,
+                  "segmentCaptureIncomplete": false
+                }
+              ]
+            },
+            {
+              "itemId": "0197a1b2-0003-7000-8000-000000000002",
+              "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+              "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+              "itemType": "commitment",
+              "text": "Maria sends the launch checklist to design",
+              "ownerText": "Maria",
+              "ownerSupport": "stated",
+              "dueText": "by Wednesday",
+              "dueSupport": "stated",
+              "reviewState": "proposed",
+              "eligibility": false,
+              "evidenceStatus": "valid",
+              "corrected": false,
+              "latestRevisionId": null,
+              "unresolved": false,
+              "createdAtUtc": "2026-09-27T09:46:40Z",
+              "evidence": [
+                {
+                  "linkId": "0197a1b2-0004-7000-8000-000000000002",
+                  "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                  "role": "claim",
+                  "quoteText": "ship the beta on Friday",
+                  "rawStart": 14,
+                  "rawEnd": 37,
+                  "sequence": 1,
+                  "audioStartTime": 12.0,
+                  "audioEndTime": 15.8,
+                  "segmentCaptureIncomplete": false
+                }
+              ]
+            },
+            {
+              "itemId": "0197a1b2-0003-7000-8000-000000000003",
+              "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+              "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+              "itemType": "question",
+              "text": "Do we need a second QA pass before the beta?",
+              "ownerText": null,
+              "ownerSupport": "not_stated",
+              "dueText": null,
+              "dueSupport": "not_stated",
+              "reviewState": "proposed",
+              "eligibility": false,
+              "evidenceStatus": "valid",
+              "corrected": false,
+              "latestRevisionId": null,
+              "unresolved": true,
+              "createdAtUtc": "2026-09-27T09:46:40Z",
+              "evidence": [
+                {
+                  "linkId": "0197a1b2-0004-7000-8000-000000000003",
+                  "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                  "role": "claim",
+                  "quoteText": "ship the beta on Friday",
+                  "rawStart": 14,
+                  "rawEnd": 37,
+                  "sequence": 1,
+                  "audioStartTime": 12.0,
+                  "audioEndTime": 15.8,
+                  "segmentCaptureIncomplete": false
+                }
+              ]
+            },
+            {
+              "itemId": "0197a1b2-0003-7000-8000-000000000004",
+              "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+              "originRunId": "0197a1b2-0002-7000-8000-000000000001",
+              "itemType": "fact",
+              "text": "The beta group has 240 people",
+              "ownerText": null,
+              "ownerSupport": "not_stated",
+              "dueText": null,
+              "dueSupport": "not_stated",
+              "reviewState": "proposed",
+              "eligibility": false,
+              "evidenceStatus": "valid",
+              "corrected": false,
+              "latestRevisionId": null,
+              "unresolved": true,
+              "createdAtUtc": "2026-09-27T09:46:40Z",
+              "evidence": [
+                {
+                  "linkId": "0197a1b2-0004-7000-8000-000000000004",
+                  "evidenceId": "0197a1b2-0001-7000-8000-000000000002",
+                  "role": "claim",
+                  "quoteText": "ship the beta on Friday",
+                  "rawStart": 14,
+                  "rawEnd": 37,
+                  "sequence": 1,
+                  "audioStartTime": 12.0,
+                  "audioEndTime": 15.8,
+                  "segmentCaptureIncomplete": false
+                }
+              ]
+            }
+          ],
+          "rejected": [],
+          "pendingCount": 4,
+          "acceptedCount": 0,
+          "skippedCount": 0
+        }
+      },
+      "knowledge_review_item": {
+        "$review": "meeting"
+      }
+    },
+    "steps": [
+      {
+        "hover": "#knowledge-heading"
+      },
+      {
+        "waitFor": "text=Accept all"
+      },
+      {
+        "click": "[data-item-id=\"0197a1b2-0003-7000-8000-000000000001\"] button:text-is(\"Accept\")"
+      },
+      {
+        "waitFor": "[data-sonner-toast]:has-text(\"Accepted — eligible for later meetings\")"
+      },
+      {
+        "click": "[data-item-id=\"0197a1b2-0003-7000-8000-000000000002\"] button[aria-label=\"Reject\"]"
+      },
+      {
+        "waitFor": "[data-sonner-toast]:has-text(\"Rejected — it won't come back unless you restore it\")"
+      },
+      {
+        "click": "[data-sonner-toast]:has-text(\"Accepted — eligible for later meetings\") button:has-text(\"Undo\")"
+      },
+      {
+        "waitFor": "[data-item-id=\"0197a1b2-0003-7000-8000-000000000001\"] button:text-is(\"Accept\")"
+      },
+      {
+        "click": "button:has-text(\"Rejected (1)\")"
+      },
+      {
+        "waitFor": "[data-item-id=\"0197a1b2-0003-7000-8000-000000000002\"] >> text=Restore"
+      }
+    ]
+  },
+  {
     "name": "knowledge-accepted-corrected",
     "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
     "ipc": {
