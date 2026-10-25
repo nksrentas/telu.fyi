@@ -217,3 +217,17 @@ Learned:
 - Candidate rows and rejected rows both carry data-item-id, so `[data-item-id="…"] button:text-is("Accept")` scopes a step to one row. Accepted rows also show a Reject button, so an unscoped `button[aria-label="Reject"]` can hit the wrong row.
 - Sonner toasts match `[data-sonner-toast]:has-text("…")`.
 Next: T18
+
+## Session 18 · T18 · 2026-10-25
+Did: automated human check 5. New tests/knowledge_review_loop.rs, one test. It uses its own staged completer: the extraction reply is returned once, and every other stage gets `{"items": []}`. The test then drives these steps through the public API:
+- run_extraction proposes 3 items.
+- Accept A. Correct C with owner Maria. Reject B.
+- Regenerate with A, B as a decision, B retyped as a commitment, C and a new D. Counts are proposed 1, suppressed 2, reconfirmed 2. B is absent from the items, and C stays accepted, eligible, corrected and owned by Maria.
+- Restore B. B is back in review: same id, origin is the first run, proposed, not eligible, not corrected, no owner. accepted 2, pending 2. deletion_impact is {2, 2, 0, 2}.
+- delete_meeting_then_cancel_extraction. Every meeting_id table has 0 rows, the meetings row is gone, and the view is empty.
+No knowledge/ change was needed; all of it was already pub. It passed the first time it ran. As a not-a-fix item, it has no base-failure proof.
+Learned:
+- knowledge::test_support is cfg(test) and crate-private. Integration tests need their own staged completer. EXTRACTION_SYSTEM_PROMPT is pub and can be used as a match pattern.
+- Empty support and followup replies keep every candidate: apply_support counts them as unparsed.
+Lesson: [this project] the first gate failed on rustfmt for the new test file → run `rustfmt --edition 2021` on every new .rs file before the gate. Only files that were not clean on base keep the long-line style.
+Next: T19

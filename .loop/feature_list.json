@@ -346,8 +346,13 @@
       "touches": [
         "frontend/src-tauri/tests/knowledge_review_loop.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "546b255",
+        "ran": "cargo test --features coreml --test knowledge_review_loop (1 passed); bash .loop/verify.sh all steps passed (gallery 152)",
+        "review": "read-only subagent: spec, standards, lean all none",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "TE1",
