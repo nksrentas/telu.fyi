@@ -249,3 +249,10 @@ Did: useRowActions.perform (candidate-row.tsx) and RejectedRow.restore (rejected
 - Undo needed no change: useUndo drops its entry before it awaits, so a second click finds nothing. Its test is a regression guard and passed on base.
 Learned: a disabled={busy} button does not stop two clicks dispatched before React re-renders; only a ref set synchronously does. Accept all (review-block useAcceptAll) has the same state-only busy and remains unguarded. It is out of this item's scope.
 Next: next failing item in feature_list.json
+
+## Session 21 · TE3 · 2026-10-25
+Did: TE3 was test-only. The code already covered every edge.
+- Rust: one new test in transcript_search_tests seeds 60 meetings. Their evidence text holds "Cafe\u{301}" and a 500-char x run. The counts are [50, 50, 0, 50, 0] for these queries: "a", "\u{301}", "\u{301}\u{308}", the 500-char hit and the 500-char miss. Nothing panics, and every query stays within LIMIT 50.
+- bun: search-popover.test.tsx types '', spaces, '\t\n ' and NBSP plus ideographic space. It sees zero api_search_transcripts calls.
+Learned: blank queries are guarded twice, by useDebouncedSearch(trimmed) in search-popover.tsx and by the `!query.trim()` check in SidebarProvider.searchTranscripts. Removing just one guard keeps the bun test green. Removing both makes it fail, which I checked.
+Next: next failing item in feature_list.json

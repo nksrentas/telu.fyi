@@ -411,8 +411,12 @@
         "frontend/src/components/app-shell/search-popover.tsx",
         "frontend/tests/components/search-popover.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "8119f7f",
+        "ran": "bash .loop/verify.sh (gate: all steps passed, 152 gallery); cargo test transcript_search --lib 13 passed; bun search-popover.test.tsx 3 pass",
+        "notes": "Test-only edge item: code already handled these. New Rust test gives counts [50,50,0,50,0] for 'a', U+0301, U+0301U+0308, 500-char hit, 500-char miss over 60 meetings. Bun test sends '', spaces, tab/newline, NBSP/ideographic space and sees zero api_search_transcripts calls; it fails when the trim guards in search-popover.tsx and SidebarProvider.tsx are both removed."
+      }
     },
     {
       "id": "TR1",
