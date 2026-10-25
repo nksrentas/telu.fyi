@@ -352,6 +352,39 @@ describe('ReviewBlock', () => {
     error.mockRestore();
   });
 
+  test('Accept all counts and undoes only the requested items Rust accepted', async () => {
+    const success = spyOn(toast, 'success');
+    const earlier = accepted({ itemId: 'item-4' });
+    responses.knowledge_accept_all = () => view([accepted(), accepted({ itemId: 'item-2' }), item({ itemId: 'item-3' }), earlier]);
+    responses.knowledge_review_item = (args) => item({ itemId: String(args.itemId) });
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' }), item({ itemId: 'item-3' }), earlier])} />);
+    await click('Accept all');
+    expect(ipc.mock.calls.find(([command]) => command === 'knowledge_accept_all')?.[1]).toEqual({ meetingId: 'meeting-a', itemIds: ['item-1', 'item-2', 'item-3'] });
+    expect(success.mock.calls[0]?.[0]).toBe('Accepted 2 items');
+
+    await act(async () => (success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick());
+    await settle();
+    expect(reviewCalls()).toEqual([
+      { meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' },
+      { meetingId: 'meeting-a', itemId: 'item-2', action: 'reopen' },
+    ]);
+    success.mockRestore();
+  });
+
+  test('Accept all with nothing accepted by Rust says so and offers no Undo', async () => {
+    const info = spyOn(toast, 'info');
+    const success = spyOn(toast, 'success');
+    responses.knowledge_accept_all = () => view([item(), item({ itemId: 'item-2' })]);
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+    await click('Accept all');
+    const successCalls = success.mock.calls.length;
+    const infoCalls = info.mock.calls;
+    info.mockRestore();
+    success.mockRestore();
+    expect(successCalls).toBe(0);
+    expect(infoCalls).toEqual([[REVIEW_TOAST.noneAccepted]]);
+  });
+
   test('single Accept and Reject offer Undo and ⌘Z; ⌘Z in a text field and corrections do nothing', async () => {
     const success = spyOn(toast, 'success');
     responses.knowledge_review_item = (args) =>

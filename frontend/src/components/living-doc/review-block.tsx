@@ -20,6 +20,7 @@ export const REVIEW_TOAST = {
   rejected: "Rejected — it won't come back unless you restore it",
   restored: "Restored — it's back in review",
   corrected: 'Correction saved — Telu keeps your wording',
+  noneAccepted: 'Nothing was accepted — these items were already reviewed',
 };
 
 interface UndoEntry {
@@ -129,11 +130,15 @@ function useAcceptAll(meetingId: string, items: KnowledgeItemView[], apply: (vie
     try {
       const result = await acceptAllKnowledgeItems(meetingId, itemIds);
       const stagger = prefersReducedMotion() ? 0 : ACCEPT_ALL_STAGGER_MS;
-      itemIds.forEach((itemId, index) => {
-        const view = result.items.find((item) => item.itemId === itemId);
-        if (view) window.setTimeout(() => apply(view), index * stagger);
-      });
-      toast.success(`Accepted ${itemIds.length} items`, withUndo({ itemIds, action: 'reopen' }));
+      const requested = new Set(itemIds);
+      const views = result.items.filter((item) => requested.has(item.itemId));
+      views.forEach((view, index) => window.setTimeout(() => apply(view), index * stagger));
+      const acceptedIds = views.filter((view) => view.reviewState === 'accepted').map((view) => view.itemId);
+      if (acceptedIds.length === 0) {
+        toast.info(REVIEW_TOAST.noneAccepted);
+        return;
+      }
+      toast.success(`Accepted ${acceptedIds.length} items`, withUndo({ itemIds: acceptedIds, action: 'reopen' }));
     } catch (error) {
       console.error('Failed to accept all knowledge items:', error);
       toast.error(REVIEW_ERROR);
