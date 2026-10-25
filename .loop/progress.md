@@ -171,3 +171,13 @@ Learned:
 - The extraction registry is a process-global map keyed by "knowledge:{meeting_id}" with no trim. Tests in one binary run in parallel, so each test that registers an extraction needs its own meeting id.
 - The app pool never sets foreign_keys, but sqlx's SqliteConnectOptions turns it on by default. So an extraction that writes after its meeting is deleted, in the moment before cancel, gets a foreign-key error instead of leaving orphan rows.
 Next: T14
+
+## Session 14 · T14 · 2026-10-25
+Did: WR-82, WR-83 and WR-84, test-only.
+- knowledge-run.test.tsx: the revalidate test now asserts that validate_provider_route was called (index >= 0) before comparing its order with knowledge_start_extraction.
+- knowledge-review.test.tsx: the corrections-offer-no-Undo test asserts the corrected toast exists before reading its options. The invalid-evidence test feeds evidenceStatus 'changed' with eligibility: true and asserts that 'Accepted · eligible' is absent. The UI hides AcceptedStatus whenever evidenceProblem(item) is set, so the row can't show eligible even when Rust says it is.
+- Each test failed under a scratch edit that broke its behaviour (see the evidence). The scratch edits were reverted.
+Learned:
+- candidate-row.tsx derives "not eligible" from evidenceStatus for rows with an evidence problem (evidenceProblem). It reads item.eligibility only for valid accepted rows.
+- The scratch-break check works as edit → bun test -t '<name>' → git checkout -- <file>, with no stash.
+Next: T15

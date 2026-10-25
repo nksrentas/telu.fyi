@@ -268,8 +268,13 @@
         "frontend/tests/components/knowledge-run.test.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "aa29521",
+        "ran": "bash .loop/verify.sh green (cargo 486 lib + integration, bun 150 pass, typecheck 0 src / 36 tests, gallery 150 passed); bun test knowledge-run + knowledge-review 31 pass",
+        "scratch_failures": "WR-82: validateProviderRoute removed from knowledge-section.tsx -> 'expect(received).toBeGreaterThanOrEqual(expected) Expected: >= 0 Received: -1'. WR-83: toast.success(REVIEW_TOAST.corrected) removed in review-block.tsx -> 'expect(received).toBeDefined() Received: undefined'. WR-84: AcceptedStatus rendered despite evidence problem in candidate-row.tsx -> 'Expected to not contain: \"Accepted · eligible\"' (received '...Evidence changed — not eligible...✓ Accepted · eligible...'). Scratch edits reverted with git checkout, not committed.",
+        "browser": "not required (ui: false)"
+      }
     },
     {
       "id": "T15",
