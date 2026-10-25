@@ -26,6 +26,7 @@ export const REVIEW_ERROR = "Couldn't save that. Nothing changed.";
 export const EMPTY_TEXT_ERROR = "Text can't be empty.";
 export const TEXT_LIMIT = 400;
 export const FIELD_LIMIT = 80;
+const IME_KEY_CODE = 229;
 
 export const ROW_GRID =
   'grid grid-cols-1 items-center gap-1.5 rounded-[12px] py-2.5 pl-3.5 pr-3 @[601px]:grid-cols-[112px_minmax(0,1fr)_auto] @[601px]:gap-3';
@@ -41,6 +42,7 @@ interface Draft {
   text: string;
   owner: string;
   due: string;
+  basedOnRevisionId: string | null;
 }
 
 export function evidenceProblem(item: KnowledgeItemView): string | null {
@@ -50,7 +52,7 @@ export function evidenceProblem(item: KnowledgeItemView): string | null {
 }
 
 function draftFrom(item: KnowledgeItemView): Draft {
-  return { text: item.text, owner: item.ownerText ?? '', due: item.dueText ?? '' };
+  return { text: item.text, owner: item.ownerText ?? '', due: item.dueText ?? '', basedOnRevisionId: item.latestRevisionId };
 }
 
 interface FieldValueProps {
@@ -109,6 +111,10 @@ interface CorrectionFormProps {
   onDiscard: () => void;
 }
 
+function isComposing(event: KeyboardEvent<HTMLElement>) {
+  return event.nativeEvent.isComposing || event.nativeEvent.keyCode === IME_KEY_CODE;
+}
+
 function CorrectionForm({ draft, error, onChange, onSave, onDiscard }: CorrectionFormProps) {
   const textRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -120,7 +126,7 @@ function CorrectionForm({ draft, error, onChange, onSave, onDiscard }: Correctio
       event.preventDefault();
       event.stopPropagation();
       onDiscard();
-    } else if (event.key === 'Enter' && !event.shiftKey) {
+    } else if (event.key === 'Enter' && !event.shiftKey && !isComposing(event)) {
       event.preventDefault();
       onSave();
     }
@@ -179,7 +185,7 @@ function useRowActions(meetingId: string, item: KnowledgeItemView, onDecided: (d
         text: draft.text.trim(),
         ownerText: draft.owner.trim() || null,
         dueText: draft.due.trim() || null,
-        basedOnRevisionId: item.latestRevisionId,
+        basedOnRevisionId: draft.basedOnRevisionId,
       })
     );
   return { busy, review, correct };

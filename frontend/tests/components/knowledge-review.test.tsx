@@ -288,6 +288,53 @@ describe('CandidateRow', () => {
     expect(root().findAll((node) => node.type === 'textarea')).toHaveLength(0);
   });
 
+  test('a correction is based on the revision the editor opened from, not one that arrived while editing', async () => {
+    responses.knowledge_correct_item = () => accepted({ corrected: true, latestRevisionId: 'rev-3' });
+    const decided = mock(() => {});
+    await renderRow(item(), decided);
+    await click('Correct');
+    await act(async () => {
+      renderer!.update(
+        <TooltipProvider>
+          <CandidateRow meetingId="meeting-a" item={item({ text: 'Changed elsewhere', latestRevisionId: 'rev-2' })} run={null} onDecided={decided} />
+        </TooltipProvider>
+      );
+    });
+    const textarea = root().find((node) => node.type === 'textarea');
+    await act(async () => textarea.props.onChange({ target: { value: 'Maria sends the final draft' } }));
+    await click('Save correction');
+    const [, args] = ipc.mock.calls.find(([command]) => command === 'knowledge_correct_item')!;
+    expect((args as { correction: { basedOnRevisionId: string } }).correction.basedOnRevisionId).toBe('rev-1');
+  });
+
+  test('Enter during an IME composition does not save the correction', async () => {
+    responses.knowledge_correct_item = () => accepted({ corrected: true });
+    await renderRow(item());
+    await click('Correct');
+    const textarea = () => root().find((node) => node.type === 'textarea');
+    await act(async () => textarea().props.onChange({ target: { value: 'マリアが送る' } }));
+    const preventDefault = mock(() => {});
+    await act(async () =>
+      textarea().props.onKeyDown({ key: 'Enter', shiftKey: false, nativeEvent: { isComposing: true }, preventDefault, stopPropagation: () => {} })
+    );
+    await settle();
+    expect(ipc.mock.calls.some(([command]) => command === 'knowledge_correct_item')).toBe(false);
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(root().findAll((node) => node.type === 'textarea')).toHaveLength(1);
+
+    await act(async () =>
+      textarea().props.onKeyDown({ key: 'Enter', shiftKey: false, nativeEvent: { isComposing: false, keyCode: 229 }, preventDefault, stopPropagation: () => {} })
+    );
+    await settle();
+    expect(ipc.mock.calls.some(([command]) => command === 'knowledge_correct_item')).toBe(false);
+
+    await act(async () =>
+      textarea().props.onKeyDown({ key: 'Enter', shiftKey: false, nativeEvent: { isComposing: false, keyCode: 13 }, preventDefault, stopPropagation: () => {} })
+    );
+    await settle();
+    expect(ipc.mock.calls.some(([command]) => command === 'knowledge_correct_item')).toBe(true);
+  });
+
   test('invalid evidence is never eligible and keeps Reject and Correct…; unresolved accepted fields turn amber', async () => {
     await renderRow(accepted({ evidenceStatus: 'changed', eligibility: false }));
     expect(textOf(root())).toContain('Evidence changed — not eligible');
