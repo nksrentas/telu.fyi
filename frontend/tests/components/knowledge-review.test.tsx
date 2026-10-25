@@ -185,6 +185,32 @@ async function pressUndo(target?: { tagName: string }) {
   await settle();
 }
 
+function fakeWindowTimers() {
+  const win = globals.window as unknown as Record<string, unknown>;
+  const real = { set: win.setTimeout, clear: win.clearTimeout };
+  const queue = new Map<number, () => void>();
+  let handles = 0;
+  win.setTimeout = (callback: () => void) => {
+    handles += 1;
+    queue.set(handles, callback);
+    return handles;
+  };
+  win.clearTimeout = (handle: number) => queue.delete(handle);
+  return {
+    queue,
+    flush: () => act(() => {
+      for (const [handle, callback] of [...queue]) {
+        queue.delete(handle);
+        callback();
+      }
+    }),
+    restore: () => {
+      win.setTimeout = real.set;
+      win.clearTimeout = real.clear;
+    },
+  };
+}
+
 beforeEach(() => {
   ipc.mockClear();
   responses = {};
@@ -474,6 +500,85 @@ describe('ReviewBlock', () => {
     success.mockRestore();
     info.mockRestore();
     dismiss.mockRestore();
+  });
+
+  test('a decision made during the Accept-all stagger survives the late timers; unmount clears them', async () => {
+    const timers = fakeWindowTimers();
+    try {
+      responses.knowledge_accept_all = (args) => view((args.itemIds as string[]).map((itemId) => accepted({ itemId })));
+      responses.knowledge_review_item = (args) => item({ itemId: String(args.itemId), reviewState: 'rejected' });
+      await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+      await click('Accept all');
+      expect(timers.queue.size).toBe(2);
+      await act(async () => buttons('Reject')[0].props.onClick());
+      await settle();
+      timers.flush();
+      expect(buttons('Rejected (1)')).toHaveLength(1);
+      expect(textOf(root()).split('✓ Accepted · eligible')).toHaveLength(2);
+
+      const changes = mock(() => {});
+      await render(<ReviewBlock meetingId="meeting-a" knowledge={view([item(), item({ itemId: 'item-2' })])} onChange={changes} />);
+      await click('Accept all');
+      expect(timers.queue.size).toBe(2);
+      unmount();
+      expect(timers.queue.size).toBe(0);
+      expect(changes).not.toHaveBeenCalled();
+
+      let resolveAcceptAll: (value: unknown) => void = () => {};
+      responses.knowledge_accept_all = (args) => new Promise((resolve) => {
+        resolveAcceptAll = () => resolve(view((args.itemIds as string[]).map((itemId) => accepted({ itemId }))));
+      });
+      await render(<ReviewBlock meetingId="meeting-a" knowledge={view([item(), item({ itemId: 'item-2' })])} onChange={changes} />);
+      await act(async () => button('Accept all').props.onClick());
+      unmount();
+      await act(async () => resolveAcceptAll(undefined));
+      await settle();
+      expect(timers.queue.size).toBe(0);
+      expect(changes).not.toHaveBeenCalled();
+    } finally {
+      timers.restore();
+    }
+  });
+
+  test('the ⌘Z listener is attached once across re-renders', async () => {
+    const win = globals.window!;
+    const realAdd = win.addEventListener as EventTarget['addEventListener'];
+    const added: string[] = [];
+    win.addEventListener = (type: string, listener: EventListenerOrEventListenerObject) => {
+      added.push(type);
+      realAdd(type, listener);
+    };
+    try {
+      await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+      for (let index = 0; index < 5; index += 1) {
+        await act(async () => renderer!.update(<TooltipProvider><Harness initial={view([item()])} /></TooltipProvider>));
+      }
+    } finally {
+      win.addEventListener = realAdd;
+    }
+    expect(added.filter((type) => type === 'keydown')).toHaveLength(1);
+  });
+
+  test('an Undo entry expires when its toast closes', async () => {
+    const success = spyOn(toast, 'success');
+    const info = spyOn(toast, 'info');
+    type Closable = { onAutoClose: () => void; onDismiss: () => void };
+    const closeOf = (calls: unknown[][]) => calls[0]?.[1] as Closable;
+    responses.knowledge_review_item = (args) =>
+      args.action === 'accept' ? accepted({ itemId: String(args.itemId) }) : item({ itemId: String(args.itemId), reviewState: 'rejected' });
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+    await act(async () => buttons('Accept')[0].props.onClick());
+    await settle();
+    await act(async () => buttons('Reject')[0].props.onClick());
+    await settle();
+    closeOf(success.mock.calls).onAutoClose();
+    closeOf(info.mock.calls).onDismiss();
+
+    const calls = reviewCalls().length;
+    await pressUndo();
+    expect(reviewCalls()).toHaveLength(calls);
+    success.mockRestore();
+    info.mockRestore();
   });
 
   test('living-doc sources never render raw HTML or the memory label', () => {
