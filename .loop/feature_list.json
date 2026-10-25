@@ -390,8 +390,12 @@
         "frontend/src/components/living-doc/rejected-group.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "01b880e",
+        "ran": "bash .loop/verify.sh (full gate incl. 152 gallery screens) passed; bun knowledge-review.test.tsx 26 pass. Base proof: Accept, Reject and Restore double-click tests failed on base with 2 knowledge_review_item calls each (busy state alone does not block a second click before re-render). Undo already passed on base (useUndo drops its entry before awaiting) and is kept as a regression guard.",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "TE3",

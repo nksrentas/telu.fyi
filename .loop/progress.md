@@ -242,3 +242,10 @@ Lesson: [tests] I copied a direct `as { action }` cast from an older test, and t
 Lesson: [this project] review found that a batch Undo with a stale second item would claim "Nothing was undone" → when an error message makes a claim about state, test the multi-item path where part of the work already happened.
 Lesson: [tests] review flagged a test line asserting a constant equals its literal → put the spec's literal in the behavioural assertion itself.
 Next: next failing item in feature_list.json
+
+## Session 20 · TE2 · 2026-10-25
+Did: useRowActions.perform (candidate-row.tsx) and RejectedRow.restore (rejected-group.tsx) now have a useRef in-flight guard next to their busy state. A second call while the first is pending returns at once. That covers Accept, Reject, Restore, and also Correct save, Reopen and the accepted-row Reject, which share perform.
+- Tests: a nested describe in knowledge-review.test.tsx holds each knowledge_review_item promise open and calls the captured onClick twice in one act, so no re-render happens in between. It expects exactly one call per control. On base, Accept, Reject and Restore failed with 2 calls each.
+- Undo needed no change: useUndo drops its entry before it awaits, so a second click finds nothing. Its test is a regression guard and passed on base.
+Learned: a disabled={busy} button does not stop two clicks dispatched before React re-renders; only a ref set synchronously does. Accept all (review-block useAcceptAll) has the same state-only busy and remains unguarded. It is out of this item's scope.
+Next: next failing item in feature_list.json
