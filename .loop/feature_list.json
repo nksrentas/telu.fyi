@@ -323,8 +323,12 @@
         "frontend/tests/visual/screens/preparation.json",
         "frontend/tests/visual/fixtures/base-ipc.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "ddebbd5",
+        "ran": "bash .loop/verify.sh (gate: all steps passed; bun 8 new tests in tests/components/knowledge-picker.test.tsx; 166 gallery screens)",
+        "browser": "WebKit gallery preparation-knowledge-picker, light and dark: two meetings expanded, 3 + 2 eligible items with type and date, proposed item hidden, selected items filled"
+      }
     },
     {
       "id": "U5",
