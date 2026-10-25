@@ -1,9 +1,0 @@
-{
-  "id": "E3",
-  "passes": true,
-  "evidence": {
-    "commit": "cc681eda170deac4835484ca700ec449b2c1aef3",
-    "ran": "bash .loop/verify.sh (gate.sh: cargo lib + integration, bun, node, typecheck, gallery 176 passed); cargo test preparation::edges --lib 3 passed"
-  },
-  "notes": "Did: preparation/edges.rs (#[cfg(test)], 3 tests) through commands::begin/execute/get_briefing. begin refuses an empty saved selection with PREP_NO_SOURCES before any run is registered or stored (it calls selection::list, which also checks the planned meeting, so ensure_planned_meeting is now private to selection.rs). briefing::compose returns an empty Draft without calling the model when the context has no pieces, so a selection whose every source is deleted or missing stores a completed briefing with 0 claims and 0 questions, with its manifest entries deleted DOCUMENT_DELETED / missing MANAGED_FILE_MISSING. StoredBriefing (prep_get_briefing) gains nothing_used: bool (camelCase nothingUsed), derived on read: true when no manifest entry is included or truncated. A managed file removed from disk shows as missing, its text never reaches the prompt, and a staged reply citing it (S1#0) stores 0 claims, dropping 1 statement and 1 question. commands_tests a_second_generate_while_one_runs_is_refused now selects a source first.\nAssumptions: an all-unusable selection is not refused. It runs, and the briefing says nothing could be used (nothing_used) instead of an empty or invented one. An all-omitted selection (over budget) is treated the same way.\nLearned: preparation-service.ts StoredBriefing has no nothingUsed field yet, and the UI does not map PREP_NO_SOURCES or render nothing_used. U6 (manifest popover) or the briefing block should add both. The gallery screen peek-inline-transcript light failed once more in the first full gate under load and passed on the rerun."
-}

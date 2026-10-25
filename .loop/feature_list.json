@@ -505,8 +505,11 @@
       "touches": [
         "frontend/src-tauri/src/preparation/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "cc681eda170deac4835484ca700ec449b2c1aef3",
+        "ran": "bash .loop/verify.sh (gate.sh: cargo lib + integration, bun, node, typecheck, gallery 176 passed); cargo test preparation::edges --lib 3 passed"
+      }
     },
     {
       "id": "E4",
