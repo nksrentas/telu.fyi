@@ -4,9 +4,13 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import type { TranscriptDrawerHandle } from '../../src/components/living-doc/transcript-drawer';
 
 type TauriWindow = { __TAURI_INTERNALS__: { invoke: typeof ipcInvoke } };
+type KeyListener = (event: { key: string; defaultPrevented: boolean }) => void;
+type TestDocument = { addEventListener: (type: string, listener: KeyListener) => void; removeEventListener: (type: string, listener: KeyListener) => void };
 
 const globalWithWindow = globalThis as typeof globalThis & { window?: TauriWindow };
 const originalWindow = globalWithWindow.window;
+const globalWithDocument = globalThis as unknown as { document?: TestDocument };
+const originalDocument = globalWithDocument.document;
 
 let readEvidence: () => Promise<unknown[]> = async () => [];
 let legacyLines: unknown[] = [];
@@ -159,5 +163,31 @@ describe('TranscriptDrawer', () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     });
     expect(lines().some((node) => node.props['data-line'] === 'S1200')).toBe(true);
+  });
+});
+
+describe('TranscriptDrawer Escape', () => {
+  const keyListeners = new Set<KeyListener>();
+  beforeAll(() => {
+    globalWithDocument.document = {
+      addEventListener: (type, listener) => { if (type === 'keydown') keyListeners.add(listener); },
+      removeEventListener: (type, listener) => { if (type === 'keydown') keyListeners.delete(listener); },
+    };
+  });
+  afterAll(() => {
+    globalWithDocument.document = originalDocument;
+  });
+  const press = (defaultPrevented: boolean) =>
+    act(async () => keyListeners.forEach((listener) => listener({ key: 'Escape', defaultPrevented })));
+
+  test('an Escape already handled by an open popover leaves the drawer open; the next Escape closes it', async () => {
+    const onClose = mock(() => {});
+    await render(drawer({ onClose }));
+
+    await press(true);
+    expect(onClose).not.toHaveBeenCalled();
+
+    await press(false);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

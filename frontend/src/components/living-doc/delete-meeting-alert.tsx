@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { AlertDialog } from 'radix-ui';
@@ -35,6 +35,7 @@ export function deletionBody(impact: KnowledgeDeletionImpact): string {
 
 function useDeletionImpact(meetingId: string, open: boolean) {
   const [state, setState] = useState<ImpactState>({ status: 'loading' });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!open) return;
     let current = true;
@@ -50,8 +51,9 @@ function useDeletionImpact(meetingId: string, open: boolean) {
     return () => {
       current = false;
     };
-  }, [meetingId, open]);
-  return state;
+  }, [meetingId, open, attempt]);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
+  return { state, retry };
 }
 
 interface DeleteMeetingAlertProps {
@@ -66,7 +68,7 @@ interface DeleteMeetingAlertProps {
 export function DeleteMeetingAlert({ meetingId, title, open, onOpenChange, onDeleted, navigateHome = true }: DeleteMeetingAlertProps) {
   const router = useRouter();
   const cancelRef = useRef<HTMLButtonElement>(null);
-  const impactState = useDeletionImpact(meetingId, open);
+  const { state: impactState, retry: retryImpact } = useDeletionImpact(meetingId, open);
   const [deleting, setDeleting] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -117,7 +119,21 @@ export function DeleteMeetingAlert({ meetingId, title, open, onOpenChange, onDel
                 </span>
               )}
               {impactState.status === 'ready' && <p className="m-0">{deletionBody(impactState.impact)}</p>}
-              {impactState.status === 'error' && <p className="m-0">Couldn&apos;t load what will be removed.</p>}
+              {impactState.status === 'error' && (
+                <p className="m-0">
+                  Couldn&apos;t load what will be removed.{' '}
+                  <button
+                    type="button"
+                    className="font-medium text-accent-strong underline-offset-2 hover:underline"
+                    onClick={() => {
+                      cancelRef.current?.focus();
+                      retryImpact();
+                    }}
+                  >
+                    Try again
+                  </button>
+                </p>
+              )}
               <p className="m-0">{AUDIO_NOTE}</p>
             </div>
           </AlertDialog.Description>

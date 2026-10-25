@@ -147,5 +147,29 @@
         "waitFor": "text=2 accepted items"
       }
     ]
+  },
+  {
+    "name": "delete-alert-impact-failed",
+    "path": "/meeting-details?id=7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+    "ipc": {
+      "knowledge_list_evidence": [],
+      "knowledge_deletion_impact": {
+        "$error": "Failed to load deletion impact"
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-label=\"More\"]"
+      },
+      {
+        "click": "[role=menuitem]:has-text(\"Delete meeting…\")"
+      },
+      {
+        "waitFor": "[role=alertdialog]"
+      },
+      {
+        "waitFor": "[role=alertdialog] button:has-text(\"Try again\")"
+      }
+    ]
   }
 ]
