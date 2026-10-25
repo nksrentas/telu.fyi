@@ -89,6 +89,7 @@ pub fn derive_card_state(
     completeness: MeetingCompleteness,
     latest_run_status: Option<RunStatus>,
     pending_count: i64,
+    accepted_count: i64,
     evidence_count: i64,
 ) -> AgendaCardState {
     match lifecycle {
@@ -105,7 +106,7 @@ pub fn derive_card_state(
     if matches!(completeness, MeetingCompleteness::Incomplete | MeetingCompleteness::RecoveredWithGaps) {
         return AgendaCardState::Incomplete;
     }
-    if latest_run_status == Some(RunStatus::Succeeded) {
+    if latest_run_status == Some(RunStatus::Succeeded) || accepted_count > 0 {
         return AgendaCardState::Reviewed;
     }
     if evidence_count > 0 {
@@ -207,6 +208,7 @@ fn agenda_meeting(row: AgendaRow) -> Option<(DateTime<Utc>, AgendaMeeting)> {
         row.completeness,
         row.latest_run_status,
         row.pending_count,
+        row.accepted_count,
         row.evidence_count,
     );
     Some((
@@ -285,14 +287,16 @@ mod tests {
         use MeetingCompleteness as C;
         use MeetingLifecycle as L;
 
-        assert_eq!(derive_card_state(L::Recording, C::Pending, None, 0, 0), S::Recording);
-        assert_eq!(derive_card_state(L::Finalizing, C::Pending, None, 0, 3), S::Finalizing);
-        assert_eq!(derive_card_state(L::Complete, C::Complete, Some(RunStatus::Running), 2, 3), S::Extracting);
-        assert_eq!(derive_card_state(L::Incomplete, C::Incomplete, Some(RunStatus::Succeeded), 2, 3), S::ToReview);
-        assert_eq!(derive_card_state(L::Incomplete, C::Incomplete, Some(RunStatus::Succeeded), 0, 3), S::Incomplete);
-        assert_eq!(derive_card_state(L::Complete, C::Complete, Some(RunStatus::Succeeded), 0, 3), S::Reviewed);
-        assert_eq!(derive_card_state(L::Complete, C::Complete, Some(RunStatus::Failed), 0, 3), S::NoKnowledge);
-        assert_eq!(derive_card_state(L::Legacy, C::CompletionNotVerified, None, 0, 0), S::TranscriptOnly);
+        assert_eq!(derive_card_state(L::Recording, C::Pending, None, 0, 0, 0), S::Recording);
+        assert_eq!(derive_card_state(L::Finalizing, C::Pending, None, 0, 0, 3), S::Finalizing);
+        assert_eq!(derive_card_state(L::Complete, C::Complete, Some(RunStatus::Running), 2, 0, 3), S::Extracting);
+        assert_eq!(derive_card_state(L::Incomplete, C::Incomplete, Some(RunStatus::Succeeded), 2, 0, 3), S::ToReview);
+        assert_eq!(derive_card_state(L::Incomplete, C::Incomplete, Some(RunStatus::Succeeded), 0, 0, 3), S::Incomplete);
+        assert_eq!(derive_card_state(L::Complete, C::Complete, Some(RunStatus::Succeeded), 0, 0, 3), S::Reviewed);
+        assert_eq!(derive_card_state(L::Complete, C::Complete, Some(RunStatus::Failed), 0, 0, 3), S::NoKnowledge);
+        assert_eq!(derive_card_state(L::Complete, C::Complete, Some(RunStatus::Failed), 0, 2, 3), S::Reviewed);
+        assert_eq!(derive_card_state(L::Incomplete, C::Incomplete, Some(RunStatus::Failed), 0, 2, 3), S::Incomplete);
+        assert_eq!(derive_card_state(L::Legacy, C::CompletionNotVerified, None, 0, 0, 0), S::TranscriptOnly);
     }
 
     #[tokio::test]
@@ -339,6 +343,49 @@ mod tests {
             vec!["legacy-rfc", "legacy-naive"]
         );
         assert!(meetings.iter().all(|meeting| meeting.card_state == AgendaCardState::TranscriptOnly));
+    }
+
+    #[tokio::test]
+    async fn agenda_keeps_accepted_knowledge_after_a_failed_regenerate() {
+        use crate::knowledge::models::TriggerKind;
+        use crate::knowledge::repository::{KnowledgeRepository, NewRun, RunCounts};
+
+        let pool = migrated_pool().await;
+        let meeting_id = "018f5e27-2f68-7e27-9c90-7c7212314921";
+        let items = seed_items(&pool, meeting_id, &["Ship the beta", "Write notes"]).await;
+        append_review(&pool, meeting_id, &items[0], ReviewAction::Accept).await.expect("accept");
+        append_review(&pool, meeting_id, &items[1], ReviewAction::Reject).await.expect("reject");
+        let regenerate = KnowledgeRepository::insert_running_run(
+            &pool,
+            &NewRun {
+                run_id: "regenerate-run".to_string(),
+                meeting_id: meeting_id.to_string(),
+                trigger_kind: TriggerKind::User,
+                provider_id: "ollama".to_string(),
+                model_id: "llama3".to_string(),
+                location_class: "local".to_string(),
+                sanitized_origin: "This device".to_string(),
+                prompt_version: "knowledge-extract-v2".to_string(),
+                meeting_completeness_at_start: "complete".to_string(),
+                input_evidence_count: 1,
+                input_fingerprint: "fingerprint".to_string(),
+            },
+        )
+        .await
+        .expect("regenerate run");
+        let mut connection = pool.acquire().await.expect("connection");
+        KnowledgeRepository::finalize_run(&mut connection, &regenerate.run_id, RunStatus::Failed, RunCounts::default(), Some("PROVIDER_FAILED"))
+            .await
+            .expect("failed run");
+        drop(connection);
+        let now = Utc::now();
+
+        let meetings = list_day(&pool, now - Duration::hours(12), now + Duration::hours(12)).await.expect("day meetings");
+
+        let meeting = meetings.iter().find(|meeting| meeting.id == meeting_id).expect("seeded meeting");
+        assert_eq!(meeting.latest_run_status, Some(RunStatus::Failed));
+        assert_eq!(meeting.accepted_count, 1);
+        assert_eq!(meeting.card_state, AgendaCardState::Reviewed);
     }
 
     #[test]
