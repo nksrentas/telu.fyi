@@ -231,3 +231,14 @@ Learned:
 - Empty support and followup replies keep every candidate: apply_support counts them as unparsed.
 Lesson: [this project] the first gate failed on rustfmt for the new test file → run `rustfmt --edition 2021` on every new .rs file before the gate. Only files that were not clean on base keep the long-line style.
 Next: T19
+
+## Session 19 · TE1 · 2026-10-25
+Did: useUndo in review-block.tsx maps the codes for a stale item to a plain toast.info. The codes are KNOWLEDGE_REVISION_CONFLICT, KNOWLEDGE_INVALID_TRANSITION and KNOWLEDGE_ITEM_NOT_FOUND. The toast is REVIEW_TOAST.undoStale, 'This item changed since. Nothing was undone.' It logs nothing and fires no error toast.
+- An Accept-all Undo stops at the first failure. If it had already reverted some items, it shows undoPartial ('Some items changed since. Only part of this was undone.') so the message stays true. The first review raised this.
+- Tests: the stale case runs once per code (one review call, the exact toast, no error toast, both items still accepted), plus one partial-batch test. On base they failed: toast.error(REVIEW_ERROR) fired and the info toast was never called.
+Assumptions: Rust never returns REVISION_CONFLICT for reopen or restore. In practice "another window decided it" comes back as INVALID_TRANSITION (see fn transition in review.rs) and a removed item as ITEM_NOT_FOUND. So all three count as "changed elsewhere".
+Learned: sonner's ExternalToast won't cast straight to `{ action: … }`. Go through `as unknown as`, or the gate's test-type-error count goes over 36. reviewCalls() entries are possibly undefined, so use `args?.`.
+Lesson: [tests] I copied a direct `as { action }` cast from an older test, and the gate failed at 37 test type errors → copy patterns from tests that typecheck, and run `pnpm --dir frontend exec tsc --noEmit | grep -c '^tests/'` before the gate.
+Lesson: [this project] review found that a batch Undo with a stale second item would claim "Nothing was undone" → when an error message makes a claim about state, test the multi-item path where part of the work already happened.
+Lesson: [tests] review flagged a test line asserting a constant equals its literal → put the spec's literal in the behavioural assertion itself.
+Next: next failing item in feature_list.json

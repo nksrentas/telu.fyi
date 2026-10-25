@@ -367,8 +367,12 @@
         "frontend/src/components/living-doc/review-block.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "4de8b49",
+        "ran": "bash .loop/verify.sh (bun test 22/22 in knowledge-review, tsc test errors 36, gallery 152 passed); base failure: with the old catch, every code gave toast.error(REVIEW_ERROR) and no stale toast ('But it was not called')",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "TE2",
