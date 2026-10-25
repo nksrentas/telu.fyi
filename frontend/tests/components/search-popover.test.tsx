@@ -8,8 +8,10 @@ const originalDocument = globals.document;
 const windowEvents = new EventTarget();
 const PopoverState = createContext<{ open: boolean; setOpen: (open: boolean) => void }>({ open: false, setOpen: () => {} });
 
+let searchResponse: unknown[] = [];
 const invoke = mock(async (command: string, _args?: Record<string, unknown>): Promise<unknown> => {
-  if (command === 'api_get_meetings' || command === 'api_search_transcripts') return [];
+  if (command === 'api_get_meetings') return [];
+  if (command === 'api_search_transcripts') return searchResponse;
   throw new Error(`Unexpected command: ${command}`);
 });
 const searchCalls = () => invoke.mock.calls.filter(([command]) => command === 'api_search_transcripts').map(([, args]) => args);
@@ -36,6 +38,7 @@ mock.module('../../src/components/ui/popover', () => ({
 
 const { SidebarProvider, useSidebar } = await import('../../src/components/Sidebar/SidebarProvider');
 const { SearchPopover, SEARCH_DEBOUNCE_MS, SEARCH_PLACEHOLDER } = await import('../../src/components/app-shell/search-popover');
+const { CommandItem } = await import('../../src/components/ui/command');
 
 let renderer: ReactTestRenderer | null = null;
 let toggleUnrelatedState: () => void = () => {};
@@ -66,6 +69,8 @@ beforeAll(() => {
 afterEach(() => {
   act(() => renderer?.unmount());
   renderer = null;
+  invoke.mockClear();
+  searchResponse = [];
   jest.useRealTimers();
 });
 
@@ -79,23 +84,26 @@ afterAll(() => {
   mock.module('../../src/components/ui/popover', () => originalPopover);
 });
 
+async function renderAndSearch(query: string) {
+  await act(async () => {
+    renderer = create(
+      <SidebarProvider>
+        <UnrelatedStateProbe />
+        <SearchPopover origin="Today" />
+      </SidebarProvider>,
+    );
+  });
+  const trigger = root().find((node: ReactTestInstance) => node.type === 'button' && node.props['aria-label'] === 'Search');
+  await act(async () => trigger.props.onClick());
+  const input = root().find((node: ReactTestInstance) => node.type === 'input' && node.props.placeholder === SEARCH_PLACEHOLDER);
+  await act(async () => input.props.onChange({ target: { value: query } }));
+  await advance(SEARCH_DEBOUNCE_MS + 50);
+}
+
 describe('SearchPopover inside SidebarProvider', () => {
   test('a query runs the search command once; unrelated provider re-renders do not run it again', async () => {
     jest.useFakeTimers();
-    await act(async () => {
-      renderer = create(
-        <SidebarProvider>
-          <UnrelatedStateProbe />
-          <SearchPopover origin="Today" />
-        </SidebarProvider>,
-      );
-    });
-    const trigger = root().find((node: ReactTestInstance) => node.type === 'button' && node.props['aria-label'] === 'Search');
-    await act(async () => trigger.props.onClick());
-    const input = root().find((node: ReactTestInstance) => node.type === 'input' && node.props.placeholder === SEARCH_PLACEHOLDER);
-    await act(async () => input.props.onChange({ target: { value: 'roadmap' } }));
-
-    await advance(SEARCH_DEBOUNCE_MS + 50);
+    await renderAndSearch('roadmap');
     expect(searchCalls()).toEqual([{ query: 'roadmap' }]);
 
     for (let render = 0; render < 10; render += 1) {
@@ -103,5 +111,23 @@ describe('SearchPopover inside SidebarProvider', () => {
       await advance(SEARCH_DEBOUNCE_MS + 50);
     }
     expect(searchCalls()).toEqual([{ query: 'roadmap' }]);
+  });
+
+  test('renders one CommandItem per result with a unique value and no duplicate-key warning', async () => {
+    jest.useFakeTimers();
+    searchResponse = [
+      { id: 'meeting-a', title: 'Roadmap review', matchContext: 'Roadmap review', timestamp: '' },
+      { id: 'meeting-b', title: 'Weekly sync', matchContext: 'First the roadmap for Q3.', timestamp: '00:00' },
+    ];
+    const consoleError = jest.spyOn(console, 'error');
+    try {
+      await renderAndSearch('roadmap');
+      const values = root().findAllByType(CommandItem).map((item) => item.props.value);
+
+      expect(values).toEqual(['meeting-a', 'meeting-b']);
+      expect(consoleError.mock.calls.filter((call) => String(call[0]).includes('same key'))).toEqual([]);
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

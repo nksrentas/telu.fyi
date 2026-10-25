@@ -274,26 +274,34 @@ impl TranscriptsRepository {
 
         let rows = sqlx::query_as::<_, (String, String, String, String)>(
             "SELECT id, title, body, position FROM (
-                SELECT m.id AS id, m.title AS title, m.title AS body, '' AS position,
-                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)) AS sort_key
-                FROM meetings m
-                WHERE LOWER(m.title) LIKE ?1 ESCAPE '\\'
-                UNION ALL
-                SELECT m.id, m.title, e.transcript,
-                       printf('%02d:%02d', CAST(e.audio_start_time AS INTEGER) / 60,
-                              CAST(e.audio_start_time AS INTEGER) % 60),
-                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT))
-                FROM meetings m
-                JOIN transcript_evidence e ON e.meeting_id = m.id
-                WHERE LOWER(e.transcript) LIKE ?1 ESCAPE '\\'
-                UNION ALL
-                SELECT m.id, m.title, t.transcript, t.timestamp,
-                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT))
-                FROM meetings m
-                JOIN transcripts t ON t.meeting_id = m.id
-                WHERE LOWER(t.transcript) LIKE ?1 ESCAPE '\\'
+                SELECT id, title, body, position, sort_key,
+                       ROW_NUMBER() OVER (PARTITION BY id ORDER BY kind, rank) AS best
+                FROM (
+                    SELECT m.id AS id, m.title AS title, m.title AS body, '' AS position,
+                           COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)) AS sort_key,
+                           0 AS kind, 0 AS rank
+                    FROM meetings m
+                    WHERE LOWER(m.title) LIKE ?1 ESCAPE '\\'
+                    UNION ALL
+                    SELECT m.id, m.title, e.transcript,
+                           printf('%02d:%02d', CAST(e.audio_start_time AS INTEGER) / 60,
+                                  CAST(e.audio_start_time AS INTEGER) % 60),
+                           COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)),
+                           1, e.sequence
+                    FROM meetings m
+                    JOIN transcript_evidence e ON e.meeting_id = m.id
+                    WHERE LOWER(e.transcript) LIKE ?1 ESCAPE '\\'
+                    UNION ALL
+                    SELECT m.id, m.title, t.transcript, t.timestamp,
+                           COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)),
+                           2, t.timestamp
+                    FROM meetings m
+                    JOIN transcripts t ON t.meeting_id = m.id
+                    WHERE LOWER(t.transcript) LIKE ?1 ESCAPE '\\'
+                )
              )
-             ORDER BY sort_key DESC
+             WHERE best = 1
+             ORDER BY sort_key DESC, id
              LIMIT 50",
         )
         .bind(like_pattern(query))
@@ -612,12 +620,60 @@ mod transcript_search_tests {
     }
 
     #[tokio::test]
-    async fn transcript_search_ignores_blank_queries_and_caps_results() {
+    async fn transcript_search_returns_one_entry_per_meeting_preferring_the_title() {
         let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Roadmap review").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315101", 0, "First the roadmap for Q3.").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315102", 1, "Then the roadmap for Q4.").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "roadmap").await.expect("search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, MEETING);
+        assert_eq!(results[0].match_context, "Roadmap review");
+    }
+
+    #[tokio::test]
+    async fn transcript_search_keeps_the_earliest_segment_when_the_title_misses() {
+        let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Weekly sync").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315102", 1, "Then the roadmap for Q4.").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315101", 0, "First the roadmap for Q3.").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "roadmap").await.expect("search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].match_context, "First the roadmap for Q3.");
+        assert_eq!(results[0].timestamp, "00:00");
+    }
+
+    #[tokio::test]
+    async fn transcript_search_does_not_let_one_meeting_crowd_out_others() {
+        let pool = migrated_pool().await;
+        let other = "018f5e27-2f68-7e27-9c90-7c7212315002";
         titled_meeting(&pool, MEETING, "Standup").await;
+        titled_meeting(&pool, other, "Retro").await;
         for sequence in 0..60 {
             let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123152{sequence:02x}");
             insert_evidence(&pool, MEETING, &evidence_id, sequence, "alpha release notes").await;
+        }
+        insert_evidence(&pool, other, "018f5e27-2f68-7e27-9c90-7c7212315301", 0, "alpha retro").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "alpha").await.expect("search");
+
+        let mut ids: Vec<&str> = results.iter().map(|result| result.id.as_str()).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![MEETING, other]);
+    }
+
+    #[tokio::test]
+    async fn transcript_search_ignores_blank_queries_and_caps_results() {
+        let pool = migrated_pool().await;
+        for meeting in 0..60 {
+            let meeting_id = format!("018f5e27-2f68-7e27-9c90-7c72123160{meeting:02x}");
+            let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123152{meeting:02x}");
+            titled_meeting(&pool, &meeting_id, "Standup").await;
+            insert_evidence(&pool, &meeting_id, &evidence_id, 0, "alpha release notes").await;
         }
 
         let blank = TranscriptsRepository::search_transcripts(&pool, "   ").await.expect("blank search");
