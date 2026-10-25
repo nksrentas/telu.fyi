@@ -1,0 +1,5 @@
+Maya owns the ledger export and expects it done by March 20.
+
+The support team asked for a migration FAQ before the billing switch.
+
+Atlas beta feedback so far: setup takes too long.
