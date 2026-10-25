@@ -195,3 +195,13 @@ Learned:
 Lesson: [tests] my first guard regex matched only single quotes, and review found a double-quoted unrestored mock → a static scan over source must accept every quote style the codebase uses (the .js tests use double quotes).
 Lesson: [tests] `afterAll(() => mock.module(...))` silently failed to restore in bun 1.3.9 → write afterAll hooks with block bodies, and prove isolation with pair runs, not just the full run.
 Next: T16
+
+## Session 16 · T16 · 2026-10-25
+Did: WR-86, test-only. playwright.config.ts pins timezoneId 'Europe/Athens' and locale 'en-GB' on the webkit project. In tauri-ipc-stub.js, frozenNow is '2026-09-27T10:46:00+03:00' (EEST on that date).
+- The full gate passed, including 150 gallery screens. With TZ=America/Los_Angeles, the Today screens' PNGs are byte-identical to the default-zone run in light and dark.
+- Base proof: base config with a scratch timezoneId 'America/Los_Angeles' rendered the agenda at 23:30–03:02 instead of 09:30–13:02, so today-populated differed.
+Learned:
+- On macOS, Playwright's WebKit ignores the TZ env var. It reads the system zone, which is Europe/Athens on this Mac. So `TZ=... gallery` can't show the bug on base. Simulate a machine zone with the context's timezoneId instead.
+- All fixture timestamps end in Z. The frozen now was the only naive date.
+Lesson: [this project] the item's verify step (TZ=America/Los_Angeles) can't fail on base on macOS WebKit → to prove a fix depends on the zone, override the browser context's timezoneId rather than the process TZ.
+Next: T17

@@ -306,8 +306,13 @@
         "frontend/tests/visual/playwright.config.ts",
         "frontend/tests/visual/tauri-ipc-stub.js"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "3855644",
+        "ran": "bash .loop/verify.sh (gate all steps, gallery 150 passed); TZ=America/Los_Angeles gallery today: today-populated/empty/min-height/sidebar-today-count/peek-legacy PNGs byte-identical to default-zone run, light and dark",
+        "base_failure": "TZ env does not reach WebKit on macOS, so base was run with scratch timezoneId America/Los_Angeles: today-populated PNG differs, agenda times 23:30/00:00/.../03:02 instead of 09:30/10:00/.../13:02",
+        "browser": "looked at today-populated light: header 'Sunday, 27 September', Athens times 09:30-13:02 with the fix"
+      }
     },
     {
       "id": "T17",
