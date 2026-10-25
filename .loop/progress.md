@@ -160,3 +160,7 @@ Assumptions: the tooltip is the native title attribute, not Radix Tooltip. It ne
 ## R1 · worker 1 · 2026-10-25
 Did: regression check only, no code change. The gate passed first time on HEAD c4a09bb (after E5). Frozen paths have no diff since the base, and the KNOW-07 status equals the base's committed status. Its inputs are all frozen, so it cannot drift while the gate holds.
 Learned: peek-inline-transcript did not flake this run (gallery 188/188 first time).
+
+## R2 · worker 1 · 2026-10-25
+Did: docs/telu/phase3-preparation.md with formats (paste text, .md/.markdown/.txt import, UTF-8 without NUL), limits (MAX_SOURCE_BYTES 1 MiB, MAX_SOURCE_CHARS 200_000, MAX_PASSAGES 2_000, MAX_PASSAGE_CHARS 4_000), selection caps (12 versions, 60 knowledge items), budget (CHARS_PER_TOKEN 4, RESERVED_OUTPUT_TOKENS 2_000, MIN/MAX_CONTEXT_TOKENS 1_000/12_000, per source total/2), PREP_PROMPT_VERSION prep-briefing-v3, MAX_QUESTIONS 5, manifest/claim/run statuses with reason codes, harness command and what is not built. Doc only, no code change.
+Learned: a constant renamed or changed in documents/limits.rs, preparation/models.rs, context.rs, commands.rs, briefing.rs or questions.rs now also needs this doc updated; nothing checks it automatically. The filter preparation::evaluation selects the 3 harness tests.

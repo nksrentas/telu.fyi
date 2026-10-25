@@ -1,9 +1,0 @@
-{
- "id": "R2",
- "passes": true,
- "evidence": {
-  "commit": "8ed22a8",
-  "ran": "bash .loop/verify.sh (gate passed, gallery 188/188); grep of every named constant in documents/ and preparation/ matched once each; cargo test preparation::evaluation 3 passed"
- },
- "notes": "Did: docs/telu/phase3-preparation.md with formats (paste text, .md/.markdown/.txt import, UTF-8 without NUL), limits (MAX_SOURCE_BYTES 1 MiB, MAX_SOURCE_CHARS 200_000, MAX_PASSAGES 2_000, MAX_PASSAGE_CHARS 4_000), selection caps (12 versions, 60 knowledge items), budget (CHARS_PER_TOKEN 4, RESERVED_OUTPUT_TOKENS 2_000, MIN/MAX_CONTEXT_TOKENS 1_000/12_000, per source total/2), PREP_PROMPT_VERSION prep-briefing-v3, MAX_QUESTIONS 5, manifest/claim/run statuses with reason codes, harness command and what is not built. Doc only, no code change.\nLearned: a constant renamed or changed in documents/limits.rs, preparation/models.rs, context.rs, commands.rs, briefing.rs or questions.rs now also needs this doc updated; nothing checks it automatically. The filter preparation::evaluation selects the 3 harness tests."
-}

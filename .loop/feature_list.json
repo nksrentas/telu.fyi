@@ -598,8 +598,11 @@
       "touches": [
         "docs/telu/phase3-preparation.md"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "8ed22a8",
+        "ran": "bash .loop/verify.sh (gate passed, gallery 188/188); grep of every named constant in documents/ and preparation/ matched once each; cargo test preparation::evaluation 3 passed"
+      }
     }
   ]
 }
