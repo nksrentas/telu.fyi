@@ -1,6 +1,7 @@
 pub mod briefing;
 pub mod commands;
 pub mod context;
+pub mod evaluation;
 pub mod freshness;
 pub mod models;
 pub mod questions;
