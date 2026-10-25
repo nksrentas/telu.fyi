@@ -163,3 +163,11 @@ Learned:
 - agenda/mod.rs and commands.rs were not rustfmt-clean on base, so keep the long-line style.
 - today-view.test.tsx:370 mocks cardState 'no_knowledge' with the default acceptedCount 2. Rust can no longer produce that combination. It's harmless (a UI-only mock) and was left alone, outside T12's touches.
 Next: T13
+
+## Session 13 · T13 · 2026-10-25
+Did: IN-22. New pub async fn delete_meeting_then_cancel_extraction(pool, meeting_id) in api/api.rs. It runs MeetingsRepository::delete_meeting first and calls knowledge::extraction::cancel_active_extraction only when the delete returned Ok(true). api_delete_meeting calls it, so the Tauri State stays out of the testable seam.
+- 3 new tests in tests/knowledge_deletion.rs: an unknown id (Ok(false)) and a blank id (repository Err) leave the registered token uncancelled and still registered. A successful delete cancels the token, removes the registry entry and leaves 0 rows in every meeting-scoped table. On base order (cancel, then delete) both failure-path tests failed at !token.is_cancelled().
+Learned:
+- The extraction registry is a process-global map keyed by "knowledge:{meeting_id}" with no trim. Tests in one binary run in parallel, so each test that registers an extraction needs its own meeting id.
+- The app pool never sets foreign_keys, but sqlx's SqliteConnectOptions turns it on by default. So an extraction that writes after its meeting is deleted, in the moment before cancel, gets a foreign-key error instead of leaving orphan rows.
+Next: T14

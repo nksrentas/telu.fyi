@@ -248,8 +248,12 @@
         "frontend/src-tauri/src/api/api.rs",
         "frontend/src-tauri/tests/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "3fe77d4",
+        "ran": "bash .loop/verify.sh (gate: all steps passed, 150 gallery); cargo test --test knowledge_deletion 6/6. On base order (cancel before delete) the unknown-id and blank-id tests failed at assert !token.is_cancelled()",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "T14",
