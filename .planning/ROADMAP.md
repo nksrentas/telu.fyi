@@ -14,7 +14,7 @@ Telu extends the active Tauri/Rust and Next.js/React Community Edition applicati
 - Decimal phases (2.1, 2.2): urgent insertions, if later required
 
 - [x] **Phase 1: Baseline Observability, Identity, and Trust Boundaries** - Make the existing desktop foundation measurable, recoverable, consistently identified, and truthful about every data destination. (completed 2026-09-26)
-- [ ] **Phase 2: Evidence-Linked Post-Meeting Knowledge** - Turn completed meetings into inspectable, correctable, evidence-backed knowledge without erasing history.
+- [x] **Phase 2: Evidence-Linked Post-Meeting Knowledge** - Turn completed meetings into inspectable, correctable, evidence-backed knowledge without erasing history. (completed 2026-10-25)
 - [ ] **Phase 3: Bounded Sourced Preparation** - Let users prepare from an explicit, lifecycle-safe set of accepted knowledge and versioned documents using direct bounded context.
 - [ ] **Phase 4: Cancellable Live-Loop Validation** - Prove that a tightly bounded live loop can surface timely, grounded value and remain silent when intervention would distract.
 - [ ] **Phase 5: Recurring-Series Memory** - Carry only reviewed knowledge across explicitly managed meeting series with chronology, conflict, and repair semantics intact.
@@ -144,7 +144,7 @@ Plans:
 **Verification approach:** Use representative held-out transcripts plus insufficient-evidence and degraded-capture cases; test exact evidence navigation and semantic support separately; exercise accept, reject, correct, restore, regenerate, delete, and retry scenarios; audit append-only lineage and future-context eligibility.
 **Exit gate:** Phase 3 may proceed only when item correctness, exact evidence-span support, abstention behavior, correction lineage, regeneration safety, and deletion effects meet the predeclared representative-review thresholds. If provenance or user actions do not deterministically control future eligibility, stop before preparation, live assistance, or series memory can amplify the defect.
 **Principal risks / stop conditions:** Fluent unsupported claims, reconstructed citations, destructive correction, rejected-item resurrection, incomplete evidence, mutable summary blobs, or one score conflating claim correctness with citation support. Stop when evidence lineage is ambiguous or review actions fail to propagate.
-**Plans:** 42/43 plans executed
+**Plans:** 44/44 plans complete
 Plans:
 **Wave 1**
 
@@ -248,7 +248,8 @@ Plans:
 
 **Gap wave 12** *(blocked on 02-39 and 02-42)*
 
-- [ ] 02-43-PLAN.md — KNOW-07: harden the status against spent meetings and a recomputed gate; run the second held-out evaluation through the app; commit the report and the derived status.
+- [x] 02-44-PLAN.md — KNOW-07: register qwen3.5:9b and measure it on the development set. *(Stopped 2026-10-25 by user decision after a passing smoke; KNOW-07 deferred.)*
+- [x] 02-43-PLAN.md — KNOW-07: harden the status against spent meetings and a recomputed gate; run the second held-out evaluation through the app; commit the report and the derived status. *(Skipped 2026-10-25 by user decision; KNOW-07 deferred.)*
 
 **UI hint:** yes
 
@@ -344,7 +345,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6. Each phase's e
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Baseline Observability, Identity, and Trust Boundaries | 19/19 | Complete    | 2026-09-26 |
-| 2. Evidence-Linked Post-Meeting Knowledge | 42/43 | In Progress|  |
+| 2. Evidence-Linked Post-Meeting Knowledge | 44/44 | Complete    | 2026-10-25 |
 | 3. Bounded Sourced Preparation | 0/TBD | Not started | - |
 | 4. Cancellable Live-Loop Validation | 0/TBD | Not started | - |
 | 5. Recurring-Series Memory | 0/TBD | Not started | - |
