@@ -134,6 +134,7 @@ fn spawn_execute(
 async fn a_second_generate_while_one_runs_is_refused() {
     let pool = migrated_pool().await;
     let plan = planned_meeting(&pool).await;
+    select_pasted(&pool, &plan, &["Atlas ships Friday."]).await;
     let (first, _token) = begin(
         &pool,
         &plan,

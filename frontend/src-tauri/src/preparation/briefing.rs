@@ -104,7 +104,7 @@ pub(super) struct ClaimRow {
     pub(super) rationale: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Draft {
     pub claims: Vec<Claim>,
     pub dropped: Vec<DroppedStatement>,
@@ -137,6 +137,9 @@ where
     Fut: Future<Output = Result<String, String>>,
 {
     let blocks = source_blocks(context);
+    if blocks.is_empty() {
+        return Ok(Draft::default());
+    }
     let reply = complete(SYSTEM_PROMPT.to_string(), user_prompt(&blocks))
         .await
         .map_err(|_| {
