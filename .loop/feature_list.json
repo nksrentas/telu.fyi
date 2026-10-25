@@ -529,8 +529,11 @@
         ".github/verify-phase3-preparation-privacy.cjs",
         ".github/verify-phase3-preparation-privacy.test.cjs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "a82424f7bf19d4940720bd428228a1f9c6456f1e",
+        "ran": "bash .loop/verify.sh (gate all steps passed, gallery 176); node --test .github/verify-phase3-preparation-privacy.test.cjs 13/13; scratch analytics-with-title edit in sources-panel.tsx and info log with {title} in documents/import.rs each failed the test, then reverted"
+      }
     },
     {
       "id": "E5",
