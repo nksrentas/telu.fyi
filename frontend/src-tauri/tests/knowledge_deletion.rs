@@ -1,4 +1,6 @@
+use app_lib::api::delete_meeting_then_cancel_extraction;
 use app_lib::database::repositories::meeting::MeetingsRepository;
+use app_lib::knowledge::extraction::{has_active_extraction, register_extraction};
 use app_lib::knowledge::models::{
     AbstentionReason, CorrectionInput, KnowledgeType, ReviewAction, RunStatus, SuppressionReason, TriggerKind,
 };
@@ -295,4 +297,42 @@ async fn deleting_a_missing_meeting_changes_nothing() {
 
     assert!(!deleted);
     assert_eq!(counts(&pool, &tables, "meeting_id", MEETING_A).await, before);
+}
+
+#[tokio::test]
+async fn a_delete_of_an_unknown_meeting_leaves_its_extraction_running() {
+    let (_directory, pool) = populated().await;
+    let unknown = "018f5e27-2f68-7e27-9c90-7c7212317998";
+    let token = register_extraction(unknown, "run-unknown");
+
+    let deleted = delete_meeting_then_cancel_extraction(&pool, unknown).await.expect("delete");
+
+    assert!(!deleted);
+    assert!(!token.is_cancelled());
+    assert!(has_active_extraction(unknown));
+}
+
+#[tokio::test]
+async fn a_delete_that_errors_leaves_the_extraction_running() {
+    let (_directory, pool) = populated().await;
+    let token = register_extraction(" ", "run-blank");
+
+    delete_meeting_then_cancel_extraction(&pool, " ").await.expect_err("repository error");
+
+    assert!(!token.is_cancelled());
+    assert!(has_active_extraction(" "));
+}
+
+#[tokio::test]
+async fn a_successful_delete_cancels_the_extraction_and_leaves_no_residue() {
+    let (_directory, pool) = populated().await;
+    let tables = meeting_scoped_tables(&pool).await;
+    let token = register_extraction(MEETING_A, "run-a");
+
+    assert!(delete_meeting_then_cancel_extraction(&pool, MEETING_A).await.expect("delete"));
+
+    assert!(token.is_cancelled());
+    assert!(!has_active_extraction(MEETING_A));
+    let residue = counts(&pool, &tables, "meeting_id", MEETING_A).await;
+    assert!(residue.values().all(|count| *count == 0), "residue after delete: {residue:?}");
 }
