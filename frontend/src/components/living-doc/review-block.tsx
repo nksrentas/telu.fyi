@@ -21,7 +21,11 @@ export const REVIEW_TOAST = {
   restored: "Restored — it's back in review",
   corrected: 'Correction saved — Telu keeps your wording',
   noneAccepted: 'Nothing was accepted — these items were already reviewed',
+  undoStale: 'This item changed since. Nothing was undone.',
+  undoPartial: 'Some items changed since. Only part of this was undone.',
 };
+
+const CHANGED_ELSEWHERE = new Set(['KNOWLEDGE_REVISION_CONFLICT', 'KNOWLEDGE_INVALID_TRANSITION', 'KNOWLEDGE_ITEM_NOT_FOUND']);
 
 interface UndoEntry {
   itemIds: string[];
@@ -99,9 +103,17 @@ function useUndo(meetingId: string, apply: (view: KnowledgeItemView) => void) {
     const entry = live.current.find((candidate) => candidate.toastId === toastId);
     if (!entry) return;
     drop((candidate) => candidate === entry);
+    let undone = 0;
     try {
-      for (const itemId of entry.itemIds) apply(await reviewKnowledgeItem(meetingId, itemId, entry.action));
+      for (const itemId of entry.itemIds) {
+        apply(await reviewKnowledgeItem(meetingId, itemId, entry.action));
+        undone += 1;
+      }
     } catch (error) {
+      if (typeof error === 'string' && CHANGED_ELSEWHERE.has(error)) {
+        toast.info(undone === 0 ? REVIEW_TOAST.undoStale : REVIEW_TOAST.undoPartial);
+        return;
+      }
       console.error('Failed to undo the review action:', error);
       toast.error(REVIEW_ERROR);
     }

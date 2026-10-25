@@ -607,6 +607,49 @@ describe('ReviewBlock', () => {
     expect(added.filter((type) => type === 'keydown')).toHaveLength(1);
   });
 
+  for (const code of ['KNOWLEDGE_REVISION_CONFLICT', 'KNOWLEDGE_INVALID_TRANSITION', 'KNOWLEDGE_ITEM_NOT_FOUND']) {
+    test(`Undo on an item that changed elsewhere (${code}) says nothing was undone and touches no other item`, async () => {
+      const success = spyOn(toast, 'success');
+      const info = spyOn(toast, 'info');
+      const error = spyOn(toast, 'error');
+      responses.knowledge_accept_all = (args) => view((args.itemIds as string[]).map((itemId) => accepted({ itemId })));
+      responses.knowledge_review_item = () => { throw code; };
+      await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+      await click('Accept all');
+
+      await act(async () => (success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick());
+      await settle();
+      expect(reviewCalls()).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' }]);
+      expect(info).toHaveBeenCalledWith('This item changed since. Nothing was undone.');
+      expect(error).not.toHaveBeenCalled();
+      expect(textOf(root()).split('✓ Accepted · eligible')).toHaveLength(3);
+      success.mockRestore();
+      info.mockRestore();
+      error.mockRestore();
+    });
+  }
+
+  test('a batch Undo that hits a changed item after reverting another says only part was undone', async () => {
+    const success = spyOn(toast, 'success');
+    const info = spyOn(toast, 'info');
+    responses.knowledge_accept_all = (args) => view((args.itemIds as string[]).map((itemId) => accepted({ itemId })));
+    responses.knowledge_review_item = (args) => {
+      if (args.itemId === 'item-2') throw 'KNOWLEDGE_INVALID_TRANSITION';
+      return item({ itemId: String(args.itemId) });
+    };
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+    await click('Accept all');
+
+    await act(async () => (success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick());
+    await settle();
+    expect(reviewCalls().map((args) => args?.itemId)).toEqual(['item-1', 'item-2']);
+    expect(info).toHaveBeenCalledWith(REVIEW_TOAST.undoPartial);
+    expect(info).not.toHaveBeenCalledWith(REVIEW_TOAST.undoStale);
+    expect(textOf(root()).split('✓ Accepted · eligible')).toHaveLength(2);
+    success.mockRestore();
+    info.mockRestore();
+  });
+
   test('an Undo entry expires when its toast closes', async () => {
     const success = spyOn(toast, 'success');
     const info = spyOn(toast, 'info');
