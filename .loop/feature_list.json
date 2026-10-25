@@ -422,8 +422,11 @@
         "frontend/src-tauri/src/api/api.rs",
         "frontend/src-tauri/tests/preparation_lifecycle.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "02d38824bc6bede5c8e227b3cf6d985946dba5b0",
+        "ran": "bash .loop/verify.sh (gate: cargo tests incl. tests/preparation_lifecycle.rs 7/7, bun tests, typecheck, gallery 166 passed); review subagent: no Spec/Standards/Lean findings"
+      }
     },
     {
       "id": "M1",
