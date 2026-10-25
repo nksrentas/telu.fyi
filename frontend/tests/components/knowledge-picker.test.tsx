@@ -103,7 +103,7 @@ async function settle() {
 
 async function renderPanel() {
   await act(async () => {
-    renderer = create(<SourcesPanel plannedMeetingId="plan-1" onOpenSource={() => {}} />);
+    renderer = create(<SourcesPanel plannedMeetingId="plan-1" onOpenSource={() => {}} onSourcesChanged={() => {}} />);
   });
   await settle();
   return renderer!.root;

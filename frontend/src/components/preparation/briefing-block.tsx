@@ -52,6 +52,7 @@ export interface TranscriptTarget {
 
 interface BriefingBlockProps {
   plannedMeetingId: string
+  revision: number
   onOpenSource: (target: SourceTarget) => void
   onOpenTranscript: (target: TranscriptTarget) => void
 }
@@ -88,7 +89,7 @@ function provenanceLine(briefing: StoredBriefing, labels: SourceLabels): string 
   return `Prepared from ${listNames(parts)} · ${formatRunTime(briefing.createdUtc)}${tail}`
 }
 
-function useBriefing(plannedMeetingId: string) {
+function useBriefing(plannedMeetingId: string, revision: number) {
   const [view, setView] = useState<BriefingView | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
 
@@ -106,6 +107,9 @@ function useBriefing(plannedMeetingId: string) {
 
   useEffect(() => {
     void reload()
+  }, [reload, revision])
+
+  useEffect(() => {
     let unlisten: (() => void) | null = null
     let active = true
     onPreparationUpdated(plannedMeetingId, () => void reload())
@@ -129,12 +133,12 @@ function StateLine({ children, tone = "neutral" }: { children: ReactNode; tone?:
   )
 }
 
-export function BriefingBlock({ plannedMeetingId, onOpenSource, onOpenTranscript }: BriefingBlockProps) {
+export function BriefingBlock({ plannedMeetingId, revision, onOpenSource, onOpenTranscript }: BriefingBlockProps) {
   const [routeState, setRouteState] = useState<ProviderRouteViewState>(INITIAL_ROUTE)
   const [routeBlocked, setRouteBlocked] = useState(false)
   const [starting, setStarting] = useState(false)
   const [stopping, setStopping] = useState(false)
-  const { view, setView, loadFailed, reload } = useBriefing(plannedMeetingId)
+  const { view, setView, loadFailed, reload } = useBriefing(plannedMeetingId, revision)
   const briefing = view?.briefing ?? null
   const run = view?.run ?? null
   const labels = useSourceLabels(briefing)

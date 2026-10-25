@@ -164,6 +164,8 @@ function PlannedMeetingDoc({ meeting, initialSource, onBack }: PlannedMeetingDoc
   const [source, setSource] = useState<SourceTarget | null>(initialSource)
   const [transcript, setTranscript] = useState<TranscriptTarget | null>(null)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
+  const [briefingRevision, setBriefingRevision] = useState(0)
+  const refreshBriefing = useCallback(() => setBriefingRevision((revision) => revision + 1), [])
   const closeSource = useCallback(() => setSource(null), [])
   const closeTranscript = useCallback(() => setTranscriptOpen(false), [])
   const openSource = useCallback((target: SourceTarget) => {
@@ -225,8 +227,17 @@ function PlannedMeetingDoc({ meeting, initialSource, onBack }: PlannedMeetingDoc
               className={cn(EDITABLE, "block resize-none text-[15px] leading-[1.55] tracking-[-0.005em]")}
             />
           </section>
-          <SourcesPanel plannedMeetingId={meeting.id} onOpenSource={(versionId) => openSource({ versionId })} />
-          <BriefingBlock plannedMeetingId={meeting.id} onOpenSource={openSource} onOpenTranscript={openTranscript} />
+          <SourcesPanel
+            plannedMeetingId={meeting.id}
+            onOpenSource={(versionId) => openSource({ versionId })}
+            onSourcesChanged={refreshBriefing}
+          />
+          <BriefingBlock
+            plannedMeetingId={meeting.id}
+            revision={briefingRevision}
+            onOpenSource={openSource}
+            onOpenTranscript={openTranscript}
+          />
         </div>
       </main>
       <SourceViewer target={source} onClose={closeSource} />
