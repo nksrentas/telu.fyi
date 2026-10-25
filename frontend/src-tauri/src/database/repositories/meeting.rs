@@ -1248,6 +1248,14 @@ async fn delete_meeting_with_transaction(
         return Ok(false);
     }
 
+    sqlx::query(
+        "UPDATE briefing_claims SET status = 'source_unavailable', quote = ''
+         WHERE knowledge_meeting_id = ?",
+    )
+    .bind(meeting_id)
+    .execute(&mut *transaction)
+    .await?;
+
     let mut affected = Vec::with_capacity(MEETING_SCOPED_DELETE_ORDER.len());
     for (table, scope) in MEETING_SCOPED_DELETE_ORDER {
         let result = sqlx::query(&scoped_delete_statement(table, *scope))

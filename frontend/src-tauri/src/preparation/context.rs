@@ -34,6 +34,7 @@ pub enum ContextPiece {
     Knowledge {
         meeting_id: String,
         item_id: String,
+        revision_id: Option<String>,
         text: String,
     },
 }
@@ -174,6 +175,7 @@ fn knowledge_piece(
         Some(item) => Loaded::Pieces(vec![ContextPiece::Knowledge {
             meeting_id: meeting_id.to_string(),
             item_id: item_id.to_string(),
+            revision_id: item.latest_revision_id.clone(),
             text: item.text.clone(),
         }]),
         None => Loaded::Unusable(SourceStatus::Unavailable, "KNOWLEDGE_NOT_ELIGIBLE"),

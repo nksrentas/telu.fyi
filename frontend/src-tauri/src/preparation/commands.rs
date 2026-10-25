@@ -1,7 +1,8 @@
 use crate::database::repositories::setting::SettingsRepository;
 use crate::knowledge::dispatch::dispatch_completer;
-use crate::preparation::briefing::{self, load_claims, BriefingError, Claim};
+use crate::preparation::briefing::{self, load_claims, BriefingError, Claim, ClaimStatus};
 use crate::preparation::context::{self, Budget, PackedContext};
+use crate::preparation::freshness::KnowledgeNow;
 use crate::preparation::models::{SelectedSource, SelectionError};
 use crate::preparation::questions::{load_questions, Question};
 use crate::preparation::runs::{self, Finish, NewRun, PreparationRun, RunStatus};
@@ -239,15 +240,37 @@ async fn stored_briefing(pool: &SqlitePool, row: BriefingRow) -> Result<StoredBr
         warn!(error = %error, "stored briefing manifest is not JSON");
         STORAGE_FAILED.to_string()
     })?;
+    let claims = load_claims(pool, &row.id).await.map_err(code)?;
+    let questions = load_questions(pool, &row.id).await.map_err(code)?;
+    let cited: Vec<&Claim> = claims
+        .iter()
+        .chain(questions.iter().map(|question| &question.claim))
+        .collect();
+    let knowledge = KnowledgeNow::load(pool, &cited).await.map_err(code)?;
+    let claims: Vec<Claim> = claims
+        .into_iter()
+        .map(|claim| knowledge.checked(claim))
+        .collect();
+    let questions: Vec<Question> = questions
+        .into_iter()
+        .map(|question| Question {
+            claim: knowledge.checked(question.claim),
+            ..question
+        })
+        .collect();
+    let claim_stale = claims
+        .iter()
+        .chain(questions.iter().map(|question| &question.claim))
+        .any(|claim| claim.status == ClaimStatus::Stale);
     Ok(StoredBriefing {
-        claims: load_claims(pool, &row.id).await.map_err(code)?,
-        questions: load_questions(pool, &row.id).await.map_err(code)?,
+        claims,
+        questions,
         id: row.id,
         prompt_version: row.prompt_version,
         created_utc: row.created_utc,
         dropped_count: row.dropped_count,
         dropped_question_count: row.dropped_question_count,
-        stale: row.stale,
+        stale: row.stale || claim_stale,
         manifest,
     })
 }
