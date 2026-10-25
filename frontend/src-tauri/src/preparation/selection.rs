@@ -4,7 +4,7 @@ use crate::knowledge::repository::KnowledgeRepository;
 use crate::preparation::models::{
     SelectedSource, SelectionError, MAX_SELECTED_DOCUMENT_VERSIONS, MAX_SELECTED_KNOWLEDGE_ITEMS,
 };
-use sqlx::{SqliteConnection, SqlitePool};
+use sqlx::{SqliteConnection, SqliteExecutor, SqlitePool};
 use std::collections::{HashMap, HashSet};
 use tracing::warn;
 
@@ -38,12 +38,19 @@ pub async fn list(
     planned_meeting_id: &str,
 ) -> Result<Vec<SelectedSource>, SelectionError> {
     ensure_planned_meeting(pool, planned_meeting_id).await?;
+    saved(pool, planned_meeting_id).await
+}
+
+pub(super) async fn saved<'e, E: SqliteExecutor<'e>>(
+    executor: E,
+    planned_meeting_id: &str,
+) -> Result<Vec<SelectedSource>, SelectionError> {
     sqlx::query_as::<_, SourceRow>(
         "SELECT kind, document_version_id, meeting_id, knowledge_item_id
          FROM preparation_sources WHERE planned_meeting_id = ? ORDER BY position",
     )
     .bind(planned_meeting_id)
-    .fetch_all(pool)
+    .fetch_all(executor)
     .await
     .map_err(storage)?
     .into_iter()
@@ -69,7 +76,10 @@ fn ensure_bounded_and_unique(sources: &[SelectedSource]) -> Result<(), Selection
     }
 }
 
-async fn ensure_planned_meeting(pool: &SqlitePool, id: &str) -> Result<(), SelectionError> {
+pub(super) async fn ensure_planned_meeting(
+    pool: &SqlitePool,
+    id: &str,
+) -> Result<(), SelectionError> {
     let exists: bool =
         sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM planned_meetings WHERE id = ?)")
             .bind(id)

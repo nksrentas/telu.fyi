@@ -2,9 +2,11 @@ use crate::knowledge::parse::json_object;
 use crate::preparation::context::{ContextPiece, PackedContext};
 use crate::preparation::models::SelectedSource;
 use crate::preparation::questions::{verify_questions, Question};
+use crate::preparation::selection;
 use chrono::{DateTime, SecondsFormat, Utc};
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::Serialize;
 use serde_json::Value;
 use sqlx::SqlitePool;
 use std::collections::HashMap;
@@ -32,6 +34,7 @@ static SOURCE_TAG: Lazy<Regex> =
 pub enum BriefingError {
     ModelFailed,
     ParseFailed,
+    SelectionChanged,
     Storage,
 }
 
@@ -40,12 +43,14 @@ impl BriefingError {
         match self {
             Self::ModelFailed => "PREP_MODEL_FAILED",
             Self::ParseFailed => "PREP_PARSE_FAILED",
+            Self::SelectionChanged => "SELECTION_CHANGED",
             Self::Storage => "PREPARATION_STORAGE_FAILED",
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Claim {
     pub text: String,
     pub source_ref: String,
@@ -83,13 +88,34 @@ pub(super) struct ClaimRow {
     pub(super) rationale: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Draft {
+    pub claims: Vec<Claim>,
+    pub dropped: Vec<DroppedStatement>,
+    pub questions: Vec<Question>,
+    pub dropped_questions: Vec<DroppedStatement>,
+}
+
+#[cfg(test)]
 pub async fn run<F, Fut>(
     pool: &SqlitePool,
     planned_meeting_id: &str,
     context: &PackedContext,
     now: DateTime<Utc>,
-    mut complete: F,
+    complete: F,
 ) -> Result<BriefingOutcome, BriefingError>
+where
+    F: FnMut(String, String) -> Fut,
+    Fut: Future<Output = Result<String, String>>,
+{
+    let draft = compose(context, complete).await?;
+    save(pool, planned_meeting_id, context, draft, now).await
+}
+
+pub async fn compose<F, Fut>(
+    context: &PackedContext,
+    mut complete: F,
+) -> Result<Draft, BriefingError>
 where
     F: FnMut(String, String) -> Fut,
     Fut: Future<Output = Result<String, String>>,
@@ -115,26 +141,42 @@ where
         }
     }
     let (questions, dropped_questions) = verify_questions(&by_ref, &question_values);
+    Ok(Draft {
+        claims,
+        dropped,
+        questions,
+        dropped_questions,
+    })
+}
+
+pub async fn save(
+    pool: &SqlitePool,
+    planned_meeting_id: &str,
+    context: &PackedContext,
+    draft: Draft,
+    now: DateTime<Utc>,
+) -> Result<BriefingOutcome, BriefingError> {
     let briefing_id = store(
         pool,
         planned_meeting_id,
         context,
         Verified {
-            claims: &claims,
-            questions: &questions,
-            dropped_count: dropped.len(),
-            dropped_question_count: dropped_questions.len(),
+            claims: &draft.claims,
+            questions: &draft.questions,
+            dropped_count: draft.dropped.len(),
+            dropped_question_count: draft.dropped_questions.len(),
         },
         now,
     )
     .await
-    .map_err(storage)?;
+    .map_err(storage)?
+    .ok_or(BriefingError::SelectionChanged)?;
     Ok(BriefingOutcome {
         briefing_id,
-        claims,
-        dropped,
-        questions,
-        dropped_questions,
+        claims: draft.claims,
+        dropped: draft.dropped,
+        questions: draft.questions,
+        dropped_questions: draft.dropped_questions,
     })
 }
 
@@ -275,11 +317,17 @@ async fn store(
     context: &PackedContext,
     verified: Verified<'_>,
     now: DateTime<Utc>,
-) -> Result<String, sqlx::Error> {
+) -> Result<Option<String>, sqlx::Error> {
     let briefing_id = Uuid::new_v4().to_string();
     let manifest_json = serde_json::to_string(&context.manifest)
         .map_err(|error| sqlx::Error::Encode(error.into()))?;
     let mut transaction = pool.begin().await?;
+    let built_from = context.manifest.iter().map(|entry| &entry.source);
+    match selection::saved(&mut *transaction, planned_meeting_id).await {
+        Ok(saved) if saved.iter().eq(built_from) => {}
+        Ok(_) => return Ok(None),
+        Err(_) => return Err(sqlx::Error::Protocol("unreadable selection".to_string())),
+    }
     sqlx::query(
         "INSERT INTO briefings
          (id, planned_meeting_id, prompt_version, manifest_json, dropped_count,
@@ -339,7 +387,7 @@ async fn store(
         .await?;
     }
     transaction.commit().await?;
-    Ok(briefing_id)
+    Ok(Some(briefing_id))
 }
 
 pub(super) fn claim_from_row(row: ClaimRow) -> Result<Claim, BriefingError> {
@@ -411,9 +459,13 @@ mod tests {
 
     async fn context_for(
         pool: &SqlitePool,
+        plan: &str,
         selection: &[SelectedSource],
         total_tokens: usize,
     ) -> PackedContext {
+        crate::preparation::selection::select(pool, plan, selection.to_vec())
+            .await
+            .expect("selection");
         let app_data = tempfile::tempdir().expect("app data");
         let budget = Budget {
             per_source_tokens: 1_000,
@@ -453,7 +505,7 @@ mod tests {
             pasted(&pool, "Roadmap", "Alpha ships in May.").await,
             pasted(&pool, "Risks", "Bravo is late.").await,
         ];
-        let context = context_for(&pool, &selection, 6).await;
+        let context = context_for(&pool, &plan, &selection, 6).await;
         assert_eq!(context.manifest[1].status, SourceStatus::Omitted);
         let ordinal = first_ordinal(&context);
         let reply = serde_json::json!({
@@ -505,7 +557,7 @@ mod tests {
         let pool = migrated_pool().await;
         let plan = planned_meeting(&pool).await;
         let selection = vec![pasted(&pool, "Roadmap", "Alpha ships in May.").await];
-        let context = context_for(&pool, &selection, 100).await;
+        let context = context_for(&pool, &plan, &selection, 100).await;
 
         for reply in ["not json", "{\"statements\": [", "{\"items\": []}"] {
             let result = run(&pool, &plan, &context, now(), staged(reply)).await;
@@ -519,7 +571,7 @@ mod tests {
         let pool = migrated_pool().await;
         let plan = planned_meeting(&pool).await;
         let selection = vec![pasted(&pool, "Roadmap", "Alpha ships in May.").await];
-        let context = context_for(&pool, &selection, 100).await;
+        let context = context_for(&pool, &plan, &selection, 100).await;
 
         let result = run(&pool, &plan, &context, now(), |_, _| {
             std::future::ready(Err("offline".to_string()))
@@ -542,7 +594,7 @@ mod tests {
             )
             .await,
         ];
-        let context = context_for(&pool, &selection, 100).await;
+        let context = context_for(&pool, &plan, &selection, 100).await;
         let ordinal = first_ordinal(&context);
         let prompts = Arc::new(Mutex::new(Vec::new()));
         let seen = Arc::clone(&prompts);
@@ -575,7 +627,7 @@ mod tests {
             meeting_id: MEETING_ID.to_string(),
             item_id: items[0].clone(),
         };
-        let context = context_for(&pool, &[knowledge.clone()], 100).await;
+        let context = context_for(&pool, &plan, &[knowledge.clone()], 100).await;
         let reply = r#"{"statements": [
             {"text": "The beta ships Friday.", "source": "S1", "quote": "beta on Friday"},
             {"text": "Empty quote.", "source": "S1", "quote": ""},
