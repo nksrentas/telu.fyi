@@ -17,6 +17,7 @@ mock.module('next/navigation', () => ({ ...originalNavigation, useRouter: () => 
 
 const { toast } = await import('sonner');
 const { PreparationPage } = await import('../../src/components/preparation/preparation-page');
+const { SourceViewer } = await import('../../src/components/preparation/source-viewer');
 
 const AUTOSAVE_WAIT_MS = 800;
 const PLANNED: PlannedMeeting = {
@@ -28,22 +29,39 @@ const PLANNED: PlannedMeeting = {
   updatedUtc: '2026-10-24T08:00:00.000Z',
 };
 
+const LOCAL_ROUTE = {
+  capability: 'summary',
+  providerId: 'builtin-ai',
+  modelId: 'qwen3.5:4b',
+  locationClass: 'local',
+  sanitizedOrigin: 'This device',
+  encrypted: false,
+  validationState: 'validated',
+  resolvedAddresses: [],
+};
+
 let renderer: ReactTestRenderer | null = null;
 const originalTimeZone = process.env.TZ;
-const globals = globalThis as unknown as { window?: unknown };
+const globals = globalThis as unknown as { window?: unknown; document?: unknown };
+const originalDocument = globals.document;
 const originalWindow = globals.window;
-const windowEvents = Object.assign(new EventTarget(), { __TAURI_INTERNALS__: { invoke: ipc } });
+const windowEvents = Object.assign(new EventTarget(), {
+  __TAURI_INTERNALS__: { invoke: ipc, transformCallback: () => 1 },
+  __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener: () => {} },
+});
 const changes = mock(() => {});
 
 beforeAll(() => {
   process.env.TZ = 'UTC';
   globals.window = windowEvents;
+  globals.document = new EventTarget();
   windowEvents.addEventListener('telu:planned-meetings-changed', changes);
 });
 
 afterAll(() => {
   process.env.TZ = originalTimeZone;
   globals.window = originalWindow;
+  globals.document = originalDocument;
   mock.module('next/navigation', () => originalNavigation);
 });
 
@@ -54,6 +72,10 @@ beforeEach(() => {
     documents_list: () => [],
     prep_list_sources: () => [],
     api_get_meetings: () => [],
+    get_current_provider_route: () => LOCAL_ROUTE,
+    prep_get_briefing: () => ({ run: null, briefing: null }),
+    'plugin:event|listen': () => 1,
+    'plugin:event|unlisten': () => null,
     planning_update: (args) => ({ ...PLANNED, title: args.title, startUtc: args.startUtc, purpose: args.purpose }),
   };
 });
@@ -232,6 +254,41 @@ describe('PreparationPage', () => {
     const root = await renderPage();
     expect(textOf(root)).toContain('This planned meeting no longer exists.');
     expect(root.findAll((node) => typeof node.type === 'string' && node.props['aria-label'] === 'Meeting title')).toHaveLength(0);
+  });
+
+  test('a source chip in the brief opens the source viewer at the claim locator', async () => {
+    const claim = {
+      text: 'The launch moves to March.',
+      status: 'cited',
+      sourceRef: 'S1#2',
+      source: { kind: 'document', versionId: 'd-1-v2' },
+      passageId: 'p-3',
+      locatorJson: '{"start":360,"end":438}',
+      quote: 'moves to March',
+    };
+    responses.prep_get_briefing = () => ({
+      run: null,
+      briefing: {
+        id: 'brief-1',
+        promptVersion: 'prep-briefing-v2',
+        createdUtc: '2026-10-25T14:02:00.000Z',
+        droppedCount: 0,
+        droppedQuestionCount: 0,
+        stale: false,
+        manifest: [{ source: claim.source, status: 'included', reason: 'WITHIN_BUDGET', tokens: 30 }],
+        claims: [claim],
+        questions: [],
+      },
+    });
+    responses.documents_get_version = () => {
+      throw 'DOCUMENT_NOT_FOUND';
+    };
+    const root = await renderPage();
+    await settle();
+    expect(root.findByType(SourceViewer).props.target).toBeNull();
+    const chip = root.find((node) => node.type === 'button' && textOf(node).startsWith('Source:'));
+    await act(async () => chip.props.onClick());
+    expect(root.findByType(SourceViewer).props.target).toEqual({ versionId: 'd-1-v2', locator: { start: 360, end: 438 } });
   });
 
   test('a pending edit is saved when the page closes', async () => {

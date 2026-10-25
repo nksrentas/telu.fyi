@@ -342,5 +342,9 @@
   "agenda_list_day": [],
   "planning_list_upcoming": [],
   "documents_list": [],
-  "prep_list_sources": []
+  "prep_list_sources": [],
+  "prep_get_briefing": {
+    "run": null,
+    "briefing": null
+  }
 }

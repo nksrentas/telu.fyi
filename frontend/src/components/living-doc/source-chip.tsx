@@ -3,10 +3,11 @@
 import { forwardRef, type ComponentPropsWithoutRef } from "react"
 import { AlertTriangle, MessageCircle } from "lucide-react"
 
-import type { EvidenceLinkView, KnowledgeItemView } from "@/lib/knowledge-service"
+import type { KnowledgeItemView } from "@/lib/knowledge-service"
 import { formatElapsed } from "@/lib/format-elapsed"
 import { cn } from "@/lib/utils"
 import { useEvidenceNavigation } from "./meeting-page"
+import { claimLinks } from "./transcript-drawer"
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -14,10 +15,6 @@ export function formatEvidenceDay(isoTime: string, now: Date = new Date()): stri
   const date = new Date(isoTime)
   if (Number.isNaN(date.getTime())) return isoTime
   return date.toDateString() === now.toDateString() ? "Today" : `${MONTHS[date.getMonth()]} ${date.getDate()}`
-}
-
-export function claimLinks(item: KnowledgeItemView): EvidenceLinkView[] {
-  return item.evidence.filter((link) => link.role === "claim")
 }
 
 interface SourceChipProps extends Omit<ComponentPropsWithoutRef<"button">, "children"> {
