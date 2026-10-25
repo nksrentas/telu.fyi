@@ -579,8 +579,12 @@
       "touches": [
         "**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "c4a09bb",
+        "ran": "bash .loop/verify.sh (gate: frozen paths unchanged, cargo test 571 lib + integration all ok incl. 119 knowledge::, bun 217 pass 0 fail, node --test 83 pass, tsc 0 src / 36 tests errors, gallery 188 passed); git diff --stat 7c13d69 -- knowledge summary and all other frozen paths: empty; node .github/verify-phase2-know07-status.cjs -> {status: open, reasons: [representative_gate_not_pass]}, identical to the base's committed know-07-status.json",
+        "browser": "WebKit gallery, all 188 screens (94 light + 94 dark) passed"
+      }
     },
     {
       "id": "R2",
