@@ -256,3 +256,15 @@ Did: TE3 was test-only. The code already covered every edge.
 - bun: search-popover.test.tsx types '', spaces, '\t\n ' and NBSP plus ideographic space. It sees zero api_search_transcripts calls.
 Learned: blank queries are guarded twice, by useDebouncedSearch(trimmed) in search-popover.tsx and by the `!query.trim()` check in SidebarProvider.searchTranscripts. Removing just one guard keeps the bun test green. Removing both makes it fail, which I checked.
 Next: next failing item in feature_list.json
+
+## Session 22 · TR1 · 2026-10-25
+Did: regression check only, no code change. At HEAD 92c464d, bash .loop/verify.sh passed every step:
+- cargo: 487 lib tests plus the integration suites
+- bun: 183
+- node contract tests: 70, including the Phase 1 static gates
+- typecheck: 0 errors outside tests/, 36 in tests/
+- gallery: 152 screens
+The knowledge/ and summary/ diff since the base is empty. The KNOW-07 status was computed twice, once from a `git archive` of the base's .github, fixtures and eval dirs in a temp dir and once at HEAD. Both are identical: {"status":"open","reasons":["representative_gate_not_pass"]}. I looked at knowledge-review-undo (light) and today-populated (dark).
+No review subagent ran, because this item has no diff. The earlier items' reviews cover the code.
+Learned: the KNOW-07 status script reads only frozen paths (thresholds-v2.json and the eval reports). So a `git archive <base>` of those dirs plus .github is enough to reproduce the base's output without a worktree.
+Next: TR2

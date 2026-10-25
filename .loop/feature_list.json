@@ -438,8 +438,12 @@
       "touches": [
         "**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "92c464d",
+        "ran": "bash .loop/verify.sh: frozen paths unchanged, rustfmt, cargo 487 lib + 41 integration passed (3 ignored), bun 183/183, node contract 70/70 incl. Phase 1 static gates, typecheck 0 src / 36 tests errors, gallery 152/152; git diff --stat 7c13d69 -- knowledge summary empty; KNOW-07 status at base (git archive) and HEAD identical: {status: open, reasons: [representative_gate_not_pass]}",
+        "browser": "WebKit gallery 152 screens light+dark passed; looked at knowledge-review-undo (light) and today-populated (dark), both render correctly"
+      }
     },
     {
       "id": "TR2",
