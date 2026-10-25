@@ -61,3 +61,10 @@ Lesson: [tests] the first gate run failed at typecheck (38 > 36) because of the 
 Lesson: [bussin-react] review found that an unmount during the awaited acceptAll still scheduled timers → any async handler that schedules work after an await must check a mounted ref or abort.
 Lesson: [this project] Bash was unavailable for most of the session → write the progress note as soon as tools fail, before more code.
 Next: T4
+
+## Session 4 · T4 · 2026-10-25
+Did: WR-42. useMeetingKnowledge in knowledge-section.tsx keeps a request counter ref. A reload applies its reply, or toasts its error, only when it is still the latest request. A late reply from the mount load, or from a previous meetingId, is dropped. New test in knowledge-section.test.tsx holds the mount load and an event-triggered reload as pending promises and resolves them out of order. On base it rendered item-stale.
+Learned:
+- knowledge-section.test.tsx now captures `listen` handlers in a `listeners` map, so tests can fire 'knowledge-updated'. `getMeeting` is reassignable per test and reset in beforeEach.
+- The `knowledge` state is not cleared when meetingId changes, so the old meeting's items stay visible until the new reply arrives. This is existing behaviour and outside T4.
+Next: T5

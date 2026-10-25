@@ -72,8 +72,11 @@
         "frontend/src/components/living-doc/knowledge-section.tsx",
         "frontend/tests/components/knowledge-section.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "14eefdf",
+        "ran": "bash .loop/verify.sh (gate.sh: cargo, bun, node, typecheck, gallery 146 passed); new test 'ignores an older knowledge reply that arrives after a newer one' failed on base with Received: [\"item-stale\"]"
+      }
     },
     {
       "id": "T5",
