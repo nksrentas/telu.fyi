@@ -85,3 +85,14 @@ Standards (not fixed): the new tests call quiet.mockRestore() at the end, not in
 Lesson: [tests] review found that the autoGenerate path of WR-43 was untested, and the first guard I added (Boolean(knowledge) in autoPending) was redundant → check each fix line by reverting it and confirming a test fails.
 Lesson: [tests] a gate run failed on a flaky gallery animation → rerun once before treating a gallery failure in an untouched screen as real.
 Next: T6
+
+## Session 6 · T6 · 2026-10-25
+Did: WR-44 and WR-45 in knowledge-section.tsx.
+- useRunStarter clears routeBlocked whenever a fresh validated routeState arrives.
+- The hidden ProviderBoundary now gets refreshKey={routeCheck}. When the route is blocked or unavailable, the notice shows a "Check again" button that bumps routeCheck.
+- Stop calls stop(): it reloads when cancel returns false, and when cancel rejects it logs and shows toast.error(KNOWLEDGE_COPY.stopFailed).
+- 3 new tests in knowledge-run.test.tsx. All 3 fail on base.
+Learned:
+- ProviderBoundary emits new loading and validated objects on every refreshKey change, so a `[routeState]` effect sees each re-check.
+- The summary model's refreshKey from page-content.tsx is still not passed into KnowledgeSection, so a model change does not re-check the knowledge route by itself. Check again covers the stuck case.
+Next: T7

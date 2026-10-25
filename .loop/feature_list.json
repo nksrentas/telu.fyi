@@ -113,8 +113,12 @@
         "frontend/src/components/living-doc/knowledge-section.tsx",
         "frontend/tests/components/knowledge-run.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "f026f75",
+        "ran": "bash .loop/verify.sh (cargo, bun, node, typecheck, gallery 148 passed); bun knowledge-run.test.tsx 13 pass. On base the 3 new tests failed: no 'Check again' button (Find knowledge stayed disabled), the rejected cancel produced no toast, a false cancel did no reload (1 get_meeting call, expected 2)",
+        "browser": "not ui; gallery passed in gate"
+      }
     },
     {
       "id": "T7",
