@@ -57,7 +57,7 @@ pub async fn load_questions(
 ) -> Result<Vec<Question>, BriefingError> {
     sqlx::query_as::<_, ClaimRow>(
         "SELECT text, source_ref, document_version_id, passage_id, knowledge_meeting_id,
-                knowledge_item_id, locator_json, quote, status, rationale
+                knowledge_item_id, knowledge_revision_id, locator_json, quote, status, rationale
          FROM briefing_claims WHERE briefing_id = ? AND kind = 'question' ORDER BY ordinal",
     )
     .bind(briefing_id)

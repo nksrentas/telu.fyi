@@ -53,6 +53,7 @@ impl BriefingError {
 #[serde(rename_all = "snake_case")]
 pub enum ClaimStatus {
     Cited,
+    Stale,
     SourceUnavailable,
 }
 
@@ -66,6 +67,8 @@ pub struct Claim {
     pub passage_id: Option<String>,
     pub locator_json: Option<String>,
     pub quote: String,
+    #[serde(skip)]
+    pub revision_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +94,7 @@ pub(super) struct ClaimRow {
     passage_id: Option<String>,
     knowledge_meeting_id: Option<String>,
     knowledge_item_id: Option<String>,
+    knowledge_revision_id: Option<String>,
     locator_json: Option<String>,
     quote: String,
     status: String,
@@ -195,7 +199,7 @@ pub async fn load_claims(
 ) -> Result<Vec<Claim>, BriefingError> {
     sqlx::query_as::<_, ClaimRow>(
         "SELECT text, source_ref, document_version_id, passage_id, knowledge_meeting_id,
-                knowledge_item_id, locator_json, quote, status, rationale
+                knowledge_item_id, knowledge_revision_id, locator_json, quote, status, rationale
          FROM briefing_claims WHERE briefing_id = ? AND kind = 'statement' ORDER BY ordinal",
     )
     .bind(briefing_id)
@@ -273,13 +277,13 @@ pub(super) fn verify(
     if !piece_text(piece).contains(quote) {
         return Err("QUOTE_NOT_FOUND");
     }
-    let (passage_id, locator_json) = match piece {
+    let (passage_id, locator_json, revision_id) = match piece {
         ContextPiece::Passage {
             passage_id,
             locator_json,
             ..
-        } => (Some(passage_id.clone()), Some(locator_json.clone())),
-        ContextPiece::Knowledge { .. } => (None, None),
+        } => (Some(passage_id.clone()), Some(locator_json.clone()), None),
+        ContextPiece::Knowledge { revision_id, .. } => (None, None, revision_id.clone()),
     };
     Ok(Claim {
         text: text.to_string(),
@@ -289,6 +293,7 @@ pub(super) fn verify(
         passage_id,
         locator_json,
         quote: quote.to_string(),
+        revision_id,
     })
 }
 
@@ -375,9 +380,9 @@ async fn store(
         sqlx::query(
             "INSERT INTO briefing_claims
              (id, briefing_id, ordinal, text, source_ref, source_kind, document_version_id,
-              passage_id, knowledge_meeting_id, knowledge_item_id, locator_json, quote,
-              kind, rationale)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              passage_id, knowledge_meeting_id, knowledge_item_id, knowledge_revision_id,
+              locator_json, quote, kind, rationale)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
         .bind(Uuid::new_v4().to_string())
         .bind(&briefing_id)
@@ -389,6 +394,7 @@ async fn store(
         .bind(&claim.passage_id)
         .bind(meeting_id)
         .bind(item_id)
+        .bind(&claim.revision_id)
         .bind(&claim.locator_json)
         .bind(&claim.quote)
         .bind(kind_of_claim)
@@ -426,6 +432,7 @@ pub(super) fn claim_from_row(row: ClaimRow) -> Result<Claim, BriefingError> {
         passage_id: row.passage_id,
         locator_json: row.locator_json,
         quote: row.quote,
+        revision_id: row.knowledge_revision_id,
     })
 }
 

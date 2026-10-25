@@ -25,7 +25,7 @@ export interface PreparationRun {
 
 export interface BriefingClaim {
   text: string;
-  status: 'cited' | 'source_unavailable';
+  status: 'cited' | 'stale' | 'source_unavailable';
   sourceRef: string;
   source: SelectedSource;
   passageId: string | null;
