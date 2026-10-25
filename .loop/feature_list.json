@@ -554,8 +554,12 @@
         "frontend/tests/components/**",
         "frontend/tests/visual/screens/preparation.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "2254881",
+        "ran": "bash .loop/verify.sh (gate: all steps passed, 217 bun pass, 188 gallery passed; first run had the known flaky peek-inline-transcript light), bun test tests/components/preparation-edges.test.tsx 4 pass",
+        "browser": "WebKit gallery preparation-edge-twelve-sources and preparation-edge-twelve-brief at 1100x700, light and dark: 12 source rows lay out, 200-char source title truncates with ellipsis, chip truncates, provenance line shortened"
+      }
     },
     {
       "id": "R1",
