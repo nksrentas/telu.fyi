@@ -534,5 +534,193 @@
         "waitFor": "text=This source was deleted"
       }
     ]
+  },
+  {
+    "name": "preparation-knowledge-picker",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "prep_list_sources": [
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+          "itemId": "k-2"
+        }
+      ],
+      "knowledge_get_meeting": {
+        "$byArg": "meetingId",
+        "cases": {
+          "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d": {
+            "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+            "latestRun": null,
+            "items": [
+              {
+                "itemId": "k-dec",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "decision",
+                "text": "Ship the beta to design partners on Oct 6",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-com",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "commitment",
+                "text": "Ana sends the pricing draft before Friday",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-q",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "question",
+                "text": "Do we need SSO for the launch customers?",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-p",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "originRunId": "run-1",
+                "itemType": "decision",
+                "text": "Move standup to 9:30",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "proposed",
+                "eligibility": false,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              }
+            ],
+            "rejected": [],
+            "pendingCount": 0,
+            "acceptedCount": 4,
+            "skippedCount": 0
+          },
+          "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e": {
+            "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+            "latestRun": null,
+            "items": [
+              {
+                "itemId": "k-2",
+                "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+                "originRunId": "run-1",
+                "itemType": "decision",
+                "text": "Keep the translucent sidebar in dark mode",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              },
+              {
+                "itemId": "k-3",
+                "meetingId": "8c2d3e4f-5061-4b7c-9d8e-0f1a2b3c4d5e",
+                "originRunId": "run-1",
+                "itemType": "question",
+                "text": "Should the Island show a timer?",
+                "ownerText": null,
+                "ownerSupport": "not_stated",
+                "dueText": null,
+                "dueSupport": "not_stated",
+                "reviewState": "accepted",
+                "eligibility": true,
+                "evidenceStatus": "valid",
+                "corrected": false,
+                "latestRevisionId": null,
+                "unresolved": false,
+                "createdAtUtc": "2026-09-27T09:40:00Z",
+                "evidence": []
+              }
+            ],
+            "rejected": [],
+            "pendingCount": 0,
+            "acceptedCount": 2,
+            "skippedCount": 0
+          }
+        },
+        "default": {
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "latestRun": null,
+          "items": [],
+          "rejected": [],
+          "pendingCount": 0,
+          "acceptedCount": 0,
+          "skippedCount": 0
+        }
+      }
+    },
+    "steps": [
+      {
+        "click": "button[aria-expanded]:has-text(\"Weekly product sync\")"
+      },
+      {
+        "waitFor": "text=Ship the beta to design partners"
+      },
+      {
+        "click": "button[aria-expanded]:has-text(\"Design review\")"
+      },
+      {
+        "waitFor": "text=Keep the translucent sidebar"
+      }
+    ]
   }
 ]

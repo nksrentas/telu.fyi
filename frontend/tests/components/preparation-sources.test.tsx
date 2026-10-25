@@ -77,6 +77,7 @@ beforeEach(() => {
   responses = {
     documents_list: () => [],
     prep_list_sources: () => [],
+    api_get_meetings: () => [],
     prep_select_sources: (args) => args.sources,
   };
 });

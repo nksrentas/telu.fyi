@@ -5,6 +5,7 @@ import { ClipboardPaste, FileUp } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { KnowledgePicker } from "@/components/preparation/knowledge-picker"
 import {
   importDocument,
   listDocuments,
@@ -52,7 +53,7 @@ function useSources(plannedMeetingId: string) {
   const [selection, setSelection] = useState<SelectedSource[]>([])
   const [error, setError] = useState<string | null>(null)
   const latest = useRef<SelectedSource[]>([])
-  const queue = useRef<Promise<void>>(Promise.resolve())
+  const queue = useRef<Promise<string | null>>(Promise.resolve(null))
 
   const show = useCallback((sources: SelectedSource[]) => {
     latest.current = sources
@@ -79,13 +80,14 @@ function useSources(plannedMeetingId: string) {
   }, [plannedMeetingId, reload, show])
 
   const select = useCallback(
-    (change: (current: SelectedSource[]) => SelectedSource[]) => {
+    (change: (current: SelectedSource[]) => SelectedSource[]): Promise<string | null> => {
       queue.current = queue.current.then(async () => {
         try {
           show(await selectSources(plannedMeetingId, change(latest.current)))
           setError(null)
+          return null
         } catch (selectError) {
-          setError(sourceErrorMessage(String(selectError)))
+          return String(selectError)
         }
       })
       return queue.current
@@ -99,7 +101,10 @@ function useSources(plannedMeetingId: string) {
       if (!result.value) return null
       await reload()
       const versionId = result.value.id
-      if (result.value.extractionStatus === "extracted") await select((current) => [...current, { kind: "document", versionId }])
+      if (result.value.extractionStatus === "extracted") {
+        const code = await select((current) => [...current, { kind: "document", versionId }])
+        if (code) setError(sourceErrorMessage(code))
+      }
       return null
     },
     [reload, select]
@@ -118,58 +123,65 @@ export function SourcesPanel({ plannedMeetingId, onOpenSource }: SourcesPanelPro
   const [pasting, setPasting] = useState(false)
   const included = new Set(selection.flatMap((source) => (source.kind === "document" ? [source.versionId] : [])))
 
-  const toggle = (versionId: string) =>
-    select((current) =>
+  const showError = (code: string) => setError(sourceErrorMessage(code))
+
+  const toggle = async (versionId: string) => {
+    const code = await select((current) =>
       current.some((source) => source.kind === "document" && source.versionId === versionId)
         ? current.filter((source) => source.kind !== "document" || source.versionId !== versionId)
         : [...current, { kind: "document", versionId }]
     )
+    if (code) showError(code)
+  }
 
   const runImport = async () => {
     const code = await add(await importDocument())
-    if (code) setError(sourceErrorMessage(code))
+    if (code) showError(code)
   }
 
   return (
-    <section aria-labelledby="planned-sources-heading" className="mt-11">
-      <div className="mb-3 flex items-center gap-2">
-        <h2 id="planned-sources-heading" className="m-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.07em] text-label-3">
-          Sources
-        </h2>
-        <Button variant="plain" size="sm" onClick={() => setPasting(true)} className="gap-1 text-accent">
-          <ClipboardPaste className="size-3" aria-hidden />
-          Paste
-        </Button>
-        <Button variant="plain" size="sm" onClick={runImport} className="gap-1 text-accent">
-          <FileUp className="size-3" aria-hidden />
-          Import
-        </Button>
-      </div>
-      {error && (
-        <p role="alert" className="m-0 mb-2 text-[12px] text-coral-ink">
-          {error}
-        </p>
-      )}
-      {documents?.length === 0 && (
-        <p className="m-0 rounded-[12px] bg-surface-sunken px-3.5 py-3 text-[12px] text-label-2">
-          No sources yet. Paste notes or import a Markdown or text file.
-        </p>
-      )}
-      {documents && documents.length > 0 && (
-        <ul className="m-0 list-none space-y-1 p-0">
-          {documents.map((document) => (
-            <SourceRow
-              key={document.id}
-              document={document}
-              included={included.has(document.latestVersionId)}
-              onToggle={() => toggle(document.latestVersionId)}
-              onOpen={() => onOpenSource(document.latestVersionId)}
-            />
-          ))}
-        </ul>
-      )}
-      <PasteSourceDialog open={pasting} onOpenChange={setPasting} onSubmit={(title, text) => pasteDocument(title, text).then(add)} />
-    </section>
+    <>
+      <section aria-labelledby="planned-sources-heading" className="mt-11">
+        <div className="mb-3 flex items-center gap-2">
+          <h2 id="planned-sources-heading" className="m-0 flex-1 text-[11px] font-semibold uppercase tracking-[0.07em] text-label-3">
+            Sources
+          </h2>
+          <Button variant="plain" size="sm" onClick={() => setPasting(true)} className="gap-1 text-accent">
+            <ClipboardPaste className="size-3" aria-hidden />
+            Paste
+          </Button>
+          <Button variant="plain" size="sm" onClick={runImport} className="gap-1 text-accent">
+            <FileUp className="size-3" aria-hidden />
+            Import
+          </Button>
+        </div>
+        {error && (
+          <p role="alert" className="m-0 mb-2 text-[12px] text-coral-ink">
+            {error}
+          </p>
+        )}
+        {documents?.length === 0 && (
+          <p className="m-0 rounded-[12px] bg-surface-sunken px-3.5 py-3 text-[12px] text-label-2">
+            No sources yet. Paste notes or import a Markdown or text file.
+          </p>
+        )}
+        {documents && documents.length > 0 && (
+          <ul className="m-0 list-none space-y-1 p-0">
+            {documents.map((document) => (
+              <SourceRow
+                key={document.id}
+                document={document}
+                included={included.has(document.latestVersionId)}
+                onToggle={() => toggle(document.latestVersionId)}
+                onOpen={() => onOpenSource(document.latestVersionId)}
+              />
+            ))}
+          </ul>
+        )}
+        <PasteSourceDialog open={pasting} onOpenChange={setPasting} onSubmit={(title, text) => pasteDocument(title, text).then(add)} />
+      </section>
+      <KnowledgePicker selection={selection} select={select} onError={showError} />
+    </>
   )
 }
 
