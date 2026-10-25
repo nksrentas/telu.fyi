@@ -1,8 +1,13 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
+const originalCore = { ...await import("@tauri-apps/api/core") };
+afterAll(() => {
+  mock.module("@tauri-apps/api/core", () => originalCore);
+});
 const invokeMock = mock(async () => null);
 
 mock.module("@tauri-apps/api/core", () => ({
+  ...originalCore,
   invoke: invokeMock,
 }));
 

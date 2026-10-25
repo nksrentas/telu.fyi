@@ -20,7 +20,12 @@ export const REVIEW_TOAST = {
   rejected: "Rejected — it won't come back unless you restore it",
   restored: "Restored — it's back in review",
   corrected: 'Correction saved — Telu keeps your wording',
+  noneAccepted: 'Nothing was accepted — these items were already reviewed',
+  undoStale: 'This item changed since. Nothing was undone.',
+  undoPartial: 'Some items changed since. Only part of this was undone.',
 };
+
+const CHANGED_ELSEWHERE = new Set(['KNOWLEDGE_REVISION_CONFLICT', 'KNOWLEDGE_INVALID_TRANSITION', 'KNOWLEDGE_ITEM_NOT_FOUND']);
 
 interface UndoEntry {
   itemIds: string[];
@@ -55,17 +60,20 @@ function isTextField(target: EventTarget | null): boolean {
   return element.tagName === 'INPUT' || element.tagName === 'TEXTAREA' || element.isContentEditable === true;
 }
 
-function useUndoShortcut(canUndo: () => boolean, undo: () => void) {
+function useUndoShortcut(undoLatest: () => boolean) {
+  const handler = useRef(undoLatest);
+  useEffect(() => {
+    handler.current = undoLatest;
+  });
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!event.metaKey || event.shiftKey || event.altKey || event.ctrlKey || event.key.toLowerCase() !== 'z') return;
-      if (event.defaultPrevented || isTextField(event.target) || !canUndo()) return;
-      event.preventDefault();
-      undo();
+      if (event.defaultPrevented || isTextField(event.target)) return;
+      if (handler.current()) event.preventDefault();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [canUndo, undo]);
+  }, []);
 }
 
 function nextPending(items: KnowledgeItemView[], itemId: string): KnowledgeItemView | undefined {
@@ -74,34 +82,106 @@ function nextPending(items: KnowledgeItemView[], itemId: string): KnowledgeItemV
   return items.slice(index + 1).find(pending) ?? items.find(pending);
 }
 
+interface LiveUndo extends UndoEntry {
+  toastId: string;
+}
+
+// Module-wide so a remounted block never reuses the id of a toast still on screen.
+let undoToastCount = 0;
+
+// Each Undo toast owns its entry; ⌘Z takes the newest. A toast whose undo no longer applies is dismissed.
 function useUndo(meetingId: string, apply: (view: KnowledgeItemView) => void) {
-  const last = useRef<UndoEntry | null>(null);
-  const undo = useCallback(async () => {
-    const entry = last.current;
-    last.current = null;
+  const live = useRef<LiveUndo[]>([]);
+  const drop = useCallback((stale: (entry: LiveUndo) => boolean) => {
+    live.current = live.current.filter((entry) => {
+      if (!stale(entry)) return true;
+      toast.dismiss(entry.toastId);
+      return false;
+    });
+  }, []);
+  const undo = useCallback(async (toastId: string) => {
+    const entry = live.current.find((candidate) => candidate.toastId === toastId);
     if (!entry) return;
+    drop((candidate) => candidate === entry);
+    let undone = 0;
     try {
-      for (const itemId of entry.itemIds) apply(await reviewKnowledgeItem(meetingId, itemId, entry.action));
+      for (const itemId of entry.itemIds) {
+        apply(await reviewKnowledgeItem(meetingId, itemId, entry.action));
+        undone += 1;
+      }
     } catch (error) {
+      if (typeof error === 'string' && CHANGED_ELSEWHERE.has(error)) {
+        toast.info(undone === 0 ? REVIEW_TOAST.undoStale : REVIEW_TOAST.undoPartial);
+        return;
+      }
       console.error('Failed to undo the review action:', error);
       toast.error(REVIEW_ERROR);
     }
-  }, [meetingId, apply]);
-  const remember = useCallback((entry: UndoEntry | null) => {
-    last.current = entry;
+  }, [meetingId, apply, drop]);
+  const remember = useCallback((entry: UndoEntry): string => {
+    drop((candidate) => candidate.itemIds.some((itemId) => entry.itemIds.includes(itemId)));
+    undoToastCount += 1;
+    const toastId = `review-undo-${undoToastCount}`;
+    live.current = [...live.current, { ...entry, toastId }];
+    return toastId;
+  }, [drop]);
+  const forgetAll = useCallback(() => drop(() => true), [drop]);
+  const expire = useCallback((toastId: string) => {
+    live.current = live.current.filter((entry) => entry.toastId !== toastId);
   }, []);
-  const canUndo = useCallback(() => last.current !== null, []);
-  useUndoShortcut(canUndo, () => void undo());
-  return { undo, remember };
+  useUndoShortcut(() => {
+    const latest: LiveUndo | undefined = live.current[live.current.length - 1];
+    if (latest) void undo(latest.toastId);
+    return latest !== undefined;
+  });
+  return { undo, remember, forgetAll, expire };
+}
+
+function useStaggeredApply(apply: (view: KnowledgeItemView) => void) {
+  const pending = useRef(new Map<string, number>());
+  const mounted = useRef(true);
+  const cancel = useCallback((itemId: string) => {
+    window.clearTimeout(pending.current.get(itemId));
+    pending.current.delete(itemId);
+  }, []);
+  const applyNow = useCallback((view: KnowledgeItemView) => {
+    cancel(view.itemId);
+    apply(view);
+  }, [apply, cancel]);
+  const applyLater = useCallback((view: KnowledgeItemView, delayMs: number) => {
+    if (!mounted.current) return;
+    cancel(view.itemId);
+    pending.current.set(view.itemId, window.setTimeout(() => {
+      pending.current.delete(view.itemId);
+      apply(view);
+    }, delayMs));
+  }, [apply, cancel]);
+  useEffect(() => {
+    const timers = pending.current;
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      timers.forEach((timer) => window.clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+  return { applyNow, applyLater };
 }
 
 function prefersReducedMotion(): boolean {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-type UndoToast = (entry: UndoEntry) => { action: { label: string; onClick: () => void } };
+interface UndoToastOptions {
+  id: string;
+  action: { label: string; onClick: () => void };
+  onDismiss: () => void;
+  onAutoClose: () => void;
+}
 
-function useAcceptAll(meetingId: string, items: KnowledgeItemView[], apply: (view: KnowledgeItemView) => void, withUndo: UndoToast) {
+type UndoToast = (entry: UndoEntry) => UndoToastOptions;
+
+function useAcceptAll(meetingId: string, items: KnowledgeItemView[], applyLater: (view: KnowledgeItemView, delayMs: number) => void, withUndo: UndoToast) {
   const [acceptingAll, setAcceptingAll] = useState(false);
   const acceptAll = async () => {
     const itemIds = items.filter((item) => item.reviewState === 'proposed').map((item) => item.itemId);
@@ -109,11 +189,15 @@ function useAcceptAll(meetingId: string, items: KnowledgeItemView[], apply: (vie
     try {
       const result = await acceptAllKnowledgeItems(meetingId, itemIds);
       const stagger = prefersReducedMotion() ? 0 : ACCEPT_ALL_STAGGER_MS;
-      itemIds.forEach((itemId, index) => {
-        const view = result.items.find((item) => item.itemId === itemId);
-        if (view) window.setTimeout(() => apply(view), index * stagger);
-      });
-      toast.success(`Accepted ${itemIds.length} items`, withUndo({ itemIds, action: 'reopen' }));
+      const requested = new Set(itemIds);
+      const views = result.items.filter((item) => requested.has(item.itemId));
+      views.forEach((view, index) => applyLater(view, index * stagger));
+      const acceptedIds = views.filter((view) => view.reviewState === 'accepted').map((view) => view.itemId);
+      if (acceptedIds.length === 0) {
+        toast.info(REVIEW_TOAST.noneAccepted);
+        return;
+      }
+      toast.success(`Accepted ${acceptedIds.length} items`, withUndo({ itemIds: acceptedIds, action: 'reopen' }));
     } catch (error) {
       console.error('Failed to accept all knowledge items:', error);
       toast.error(REVIEW_ERROR);
@@ -124,7 +208,7 @@ function useAcceptAll(meetingId: string, items: KnowledgeItemView[], apply: (vie
   return { acceptingAll, acceptAll };
 }
 
-function useDecisions(items: KnowledgeItemView[], apply: (view: KnowledgeItemView) => void, withUndo: UndoToast, remember: (entry: UndoEntry | null) => void) {
+function useDecisions(items: KnowledgeItemView[], apply: (view: KnowledgeItemView) => void, withUndo: UndoToast, forgetAll: () => void) {
   const rows = useRef(new Map<string, HTMLElement>());
   const onDecided = ({ view, action }: CandidateDecision) => {
     const next = action === 'accept' ? nextPending(items, view.itemId) : undefined;
@@ -135,7 +219,7 @@ function useDecisions(items: KnowledgeItemView[], apply: (view: KnowledgeItemVie
     } else if (action === 'reject') {
       toast.info(REVIEW_TOAST.rejected, withUndo({ itemIds: [view.itemId], action: 'restore' }));
     } else {
-      remember(null);
+      forgetAll();
       if (action === 'correct') toast.success(REVIEW_TOAST.corrected);
       if (action === 'restore') toast.success(REVIEW_TOAST.restored);
     }
@@ -153,13 +237,14 @@ export function ReviewBlock({ meetingId, knowledge, onChange }: ReviewBlockProps
   const latestRun = knowledge.latestRun;
   const runFor = (item: KnowledgeItemView) => (latestRun?.runId === item.originRunId ? latestRun : null);
   const apply = useCallback((view: KnowledgeItemView) => onChange((current) => withItem(current, view)), [onChange]);
-  const { undo, remember } = useUndo(meetingId, apply);
+  const { applyNow, applyLater } = useStaggeredApply(apply);
+  const { undo, remember, forgetAll, expire } = useUndo(meetingId, applyNow);
   const withUndo: UndoToast = (entry) => {
-    remember(entry);
-    return { action: { label: 'Undo', onClick: () => void undo() } };
+    const id = remember(entry);
+    return { id, action: { label: 'Undo', onClick: () => void undo(id) }, onDismiss: () => expire(id), onAutoClose: () => expire(id) };
   };
-  const { acceptingAll, acceptAll } = useAcceptAll(meetingId, knowledge.items, apply, withUndo);
-  const { rows, onDecided } = useDecisions(knowledge.items, apply, withUndo, remember);
+  const { acceptingAll, acceptAll } = useAcceptAll(meetingId, knowledge.items, applyLater, withUndo);
+  const { rows, onDecided } = useDecisions(knowledge.items, applyNow, withUndo, forgetAll);
   const skipped = latestRun?.status === 'succeeded' ? latestRun.skippedCount : 0;
 
   return (

@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from 'bun:test';
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test';
 import type { ReactNode } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import type { EffectiveRoute } from '../../src/services/providerRouteService';
@@ -30,7 +30,16 @@ mock.module('../../src/components/ui/popover', () => ({
 
 const notify = mock(() => {});
 mock.module('sonner', () => ({ toast: { info: notify, error: notify, success: notify, warning: notify } }));
-mock.module('@tauri-apps/api/event', () => ({ listen: async () => () => {} }));
+type Listener = (event: { payload: unknown }) => void;
+const listeners = new Map<string, Listener>();
+const subscribe = async (name: string, handler: Listener) => {
+  listeners.set(name, handler);
+  return () => listeners.delete(name);
+};
+let listen: (name: string, handler: Listener) => Promise<() => void> = subscribe;
+mock.module('@tauri-apps/api/event', () => ({
+  listen: (name: string, handler: Listener) => listen(name, handler),
+}));
 
 const route = (validationState: EffectiveRoute['validationState']): EffectiveRoute => ({
   capability: 'summary',
@@ -83,9 +92,10 @@ const knowledge: MeetingKnowledgeView = {
 };
 
 let currentRoute = route('validated');
+let getMeeting: () => Promise<MeetingKnowledgeView> = async () => knowledge;
 const invoke = mock(async (command: string): Promise<unknown> => {
   if (command === 'get_current_provider_route') return currentRoute;
-  if (command === 'knowledge_get_meeting') return knowledge;
+  if (command === 'knowledge_get_meeting') return getMeeting();
   if (command === 'knowledge_list_runs') return [];
   if (command === 'validate_provider_route') return currentRoute;
   if (command === 'knowledge_cancel_extraction') return true;
@@ -97,14 +107,17 @@ const { KnowledgeSection } = await import('../../src/components/living-doc/knowl
 const textOf = (node: ReactTestInstance): string =>
   node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('');
 
-async function renderSection() {
+async function renderSection(autoGenerate = false) {
   let renderer: ReactTestRenderer | undefined;
   await act(async () => {
-    renderer = create(<KnowledgeSection meetingId="meeting-a" />);
+    renderer = create(<KnowledgeSection meetingId="meeting-a" autoGenerate={autoGenerate} />);
   });
   await act(async () => {});
   return renderer!;
 }
+
+const buttonsLabelled = (renderer: ReactTestRenderer, label: string) =>
+  renderer.root.findAll((node) => node.type === 'button' && textOf(node) === label);
 
 const findKnowledgeButton = (renderer: ReactTestRenderer) =>
   renderer.root.find((node) => node.type === 'button' && textOf(node) === 'Find knowledge');
@@ -112,7 +125,93 @@ const findKnowledgeButton = (renderer: ReactTestRenderer) =>
 describe('KnowledgeSection', () => {
   beforeEach(() => {
     invoke.mockClear();
+    notify.mockClear();
     currentRoute = route('validated');
+    getMeeting = async () => knowledge;
+    listen = subscribe;
+  });
+
+  test('shows a load error with Try again when the knowledge load fails, and Try again reloads', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => {});
+    getMeeting = async () => { throw 'KNOWLEDGE_INVALID_REQUEST'; };
+
+    const renderer = await renderSection();
+
+    expect(textOf(renderer.root)).toContain("Couldn't load knowledge for this meeting.");
+    expect(renderer.root.findAll((node) => node.props['aria-busy'] !== undefined)).toHaveLength(0);
+    const loads = () => invoke.mock.calls.filter(([command]) => command === 'knowledge_get_meeting').length;
+    expect(loads()).toBe(1);
+    expect(notify).not.toHaveBeenCalled();
+
+    getMeeting = async () => knowledge;
+    await act(async () => buttonsLabelled(renderer, 'Try again')[0].props.onClick());
+
+    expect(loads()).toBe(2);
+    expect(textOf(renderer.root)).not.toContain("Couldn't load knowledge for this meeting.");
+    expect(renderer.root.findAll((node) => node.props['data-item-id'] === 'item-1').length).toBeGreaterThan(0);
+    quiet.mockRestore();
+  });
+
+  test('shows the load error, not a running spinner, when an auto-generate load fails', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => {});
+    getMeeting = async () => { throw 'KNOWLEDGE_INVALID_REQUEST'; };
+
+    const renderer = await renderSection(true);
+
+    expect(textOf(renderer.root)).toContain("Couldn't load knowledge for this meeting.");
+    expect(textOf(renderer.root)).not.toContain('Reading the transcript…');
+    quiet.mockRestore();
+  });
+
+  test('keeps the status block and items when a reload after a good load fails', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => {});
+    const renderer = await renderSection();
+
+    getMeeting = async () => { throw 'KNOWLEDGE_INVALID_REQUEST'; };
+    await act(async () => {
+      listeners.get('knowledge-updated')?.({ payload: { meetingId: 'meeting-a' } });
+    });
+
+    expect(textOf(renderer.root)).toContain("Couldn't load knowledge for this meeting.");
+    expect(findKnowledgeButton(renderer).props.disabled).toBe(false);
+    expect(renderer.root.findAll((node) => node.props['data-item-id'] === 'item-1').length).toBeGreaterThan(0);
+    quiet.mockRestore();
+  });
+
+  test('logs a rejected knowledge-updated subscription instead of leaving it unhandled', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => {});
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    listen = async () => { throw new Error('listen failed'); };
+
+    await renderSection();
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
+    process.off('unhandledRejection', onUnhandled);
+    expect(unhandled).toEqual([]);
+    expect(quiet.mock.calls.some(([message]) => message === 'Failed to listen for knowledge updates:')).toBe(true);
+    quiet.mockRestore();
+  });
+
+  test('ignores an older knowledge reply that arrives after a newer one', async () => {
+    const pending: Array<(view: MeetingKnowledgeView) => void> = [];
+    getMeeting = () => new Promise((resolve) => pending.push(resolve));
+    const stale = { ...knowledge, items: [{ ...knowledge.items[0], itemId: 'item-stale', text: 'Stale reply' }] };
+    const fresh = { ...knowledge, items: [{ ...knowledge.items[0], itemId: 'item-fresh', text: 'Fresh reply' }] };
+
+    const renderer = await renderSection();
+    await act(async () => {
+      listeners.get('knowledge-updated')?.({ payload: { meetingId: 'meeting-a' } });
+    });
+    expect(pending).toHaveLength(2);
+    await act(async () => pending[1](fresh));
+    await act(async () => pending[0](stale));
+
+    const itemIds = renderer.root.findAll((node) => typeof node.type === 'string' && node.props['data-item-id'] !== undefined)
+      .map((node) => node.props['data-item-id']);
+    expect(itemIds).toContain('item-fresh');
+    expect(itemIds).not.toContain('item-stale');
   });
 
   test('renders the candidate row text and its evidence quote as plain text', async () => {

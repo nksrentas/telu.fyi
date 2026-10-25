@@ -755,6 +755,17 @@ pub async fn api_delete_api_key<R: Runtime>(
     }
 }
 
+pub async fn delete_meeting_then_cancel_extraction(
+    pool: &sqlx::SqlitePool,
+    meeting_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let deleted = MeetingsRepository::delete_meeting(pool, meeting_id).await?;
+    if deleted && crate::knowledge::extraction::cancel_active_extraction(meeting_id) {
+        log_info!("Cancelled active knowledge extraction for deleted meeting {}", meeting_id);
+    }
+    Ok(deleted)
+}
+
 #[tauri::command]
 pub async fn api_delete_meeting<R: Runtime>(
     _app: AppHandle<R>,
@@ -769,11 +780,8 @@ pub async fn api_delete_meeting<R: Runtime>(
     );
 
     let pool = state.db_manager.pool();
-    if crate::knowledge::extraction::cancel_active_extraction(&meeting_id) {
-        log_info!("Cancelled active knowledge extraction before deleting meeting {}", meeting_id);
-    }
 
-    match MeetingsRepository::delete_meeting(pool, &meeting_id).await {
+    match delete_meeting_then_cancel_extraction(pool, &meeting_id).await {
         Ok(true) => {
             log_info!("Successfully deleted meeting {}", meeting_id);
             Ok(serde_json::json!({

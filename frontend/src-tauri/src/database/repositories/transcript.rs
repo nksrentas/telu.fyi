@@ -274,26 +274,34 @@ impl TranscriptsRepository {
 
         let rows = sqlx::query_as::<_, (String, String, String, String)>(
             "SELECT id, title, body, position FROM (
-                SELECT m.id AS id, m.title AS title, m.title AS body, '' AS position,
-                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)) AS sort_key
-                FROM meetings m
-                WHERE LOWER(m.title) LIKE ?1 ESCAPE '\\'
-                UNION ALL
-                SELECT m.id, m.title, e.transcript,
-                       printf('%02d:%02d', CAST(e.audio_start_time AS INTEGER) / 60,
-                              CAST(e.audio_start_time AS INTEGER) % 60),
-                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT))
-                FROM meetings m
-                JOIN transcript_evidence e ON e.meeting_id = m.id
-                WHERE LOWER(e.transcript) LIKE ?1 ESCAPE '\\'
-                UNION ALL
-                SELECT m.id, m.title, t.transcript, t.timestamp,
-                       COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT))
-                FROM meetings m
-                JOIN transcripts t ON t.meeting_id = m.id
-                WHERE LOWER(t.transcript) LIKE ?1 ESCAPE '\\'
+                SELECT id, title, body, position, sort_key,
+                       ROW_NUMBER() OVER (PARTITION BY id ORDER BY kind, rank) AS best
+                FROM (
+                    SELECT m.id AS id, m.title AS title, m.title AS body, '' AS position,
+                           COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)) AS sort_key,
+                           0 AS kind, 0 AS rank
+                    FROM meetings m
+                    WHERE LOWER(m.title) LIKE ?1 ESCAPE '\\'
+                    UNION ALL
+                    SELECT m.id, m.title, e.transcript,
+                           printf('%02d:%02d', CAST(e.audio_start_time AS INTEGER) / 60,
+                                  CAST(e.audio_start_time AS INTEGER) % 60),
+                           COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)),
+                           1, e.sequence
+                    FROM meetings m
+                    JOIN transcript_evidence e ON e.meeting_id = m.id
+                    WHERE LOWER(e.transcript) LIKE ?1 ESCAPE '\\'
+                    UNION ALL
+                    SELECT m.id, m.title, t.transcript, t.timestamp,
+                           COALESCE(m.started_at_utc, CAST(m.created_at AS TEXT)),
+                           2, t.timestamp
+                    FROM meetings m
+                    JOIN transcripts t ON t.meeting_id = m.id
+                    WHERE LOWER(t.transcript) LIKE ?1 ESCAPE '\\'
+                )
              )
-             ORDER BY sort_key DESC
+             WHERE best = 1
+             ORDER BY sort_key DESC, id
              LIMIT 50",
         )
         .bind(like_pattern(query))
@@ -311,28 +319,34 @@ impl TranscriptsRepository {
             .collect())
     }
 
-    /// Helper function to extract a snippet of text around the first match of a query.
+    /// Works in character positions of the original text, because lowercasing can change byte lengths.
     fn get_match_context(transcript: &str, query: &str) -> String {
-        let transcript_lower = transcript.to_lowercase();
-        let query_lower = query.to_lowercase();
-
-        match transcript_lower.find(&query_lower) {
-            Some(match_index) => {
-                let start_index = match_index.saturating_sub(100);
-                let end_index = (match_index + query.len() + 100).min(transcript.len());
-
-                let mut context = String::new();
-                if start_index > 0 {
-                    context.push_str("...");
-                }
-                context.push_str(&transcript[start_index..end_index]);
-                if end_index < transcript.len() {
-                    context.push_str("...");
-                }
-                context
-            }
-            None => transcript.chars().take(200).collect(), // Fallback to the start of the transcript
+        const CONTEXT_CHARS: usize = 100;
+        let chars: Vec<char> = transcript.chars().collect();
+        let query_lower: String = query.chars().flat_map(char::to_lowercase).collect();
+        if query_lower.is_empty() {
+            return chars.iter().take(2 * CONTEXT_CHARS).collect();
         }
+        let mut lowered = String::new();
+        let mut char_of_byte = Vec::new();
+        for (index, ch) in chars.iter().enumerate() {
+            for lower in ch.to_lowercase() {
+                lowered.push(lower);
+                char_of_byte.extend(std::iter::repeat(index).take(lower.len_utf8()));
+            }
+        }
+
+        let Some(match_byte) = lowered.find(&query_lower) else {
+            return chars.iter().take(2 * CONTEXT_CHARS).collect();
+        };
+        let match_start = char_of_byte[match_byte];
+        let match_end = char_of_byte[match_byte + query_lower.len() - 1] + 1;
+        let start = match_start.saturating_sub(CONTEXT_CHARS);
+        let end = (match_end + CONTEXT_CHARS).min(chars.len());
+
+        let prefix = if start > 0 { "..." } else { "" };
+        let suffix = if end < chars.len() { "..." } else { "" };
+        format!("{prefix}{}{suffix}", chars[start..end].iter().collect::<String>())
     }
 }
 
@@ -606,12 +620,60 @@ mod transcript_search_tests {
     }
 
     #[tokio::test]
-    async fn transcript_search_ignores_blank_queries_and_caps_results() {
+    async fn transcript_search_returns_one_entry_per_meeting_preferring_the_title() {
         let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Roadmap review").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315101", 0, "First the roadmap for Q3.").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315102", 1, "Then the roadmap for Q4.").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "roadmap").await.expect("search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, MEETING);
+        assert_eq!(results[0].match_context, "Roadmap review");
+    }
+
+    #[tokio::test]
+    async fn transcript_search_keeps_the_earliest_segment_when_the_title_misses() {
+        let pool = migrated_pool().await;
+        titled_meeting(&pool, MEETING, "Weekly sync").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315102", 1, "Then the roadmap for Q4.").await;
+        insert_evidence(&pool, MEETING, "018f5e27-2f68-7e27-9c90-7c7212315101", 0, "First the roadmap for Q3.").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "roadmap").await.expect("search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].match_context, "First the roadmap for Q3.");
+        assert_eq!(results[0].timestamp, "00:00");
+    }
+
+    #[tokio::test]
+    async fn transcript_search_does_not_let_one_meeting_crowd_out_others() {
+        let pool = migrated_pool().await;
+        let other = "018f5e27-2f68-7e27-9c90-7c7212315002";
         titled_meeting(&pool, MEETING, "Standup").await;
+        titled_meeting(&pool, other, "Retro").await;
         for sequence in 0..60 {
             let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123152{sequence:02x}");
             insert_evidence(&pool, MEETING, &evidence_id, sequence, "alpha release notes").await;
+        }
+        insert_evidence(&pool, other, "018f5e27-2f68-7e27-9c90-7c7212315301", 0, "alpha retro").await;
+
+        let results = TranscriptsRepository::search_transcripts(&pool, "alpha").await.expect("search");
+
+        let mut ids: Vec<&str> = results.iter().map(|result| result.id.as_str()).collect();
+        ids.sort_unstable();
+        assert_eq!(ids, vec![MEETING, other]);
+    }
+
+    #[tokio::test]
+    async fn transcript_search_ignores_blank_queries_and_caps_results() {
+        let pool = migrated_pool().await;
+        for meeting in 0..60 {
+            let meeting_id = format!("018f5e27-2f68-7e27-9c90-7c72123160{meeting:02x}");
+            let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123152{meeting:02x}");
+            titled_meeting(&pool, &meeting_id, "Standup").await;
+            insert_evidence(&pool, &meeting_id, &evidence_id, 0, "alpha release notes").await;
         }
 
         let blank = TranscriptsRepository::search_transcripts(&pool, "   ").await.expect("blank search");
@@ -619,5 +681,76 @@ mod transcript_search_tests {
 
         assert!(blank.is_empty());
         assert_eq!(capped.len(), 50);
+    }
+
+    #[tokio::test]
+    async fn transcript_search_handles_one_char_combining_mark_and_500_char_queries_within_the_cap() {
+        let pool = migrated_pool().await;
+        let long_query = "x".repeat(500);
+        let missing_query = "y".repeat(500);
+        for meeting in 0..60 {
+            let meeting_id = format!("018f5e27-2f68-7e27-9c90-7c72123160{meeting:02x}");
+            let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123152{meeting:02x}");
+            titled_meeting(&pool, &meeting_id, "Standup").await;
+            insert_evidence(&pool, &meeting_id, &evidence_id, 0, &format!("Cafe\u{301} a {long_query} end")).await;
+        }
+
+        let mut counts = Vec::new();
+        for query in ["a", "\u{301}", "\u{301}\u{308}", long_query.as_str(), missing_query.as_str()] {
+            let results = TranscriptsRepository::search_transcripts(&pool, query).await.expect("search");
+            counts.push(results.len());
+        }
+
+        assert_eq!(counts, vec![50, 50, 0, 50, 0]);
+    }
+
+    #[test]
+    fn match_context_keeps_greek_case_insensitive_matches() {
+        let context = TranscriptsRepository::get_match_context("Η Συνάντηση ξεκινά αύριο.", "συνάντηση");
+
+        assert_eq!(context, "Η Συνάντηση ξεκινά αύριο.");
+    }
+
+    #[test]
+    fn match_context_survives_lowercase_that_grows_in_bytes() {
+        let transcript = format!("{} İstanbul trip", "İ".repeat(200));
+
+        let context = TranscriptsRepository::get_match_context(&transcript, "trip");
+
+        assert_eq!(context, format!("...{} İstanbul trip", "İ".repeat(90)));
+    }
+
+    #[test]
+    fn match_context_windows_by_characters_around_the_match() {
+        let transcript = format!("{}İstanbul{}", "🎉".repeat(150), "ş".repeat(150));
+
+        let context = TranscriptsRepository::get_match_context(&transcript, "İSTANBUL");
+
+        assert_eq!(context, format!("...{}İstanbul{}...", "🎉".repeat(100), "ş".repeat(100)));
+    }
+
+    #[test]
+    fn match_context_handles_matches_at_the_start_and_end() {
+        let at_start = TranscriptsRepository::get_match_context("Kickoff 🎉 notes", "kickoff");
+        let at_end = TranscriptsRepository::get_match_context("🎉 ended at İstanbul", "İSTANBUL");
+
+        assert_eq!(at_start, "Kickoff 🎉 notes");
+        assert_eq!(at_end, "🎉 ended at İstanbul");
+    }
+
+    #[test]
+    fn match_context_never_panics_on_mixed_width_text() {
+        let pieces = ["İ", "Σ", "🎉", "ß", "a", " ", "ﬃ", "K"];
+        for left in &pieces {
+            for right in &pieces {
+                let transcript = format!("{}{}{}", left.repeat(130), "target", right.repeat(130));
+                for query in ["target", "TARGET", "zzz", ""] {
+                    let context = TranscriptsRepository::get_match_context(&transcript, query);
+                    if query.eq_ignore_ascii_case("target") {
+                        assert!(context.contains("target"), "{left} {right} {query}");
+                    }
+                }
+            }
+        }
     }
 }

@@ -185,6 +185,32 @@ async function pressUndo(target?: { tagName: string }) {
   await settle();
 }
 
+function fakeWindowTimers() {
+  const win = globals.window as unknown as Record<string, unknown>;
+  const real = { set: win.setTimeout, clear: win.clearTimeout };
+  const queue = new Map<number, () => void>();
+  let handles = 0;
+  win.setTimeout = (callback: () => void) => {
+    handles += 1;
+    queue.set(handles, callback);
+    return handles;
+  };
+  win.clearTimeout = (handle: number) => queue.delete(handle);
+  return {
+    queue,
+    flush: () => act(() => {
+      for (const [handle, callback] of [...queue]) {
+        queue.delete(handle);
+        callback();
+      }
+    }),
+    restore: () => {
+      win.setTimeout = real.set;
+      win.clearTimeout = real.clear;
+    },
+  };
+}
+
 beforeEach(() => {
   ipc.mockClear();
   responses = {};
@@ -262,10 +288,57 @@ describe('CandidateRow', () => {
     expect(root().findAll((node) => node.type === 'textarea')).toHaveLength(0);
   });
 
+  test('a correction is based on the revision the editor opened from, not one that arrived while editing', async () => {
+    responses.knowledge_correct_item = () => accepted({ corrected: true, latestRevisionId: 'rev-3' });
+    const decided = mock(() => {});
+    await renderRow(item(), decided);
+    await click('Correct');
+    await act(async () => {
+      renderer!.update(
+        <TooltipProvider>
+          <CandidateRow meetingId="meeting-a" item={item({ text: 'Changed elsewhere', latestRevisionId: 'rev-2' })} run={null} onDecided={decided} />
+        </TooltipProvider>
+      );
+    });
+    const textarea = root().find((node) => node.type === 'textarea');
+    await act(async () => textarea.props.onChange({ target: { value: 'Maria sends the final draft' } }));
+    await click('Save correction');
+    const [, args] = ipc.mock.calls.find(([command]) => command === 'knowledge_correct_item')!;
+    expect((args as { correction: { basedOnRevisionId: string } }).correction.basedOnRevisionId).toBe('rev-1');
+  });
+
+  test('Enter during an IME composition does not save the correction', async () => {
+    responses.knowledge_correct_item = () => accepted({ corrected: true });
+    await renderRow(item());
+    await click('Correct');
+    const textarea = () => root().find((node) => node.type === 'textarea');
+    await act(async () => textarea().props.onChange({ target: { value: 'マリアが送る' } }));
+    const preventDefault = mock(() => {});
+    await act(async () =>
+      textarea().props.onKeyDown({ key: 'Enter', shiftKey: false, nativeEvent: { isComposing: true }, preventDefault, stopPropagation: () => {} })
+    );
+    await settle();
+    expect(ipc.mock.calls.some(([command]) => command === 'knowledge_correct_item')).toBe(false);
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(root().findAll((node) => node.type === 'textarea')).toHaveLength(1);
+
+    await act(async () =>
+      textarea().props.onKeyDown({ key: 'Enter', shiftKey: false, nativeEvent: { isComposing: false, keyCode: 229 }, preventDefault, stopPropagation: () => {} })
+    );
+    await settle();
+    expect(ipc.mock.calls.some(([command]) => command === 'knowledge_correct_item')).toBe(false);
+
+    await act(async () =>
+      textarea().props.onKeyDown({ key: 'Enter', shiftKey: false, nativeEvent: { isComposing: false, keyCode: 13 }, preventDefault, stopPropagation: () => {} })
+    );
+    await settle();
+    expect(ipc.mock.calls.some(([command]) => command === 'knowledge_correct_item')).toBe(true);
+  });
+
   test('invalid evidence is never eligible and keeps Reject and Correct…; unresolved accepted fields turn amber', async () => {
-    await renderRow(accepted({ evidenceStatus: 'changed', eligibility: false }));
+    await renderRow(accepted({ evidenceStatus: 'changed', eligibility: true }));
     expect(textOf(root())).toContain('Evidence changed — not eligible');
-    expect(textOf(root())).not.toContain('eligible·');
+    expect(textOf(root())).not.toContain('Accepted · eligible');
     expect(buttons('Reject')).toHaveLength(1);
     expect(buttons('Correct…')).toHaveLength(1);
 
@@ -352,6 +425,39 @@ describe('ReviewBlock', () => {
     error.mockRestore();
   });
 
+  test('Accept all counts and undoes only the requested items Rust accepted', async () => {
+    const success = spyOn(toast, 'success');
+    const earlier = accepted({ itemId: 'item-4' });
+    responses.knowledge_accept_all = () => view([accepted(), accepted({ itemId: 'item-2' }), item({ itemId: 'item-3' }), earlier]);
+    responses.knowledge_review_item = (args) => item({ itemId: String(args.itemId) });
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' }), item({ itemId: 'item-3' }), earlier])} />);
+    await click('Accept all');
+    expect(ipc.mock.calls.find(([command]) => command === 'knowledge_accept_all')?.[1]).toEqual({ meetingId: 'meeting-a', itemIds: ['item-1', 'item-2', 'item-3'] });
+    expect(success.mock.calls[0]?.[0]).toBe('Accepted 2 items');
+
+    await act(async () => (success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick());
+    await settle();
+    expect(reviewCalls()).toEqual([
+      { meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' },
+      { meetingId: 'meeting-a', itemId: 'item-2', action: 'reopen' },
+    ]);
+    success.mockRestore();
+  });
+
+  test('Accept all with nothing accepted by Rust says so and offers no Undo', async () => {
+    const info = spyOn(toast, 'info');
+    const success = spyOn(toast, 'success');
+    responses.knowledge_accept_all = () => view([item(), item({ itemId: 'item-2' })]);
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+    await click('Accept all');
+    const successCalls = success.mock.calls.length;
+    const infoCalls = info.mock.calls;
+    info.mockRestore();
+    success.mockRestore();
+    expect(successCalls).toBe(0);
+    expect(infoCalls).toEqual([[REVIEW_TOAST.noneAccepted]]);
+  });
+
   test('single Accept and Reject offer Undo and ⌘Z; ⌘Z in a text field and corrections do nothing', async () => {
     const success = spyOn(toast, 'success');
     responses.knowledge_review_item = (args) =>
@@ -377,11 +483,242 @@ describe('ReviewBlock', () => {
     await act(async () => root().find((node) => node.type === 'textarea').props.onChange({ target: { value: 'New wording' } }));
     await click('Save correction');
     const corrected = success.mock.calls.find(([message]) => message === REVIEW_TOAST.corrected);
+    expect(corrected).toBeDefined();
     expect(corrected?.[1]).toBeUndefined();
     const calls = reviewCalls().length;
     await pressUndo();
     expect(reviewCalls()).toHaveLength(calls);
     success.mockRestore();
+  });
+
+  test("each toast's Undo reverts its own action; ⌘Z takes the latest; a correction dismisses the rest", async () => {
+    const success = spyOn(toast, 'success');
+    const info = spyOn(toast, 'info');
+    const dismiss = spyOn(toast, 'dismiss');
+    type UndoOptions = { id: string | number; action: { onClick: () => void } };
+    const undoOf = (calls: unknown[][], index: number) => calls[index]?.[1] as UndoOptions;
+    // item-3's evidence changes once accepted, so its row keeps a Reject button.
+    const changed: Partial<KnowledgeItemView> = { evidenceStatus: 'changed', eligibility: false };
+    responses.knowledge_review_item = (args) =>
+      args.action === 'accept'
+        ? accepted({ itemId: String(args.itemId), ...(args.itemId === 'item-3' ? changed : {}) })
+        : item({ itemId: String(args.itemId), reviewState: args.action === 'reject' ? 'rejected' : 'proposed' });
+    responses.knowledge_correct_item = (args) => accepted({ itemId: String(args.itemId), corrected: true });
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' }), item({ itemId: 'item-3' })])} />);
+
+    const decide = async (itemId: string, label: string) => {
+      const row = root().find((node) => node.type === 'div' && node.props['data-item-id'] === itemId);
+      const target = row.find((node) => node.type === 'button' && (textOf(node) === label || node.props['aria-label'] === label));
+      await act(async () => target.props.onClick());
+      await settle();
+    };
+    await decide('item-1', 'Accept');
+    await decide('item-2', 'Reject');
+    const acceptToast = undoOf(success.mock.calls, 0);
+    const rejectToast = undoOf(info.mock.calls, 0);
+
+    const beforeUndo = reviewCalls().length;
+    await act(async () => acceptToast.action.onClick());
+    await settle();
+    expect(reviewCalls().slice(beforeUndo)).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' }]);
+    expect(acceptToast.id).not.toBe(rejectToast.id);
+
+    await decide('item-1', 'Reject');
+    const latestToast = undoOf(info.mock.calls, 1);
+    await pressUndo();
+    expect(reviewCalls().at(-1)).toEqual({ meetingId: 'meeting-a', itemId: 'item-1', action: 'restore' });
+    expect(dismiss).toHaveBeenCalledWith(latestToast.id);
+
+    await decide('item-3', 'Accept');
+    const supersededToast = undoOf(success.mock.calls, 1);
+    await decide('item-3', 'Reject');
+    expect(dismiss).toHaveBeenCalledWith(supersededToast.id);
+    const item3RejectToast = undoOf(info.mock.calls, 2);
+
+    dismiss.mockClear();
+    await click('Correct');
+    await act(async () => root().find((node) => node.type === 'textarea').props.onChange({ target: { value: 'New wording' } }));
+    await click('Save correction');
+    expect(dismiss).toHaveBeenCalledWith(rejectToast.id);
+    expect(dismiss).toHaveBeenCalledWith(item3RejectToast.id);
+    const calls = reviewCalls().length;
+    await act(async () => rejectToast.action.onClick());
+    await pressUndo();
+    expect(reviewCalls()).toHaveLength(calls);
+    success.mockRestore();
+    info.mockRestore();
+    dismiss.mockRestore();
+  });
+
+  test('a decision made during the Accept-all stagger survives the late timers; unmount clears them', async () => {
+    const timers = fakeWindowTimers();
+    try {
+      responses.knowledge_accept_all = (args) => view((args.itemIds as string[]).map((itemId) => accepted({ itemId })));
+      responses.knowledge_review_item = (args) => item({ itemId: String(args.itemId), reviewState: 'rejected' });
+      await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+      await click('Accept all');
+      expect(timers.queue.size).toBe(2);
+      await act(async () => buttons('Reject')[0].props.onClick());
+      await settle();
+      timers.flush();
+      expect(buttons('Rejected (1)')).toHaveLength(1);
+      expect(textOf(root()).split('✓ Accepted · eligible')).toHaveLength(2);
+
+      const changes = mock(() => {});
+      await render(<ReviewBlock meetingId="meeting-a" knowledge={view([item(), item({ itemId: 'item-2' })])} onChange={changes} />);
+      await click('Accept all');
+      expect(timers.queue.size).toBe(2);
+      unmount();
+      expect(timers.queue.size).toBe(0);
+      expect(changes).not.toHaveBeenCalled();
+
+      let resolveAcceptAll: (value: unknown) => void = () => {};
+      responses.knowledge_accept_all = (args) => new Promise((resolve) => {
+        resolveAcceptAll = () => resolve(view((args.itemIds as string[]).map((itemId) => accepted({ itemId }))));
+      });
+      await render(<ReviewBlock meetingId="meeting-a" knowledge={view([item(), item({ itemId: 'item-2' })])} onChange={changes} />);
+      await act(async () => button('Accept all').props.onClick());
+      unmount();
+      await act(async () => resolveAcceptAll(undefined));
+      await settle();
+      expect(timers.queue.size).toBe(0);
+      expect(changes).not.toHaveBeenCalled();
+    } finally {
+      timers.restore();
+    }
+  });
+
+  test('the ⌘Z listener is attached once across re-renders', async () => {
+    const win = globals.window!;
+    const realAdd = win.addEventListener as EventTarget['addEventListener'];
+    const added: string[] = [];
+    win.addEventListener = (type: string, listener: EventListenerOrEventListenerObject) => {
+      added.push(type);
+      realAdd(type, listener);
+    };
+    try {
+      await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+      for (let index = 0; index < 5; index += 1) {
+        await act(async () => renderer!.update(<TooltipProvider><Harness initial={view([item()])} /></TooltipProvider>));
+      }
+    } finally {
+      win.addEventListener = realAdd;
+    }
+    expect(added.filter((type) => type === 'keydown')).toHaveLength(1);
+  });
+
+  for (const code of ['KNOWLEDGE_REVISION_CONFLICT', 'KNOWLEDGE_INVALID_TRANSITION', 'KNOWLEDGE_ITEM_NOT_FOUND']) {
+    test(`Undo on an item that changed elsewhere (${code}) says nothing was undone and touches no other item`, async () => {
+      const success = spyOn(toast, 'success');
+      const info = spyOn(toast, 'info');
+      const error = spyOn(toast, 'error');
+      responses.knowledge_accept_all = (args) => view((args.itemIds as string[]).map((itemId) => accepted({ itemId })));
+      responses.knowledge_review_item = () => { throw code; };
+      await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+      await click('Accept all');
+
+      await act(async () => (success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick());
+      await settle();
+      expect(reviewCalls()).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' }]);
+      expect(info).toHaveBeenCalledWith('This item changed since. Nothing was undone.');
+      expect(error).not.toHaveBeenCalled();
+      expect(textOf(root()).split('✓ Accepted · eligible')).toHaveLength(3);
+      success.mockRestore();
+      info.mockRestore();
+      error.mockRestore();
+    });
+  }
+
+  test('a batch Undo that hits a changed item after reverting another says only part was undone', async () => {
+    const success = spyOn(toast, 'success');
+    const info = spyOn(toast, 'info');
+    responses.knowledge_accept_all = (args) => view((args.itemIds as string[]).map((itemId) => accepted({ itemId })));
+    responses.knowledge_review_item = (args) => {
+      if (args.itemId === 'item-2') throw 'KNOWLEDGE_INVALID_TRANSITION';
+      return item({ itemId: String(args.itemId) });
+    };
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+    await click('Accept all');
+
+    await act(async () => (success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick());
+    await settle();
+    expect(reviewCalls().map((args) => args?.itemId)).toEqual(['item-1', 'item-2']);
+    expect(info).toHaveBeenCalledWith(REVIEW_TOAST.undoPartial);
+    expect(info).not.toHaveBeenCalledWith(REVIEW_TOAST.undoStale);
+    expect(textOf(root()).split('✓ Accepted · eligible')).toHaveLength(2);
+    success.mockRestore();
+    info.mockRestore();
+  });
+
+  test('an Undo entry expires when its toast closes', async () => {
+    const success = spyOn(toast, 'success');
+    const info = spyOn(toast, 'info');
+    type Closable = { onAutoClose: () => void; onDismiss: () => void };
+    const closeOf = (calls: unknown[][]) => calls[0]?.[1] as Closable;
+    responses.knowledge_review_item = (args) =>
+      args.action === 'accept' ? accepted({ itemId: String(args.itemId) }) : item({ itemId: String(args.itemId), reviewState: 'rejected' });
+    await render(<Harness initial={view([item(), item({ itemId: 'item-2' })])} />);
+    await act(async () => buttons('Accept')[0].props.onClick());
+    await settle();
+    await act(async () => buttons('Reject')[0].props.onClick());
+    await settle();
+    closeOf(success.mock.calls).onAutoClose();
+    closeOf(info.mock.calls).onDismiss();
+
+    const calls = reviewCalls().length;
+    await pressUndo();
+    expect(reviewCalls()).toHaveLength(calls);
+    success.mockRestore();
+    info.mockRestore();
+  });
+
+  describe('a second click while the first call is in flight sends nothing', () => {
+    const holdReviews = () => {
+      const release: Array<() => void> = [];
+      responses.knowledge_review_item = (args) =>
+        new Promise((resolve) => release.push(() => resolve(item({ itemId: String(args.itemId), reviewState: args.action === 'reject' ? 'rejected' : 'proposed' }))));
+      return async () => {
+        await act(async () => release.splice(0).forEach((resolve) => resolve()));
+        await settle();
+      };
+    };
+    const doubleClick = async (onClick: () => void) => {
+      await act(async () => {
+        onClick();
+        onClick();
+      });
+      await settle();
+    };
+
+    for (const label of ['Accept', 'Reject']) {
+      test(label, async () => {
+        const release = holdReviews();
+        await render(<Harness initial={view([item()])} />);
+        await doubleClick(button(label).props.onClick);
+        expect(reviewCalls()).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: label.toLowerCase() }]);
+        await release();
+      });
+    }
+
+    test('Restore', async () => {
+      const release = holdReviews();
+      await render(<Harness initial={view([], [item({ reviewState: 'rejected' })])} />);
+      await doubleClick(button('Restore').props.onClick);
+      expect(reviewCalls()).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'restore' }]);
+      await release();
+    });
+
+    test('Undo', async () => {
+      const success = spyOn(toast, 'success');
+      responses.knowledge_review_item = () => accepted();
+      await render(<Harness initial={view([item()])} />);
+      await click('Accept');
+      const release = holdReviews();
+      await doubleClick((success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick);
+      expect(reviewCalls().slice(1)).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' }]);
+      await release();
+      success.mockRestore();
+    });
   });
 
   test('living-doc sources never render raw HTML or the memory label', () => {

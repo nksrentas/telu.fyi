@@ -156,7 +156,7 @@ function useEscapeToClose(open: boolean, close: () => void) {
   useEffect(() => {
     if (!open || typeof document === "undefined") return
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close()
+      if (event.key === "Escape" && !event.defaultPrevented) close()
     }
     document.addEventListener("keydown", onKeyDown)
     return () => document.removeEventListener("keydown", onKeyDown)

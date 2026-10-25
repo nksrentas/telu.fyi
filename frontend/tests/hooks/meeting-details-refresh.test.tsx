@@ -10,6 +10,8 @@ const originalToast = { ...await import('sonner') };
 const originalNavigation = { ...await import('next/navigation') };
 const originalConfig = { ...await import('../../src/contexts/ConfigContext') };
 const originalMeetingPage = { ...await import('../../src/components/living-doc/meeting-page') };
+const originalRecordingState = { ...await import('../../src/contexts/RecordingStateContext') };
+const originalPageContent = { ...await import('../../src/app/meeting-details/page-content') };
 afterAll(() => {
   mock.module('@tauri-apps/api/core', () => originalCore);
   mock.module('../../src/lib/analytics', () => originalAnalytics);
@@ -18,6 +20,8 @@ afterAll(() => {
   mock.module('next/navigation', () => originalNavigation);
   mock.module('../../src/contexts/ConfigContext', () => originalConfig);
   mock.module('../../src/components/living-doc/meeting-page', () => originalMeetingPage);
+  mock.module('../../src/contexts/RecordingStateContext', () => originalRecordingState);
+  mock.module('../../src/app/meeting-details/page-content', () => originalPageContent);
 });
 
 let selectedMeeting = 'meeting-a';
@@ -25,7 +29,7 @@ mock.module('next/navigation', () => ({
   usePathname: () => '/meeting-details', useRouter: () => ({}),
   useSearchParams: () => new URLSearchParams({ id: selectedMeeting }),
 }));
-mock.module('../../src/contexts/RecordingStateContext', () => ({ useRecordingState: () => ({ isRecording: false }) }));
+mock.module('../../src/contexts/RecordingStateContext', () => ({ ...originalRecordingState, useRecordingState: () => ({ isRecording: false }) }));
 mock.module('../../src/contexts/ConfigContext', () => ({ useConfig: () => ({ isAutoSummary: false }) }));
 const notify = mock(() => {});
 mock.module('sonner', () => ({ toast: { info: notify, error: notify, success: notify, warning: notify } }));
@@ -74,7 +78,7 @@ function SummaryView(props: any) {
   useEffect(() => { mounts += 1; }, []);
   return <output>{props.meeting.id}:{summaryState.summaryStatus}:{JSON.stringify(data.aiSummary)}</output>;
 }
-mock.module('../../src/app/meeting-details/page-content', () => ({ default: SummaryView }));
+mock.module('../../src/app/meeting-details/page-content', () => ({ ...originalPageContent, default: SummaryView }));
 function PassthroughMeetingPage({ onRefetchTranscripts, children }: { onRefetchTranscripts: () => Promise<void>; children: ReactNode }) {
   refresh = onRefetchTranscripts;
   return <>{children}</>;

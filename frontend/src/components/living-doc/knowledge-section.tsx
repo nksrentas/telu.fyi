@@ -34,6 +34,7 @@ import {
   ExplicitStartCard,
   FailedCard,
   KNOWLEDGE_COPY,
+  LoadFailedCard,
   NoEvidenceCard,
   RunningRow,
 } from './knowledge-run-states';
@@ -64,12 +65,19 @@ function regenerateToast(run: KnowledgeRunView): string {
 
 function useMeetingKnowledge(meetingId: string) {
   const [knowledge, setKnowledge] = useState<MeetingKnowledgeView | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const latestRequest = useRef(0);
   const reload = useCallback(async () => {
+    const request = ++latestRequest.current;
     try {
-      setKnowledge(await getMeetingKnowledge(meetingId));
+      const view = await getMeetingKnowledge(meetingId);
+      if (request !== latestRequest.current) return;
+      setKnowledge(view);
+      setLoadFailed(false);
     } catch (error) {
+      if (request !== latestRequest.current) return;
       console.error('Failed to load meeting knowledge:', error);
-      toast.error(KNOWLEDGE_COPY.generic);
+      setLoadFailed(true);
     }
   }, [meetingId]);
 
@@ -82,17 +90,19 @@ function useMeetingKnowledge(meetingId: string) {
     let disposed = false;
     void onKnowledgeUpdated((event) => {
       if (event.meetingId === meetingId) void reload();
-    }).then((unlisten) => {
-      if (disposed) unlisten();
-      else stopListening = unlisten;
-    });
+    })
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else stopListening = unlisten;
+      })
+      .catch((error) => console.error('Failed to listen for knowledge updates:', error));
     return () => {
       disposed = true;
       stopListening?.();
     };
   }, [meetingId, reload]);
 
-  return { knowledge, setKnowledge, reload };
+  return { knowledge, loadFailed, setKnowledge, reload };
 }
 
 interface RunStarterOptions {
@@ -106,6 +116,10 @@ interface RunStarterOptions {
 function useRunStarter({ meetingId, routeState, onStarted, onNoEvidence, reload }: RunStarterOptions) {
   const [starting, setStarting] = useState(false);
   const [routeBlocked, setRouteBlocked] = useState(false);
+
+  useEffect(() => {
+    if (routeState.status === 'validated') setRouteBlocked(false);
+  }, [routeState]);
 
   const startRun = useCallback(async (trigger: TriggerKind) => {
     if (routeState.status !== 'validated') {
@@ -214,8 +228,9 @@ export function KnowledgeSection({
   const [routeState, setRouteState] = useState<ProviderRouteViewState>(INITIAL_ROUTE_STATE);
   const [noEvidence, setNoEvidence] = useState(!hasEvidence);
   const [regenerateOpen, setRegenerateOpen] = useState(false);
+  const [routeCheck, setRouteCheck] = useState(0);
   const regenerateRunId = useRef<string | null>(null);
-  const { knowledge, setKnowledge, reload } = useMeetingKnowledge(meetingId);
+  const { knowledge, loadFailed, setKnowledge, reload } = useMeetingKnowledge(meetingId);
   useKnowledgeAnchor();
   const onStarted = useCallback((run: KnowledgeRunView) => {
     setKnowledge((current) => (current ? { ...current, latestRun: run } : current));
@@ -263,9 +278,31 @@ export function KnowledgeSection({
       {label}
     </Button>
   );
+  const routeFailed = routeBlocked || (routeState.status !== 'validated' && routeState.status !== 'loading');
   const notice = (action: ReactNode) => (
-    <RunNotice routeState={routeState} blocked={routeBlocked} action={action} />
+    <RunNotice
+      routeState={routeState}
+      blocked={routeBlocked}
+      action={(
+        <>
+          {action}
+          {routeFailed && (
+            <Button variant="plain" size="sm" onClick={() => setRouteCheck((count) => count + 1)}>
+              Check again
+            </Button>
+          )}
+        </>
+      )}
+    />
   );
+  const stop = async () => {
+    try {
+      if (!(await cancelKnowledgeExtraction(meetingId))) await reload();
+    } catch (error) {
+      console.error('Failed to stop knowledge extraction:', error);
+      toast.error(KNOWLEDGE_COPY.stopFailed);
+    }
+  };
 
   const running = latestRun?.status === 'running';
   const autoPending = autoEligible && !latestRun && (!autoStartedMeetings.has(meetingId) || starting);
@@ -273,7 +310,8 @@ export function KnowledgeSection({
 
   const statusBlock = () => {
     if (noEvidence) return <NoEvidenceCard />;
-    if (!knowledge && !autoPending) {
+    if (!knowledge) {
+      if (loadFailed) return null;
       return (
         <div aria-busy className="space-y-2">
           <Skeleton active />
@@ -281,7 +319,7 @@ export function KnowledgeSection({
         </div>
       );
     }
-    if (running || autoPending) return <RunningRow onStop={running ? () => void cancelKnowledgeExtraction(meetingId) : undefined} />;
+    if (running || autoPending) return <RunningRow onStop={running ? () => void stop() : undefined} />;
     if (latestRun?.status === 'failed') return <FailedCard run={latestRun} notice={notice(startButton('Try again', 'user'))} />;
     if (latestRun?.status === 'succeeded' && !hasReviewItems) return <EmptyResult run={latestRun} />;
     if (latestRun && latestRun.status !== 'cancelled') return null;
@@ -303,6 +341,7 @@ export function KnowledgeSection({
     >
       <ProviderBoundary
         capability="summary"
+        refreshKey={routeCheck}
         className="hidden"
         showUnavailableAlert={false}
         onRouteStateChange={setRouteState}
@@ -324,6 +363,7 @@ export function KnowledgeSection({
           </Button>
         </>
       )}
+      {!noEvidence && loadFailed && <LoadFailedCard onRetry={() => void reload()} />}
       {statusBlock()}
       {!noEvidence && knowledge && hasReviewItems && (
         <ReviewBlock

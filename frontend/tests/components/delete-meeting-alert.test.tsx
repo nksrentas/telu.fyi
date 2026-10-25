@@ -118,6 +118,28 @@ describe('DeleteMeetingAlert', () => {
     expect(button('Delete').props.disabled).toBe(false);
   });
 
+  test('a failed impact query shows Try again, which reloads the counts and enables Delete', async () => {
+    const quiet = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      responses.knowledge_deletion_impact = () => { throw 'impact unavailable'; };
+      await renderAlert();
+      await settle();
+      expect(textOf(renderer.root)).toContain("Couldn't load what will be removed.");
+      expect(button('Delete').props.disabled).toBe(true);
+
+      responses.knowledge_deletion_impact = () => impact(2, 1);
+      focusedCancel = false;
+      await act(async () => button('Try again').props.onClick());
+      expect(focusedCancel).toBe(true);
+      await settle();
+      expect(ipc.mock.calls.filter(([command]) => command === 'knowledge_deletion_impact')).toHaveLength(2);
+      expect(textOf(renderer.root)).toContain('2 accepted items and 1 suggestion');
+      expect(button('Delete').props.disabled).toBe(false);
+    } finally {
+      quiet.mockRestore();
+    }
+  });
+
   test('renders plural, singular and both-zero copy with the audio note', async () => {
     expect(deletionBody(impact(3, 5))).toBe(
       "3 accepted items and 5 suggestions from this meeting will be removed from this Mac, along with its transcript and summary. This can't be undone.",
