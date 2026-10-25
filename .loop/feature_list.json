@@ -347,8 +347,12 @@
         "frontend/tests/visual/screens/preparation.json",
         "frontend/tests/visual/fixtures/base-ipc.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "654ead7",
+        "ran": "bash .loop/verify.sh (bun 196 pass, cargo, typecheck 0 src errors, gallery 176 passed); bash .loop/tool.sh palette on the new files: 0 offending",
+        "browser": "WebKit gallery preparation-brief-idle/-preparing/-ready/-failed/-stale, checked light and dark PNGs"
+      }
     },
     {
       "id": "U6",
