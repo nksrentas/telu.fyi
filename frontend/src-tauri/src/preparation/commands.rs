@@ -43,6 +43,7 @@ pub struct StoredBriefing {
     pub created_utc: String,
     pub dropped_count: i64,
     pub dropped_question_count: i64,
+    pub stale: bool,
     pub manifest: Value,
     pub claims: Vec<Claim>,
     pub questions: Vec<Question>,
@@ -62,6 +63,7 @@ struct BriefingRow {
     created_utc: String,
     dropped_count: i64,
     dropped_question_count: i64,
+    stale: bool,
     manifest_json: String,
 }
 
@@ -209,7 +211,14 @@ pub async fn get_briefing(
         .await
         .map_err(read_failure)?;
     let row = sqlx::query_as::<_, BriefingRow>(
-        "SELECT id, prompt_version, created_utc, dropped_count, dropped_question_count, manifest_json
+        "SELECT id, prompt_version, created_utc, dropped_count, dropped_question_count, manifest_json,
+                EXISTS (
+                    SELECT 1 FROM json_each(briefings.manifest_json) AS entry
+                    JOIN document_versions built
+                      ON built.id = json_extract(entry.value, '$.source.versionId')
+                    JOIN document_versions newer
+                      ON newer.document_id = built.document_id AND newer.version > built.version
+                ) AS stale
          FROM briefings WHERE planned_meeting_id = ?
          ORDER BY created_utc DESC, rowid DESC LIMIT 1",
     )
@@ -238,6 +247,7 @@ async fn stored_briefing(pool: &SqlitePool, row: BriefingRow) -> Result<StoredBr
         created_utc: row.created_utc,
         dropped_count: row.dropped_count,
         dropped_question_count: row.dropped_question_count,
+        stale: row.stale,
         manifest,
     })
 }

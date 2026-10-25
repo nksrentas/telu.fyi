@@ -25,6 +25,7 @@ export interface PreparationRun {
 
 export interface BriefingClaim {
   text: string;
+  status: 'cited' | 'source_unavailable';
   sourceRef: string;
   source: SelectedSource;
   passageId: string | null;
@@ -52,6 +53,7 @@ export interface StoredBriefing {
   createdUtc: string;
   droppedCount: number;
   droppedQuestionCount: number;
+  stale: boolean;
   manifest: ManifestEntry[];
   claims: BriefingClaim[];
   questions: BriefingQuestion[];

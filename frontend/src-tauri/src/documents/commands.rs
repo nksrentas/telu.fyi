@@ -103,6 +103,14 @@ pub async fn documents_delete<R: Runtime>(
     delete(state.db_manager.pool(), &app_data_dir, &document_id).await
 }
 
+#[tauri::command]
+pub async fn documents_delete_impact(
+    state: tauri::State<'_, AppState>,
+    document_id: String,
+) -> Result<i64, String> {
+    delete_impact(state.db_manager.pool(), &document_id).await
+}
+
 async fn paste(pool: &SqlitePool, title: &str, text: &str) -> Result<DocumentVersion, String> {
     let title = title.trim();
     if title.is_empty() {
@@ -194,6 +202,17 @@ pub async fn delete(
         _ => {}
     }
     Ok(())
+}
+
+pub async fn delete_impact(pool: &SqlitePool, document_id: &str) -> Result<i64, String> {
+    let storage = |error: sqlx::Error| error_code(error.into());
+    repository::get_document(pool, document_id)
+        .await
+        .map_err(storage)?
+        .ok_or_else(|| "DOCUMENT_NOT_FOUND".to_string())?;
+    repository::citing_briefing_count(pool, document_id)
+        .await
+        .map_err(storage)
 }
 
 async fn available_document(pool: &SqlitePool, document_id: &str) -> Result<Document, String> {

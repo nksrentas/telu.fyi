@@ -794,6 +794,7 @@ pub fn run() {
             documents::commands::documents_get_version,
             documents::commands::documents_replace,
             documents::commands::documents_delete,
+            documents::commands::documents_delete_impact,
             summary::commands::api_get_summary,
             summary::commands::api_save_meeting_summary,
             summary::commands::api_get_meeting_summary_language,
