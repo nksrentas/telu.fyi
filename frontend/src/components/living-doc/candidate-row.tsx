@@ -164,7 +164,10 @@ function CorrectionForm({ draft, error, onChange, onSave, onDiscard }: Correctio
 
 function useRowActions(meetingId: string, item: KnowledgeItemView, onDecided: (decision: CandidateDecision) => void) {
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const perform = async (action: RowDecision, request: () => Promise<KnowledgeItemView>) => {
+    if (inFlight.current) return false;
+    inFlight.current = true;
     setBusy(true);
     try {
       const view = await request();
@@ -175,6 +178,7 @@ function useRowActions(meetingId: string, item: KnowledgeItemView, onDecided: (d
       toast.error(REVIEW_ERROR);
       return false;
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };

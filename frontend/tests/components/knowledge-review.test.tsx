@@ -672,6 +672,55 @@ describe('ReviewBlock', () => {
     info.mockRestore();
   });
 
+  describe('a second click while the first call is in flight sends nothing', () => {
+    const holdReviews = () => {
+      const release: Array<() => void> = [];
+      responses.knowledge_review_item = (args) =>
+        new Promise((resolve) => release.push(() => resolve(item({ itemId: String(args.itemId), reviewState: args.action === 'reject' ? 'rejected' : 'proposed' }))));
+      return async () => {
+        await act(async () => release.splice(0).forEach((resolve) => resolve()));
+        await settle();
+      };
+    };
+    const doubleClick = async (onClick: () => void) => {
+      await act(async () => {
+        onClick();
+        onClick();
+      });
+      await settle();
+    };
+
+    for (const label of ['Accept', 'Reject']) {
+      test(label, async () => {
+        const release = holdReviews();
+        await render(<Harness initial={view([item()])} />);
+        await doubleClick(button(label).props.onClick);
+        expect(reviewCalls()).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: label.toLowerCase() }]);
+        await release();
+      });
+    }
+
+    test('Restore', async () => {
+      const release = holdReviews();
+      await render(<Harness initial={view([], [item({ reviewState: 'rejected' })])} />);
+      await doubleClick(button('Restore').props.onClick);
+      expect(reviewCalls()).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'restore' }]);
+      await release();
+    });
+
+    test('Undo', async () => {
+      const success = spyOn(toast, 'success');
+      responses.knowledge_review_item = () => accepted();
+      await render(<Harness initial={view([item()])} />);
+      await click('Accept');
+      const release = holdReviews();
+      await doubleClick((success.mock.calls[0]?.[1] as unknown as { action: { onClick: () => void } }).action.onClick);
+      expect(reviewCalls().slice(1)).toEqual([{ meetingId: 'meeting-a', itemId: 'item-1', action: 'reopen' }]);
+      await release();
+      success.mockRestore();
+    });
+  });
+
   test('living-doc sources never render raw HTML or the memory label', () => {
     const folder = join(import.meta.dir, '../../src/components/living-doc');
     for (const file of readdirSync(folder)) {

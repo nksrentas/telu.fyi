@@ -21,7 +21,10 @@ interface RejectedRowProps {
 
 function RejectedRow({ meetingId, item, run, onRestored }: RejectedRowProps) {
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const restore = async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setBusy(true);
     try {
       onRestored({ view: await reviewKnowledgeItem(meetingId, item.itemId, 'restore'), action: 'restore' });
@@ -29,6 +32,7 @@ function RejectedRow({ meetingId, item, run, onRestored }: RejectedRowProps) {
       console.error('Failed to restore knowledge item:', error);
       toast.error(REVIEW_ERROR);
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   };
