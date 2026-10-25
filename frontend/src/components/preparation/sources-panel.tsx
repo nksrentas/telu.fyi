@@ -307,6 +307,7 @@ function SourceRow({ document, included, onToggle, onOpen, onReplacePaste, onRep
       <span className="min-w-0 flex-1">
         <button
           type="button"
+          title={document.title}
           onClick={onOpen}
           className="block min-h-6 max-w-full truncate rounded-[4px] text-left text-label outline-none hover:underline focus-visible:shadow-[0_0_0_2px_var(--accent)]"
         >

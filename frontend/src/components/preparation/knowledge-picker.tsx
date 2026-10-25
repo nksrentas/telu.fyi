@@ -142,7 +142,7 @@ export function KnowledgePicker({ selection, select, onError }: KnowledgePickerP
                   className={cn("size-3.5 flex-none text-label-3 transition-transform duration-150", meeting.id in expanded && "rotate-90")}
                 />
                 <span className="flex-none font-semibold tabular-nums text-label">{meeting.date}</span>
-                <span className="min-w-0 truncate text-label-2">{meeting.title}</span>
+                <span title={meeting.title} className="min-w-0 truncate text-label-2">{meeting.title}</span>
               </button>
               {meeting.id in expanded && (
                 <MeetingItemsList

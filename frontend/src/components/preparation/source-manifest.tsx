@@ -60,15 +60,18 @@ export function SourceManifest({ manifest, droppedCount, labels }: SourceManifes
         <PopoverArrow />
         <p className="m-0 text-[11px] font-semibold text-label-3">What was used</p>
         <ul className="m-0 list-none space-y-2 p-0">
-          {manifest.map((entry, index) => (
-            <li key={`${entry.source.kind}-${index}`} className="flex items-start gap-2">
-              <span aria-hidden className={`mt-[6px] size-1.5 shrink-0 rounded-full ${STATUS[entry.status].tone}`} />
-              <span className="min-w-0">
-                <span className="block truncate text-[13px] font-medium text-label">{sourceName(entry.source, labels)}</span>
-                <span className="block text-[12px] leading-[1.4] text-label-2">{manifestSentence(entry)}</span>
-              </span>
-            </li>
-          ))}
+          {manifest.map((entry, index) => {
+            const name = sourceName(entry.source, labels)
+            return (
+              <li key={`${entry.source.kind}-${index}`} className="flex items-start gap-2">
+                <span aria-hidden className={`mt-[6px] size-1.5 shrink-0 rounded-full ${STATUS[entry.status].tone}`} />
+                <span className="min-w-0">
+                  <span title={name} className="block truncate text-[13px] font-medium text-label">{name}</span>
+                  <span className="block text-[12px] leading-[1.4] text-label-2">{manifestSentence(entry)}</span>
+                </span>
+              </li>
+            )
+          })}
         </ul>
         <p data-dropped className="m-0 pt-2.5 text-[12px] text-label-2 shadow-[inset_0_0.5px_0_var(--separator)]">
           {droppedSentence(droppedCount)}
