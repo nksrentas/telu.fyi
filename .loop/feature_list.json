@@ -231,8 +231,11 @@
         "frontend/src/lib/preparation-service.ts",
         "frontend/tests/lib/preparation-service.test.ts"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "cbd62dc",
+        "ran": "bash .loop/verify.sh (gate: cargo lib+integration, bun, node, typecheck, gallery 158 passed); cargo test preparation:: --lib 37 passed; bun test tests/lib/preparation-service.test.ts 3 pass"
+      }
     },
     {
       "id": "U1",
