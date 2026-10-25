@@ -336,9 +336,9 @@ describe('CandidateRow', () => {
   });
 
   test('invalid evidence is never eligible and keeps Reject and Correct…; unresolved accepted fields turn amber', async () => {
-    await renderRow(accepted({ evidenceStatus: 'changed', eligibility: false }));
+    await renderRow(accepted({ evidenceStatus: 'changed', eligibility: true }));
     expect(textOf(root())).toContain('Evidence changed — not eligible');
-    expect(textOf(root())).not.toContain('eligible·');
+    expect(textOf(root())).not.toContain('Accepted · eligible');
     expect(buttons('Reject')).toHaveLength(1);
     expect(buttons('Correct…')).toHaveLength(1);
 
@@ -483,6 +483,7 @@ describe('ReviewBlock', () => {
     await act(async () => root().find((node) => node.type === 'textarea').props.onChange({ target: { value: 'New wording' } }));
     await click('Save correction');
     const corrected = success.mock.calls.find(([message]) => message === REVIEW_TOAST.corrected);
+    expect(corrected).toBeDefined();
     expect(corrected?.[1]).toBeUndefined();
     const calls = reviewCalls().length;
     await pressUndo();

@@ -206,7 +206,9 @@ describe('KnowledgeSection runs', () => {
     await render(<KnowledgeSection meetingId="meeting-start" />);
     await click('Find knowledge');
     const names = ipc.mock.calls.map(([name]) => name);
-    expect(names.indexOf('validate_provider_route')).toBeLessThan(names.indexOf('knowledge_start_extraction'));
+    const validateAt = names.indexOf('validate_provider_route');
+    expect(validateAt).toBeGreaterThanOrEqual(0);
+    expect(validateAt).toBeLessThan(names.indexOf('knowledge_start_extraction'));
     expect(calls('knowledge_start_extraction')[0][1]).toMatchObject({ meetingId: 'meeting-start', trigger: 'user' });
   });
 
