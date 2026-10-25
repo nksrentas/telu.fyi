@@ -212,8 +212,13 @@
         "frontend/src/components/app-shell/search-popover.tsx",
         "frontend/tests/components/search-popover.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "ea55626",
+        "ran": "bash .loop/verify.sh (gate: all steps passed, 150 gallery shots); cargo test --lib transcript 57 passed; bun search-popover.test.tsx 2 pass",
+        "base_failure": "on base, title+2 segments returned 3 rows (left: 3, right: 1); earliest-segment test got 2; a 60-segment meeting filled 49 of 50 slots and crowded out others",
+        "browser": "not a UI item; popover test feeding duplicate ids fails with React 'same key' warning, unique ids pass"
+      }
     },
     {
       "id": "T12",

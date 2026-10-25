@@ -144,3 +144,13 @@ Learned:
 - Stubbing window/document in a test: cast globalThis as unknown as { window?: unknown; document?: unknown }. Typed stubs add TS errors to the capped tests/ count.
 Lesson: [tests] the first gate failed typecheck because the new test's window/document stubs added 2 TS errors (38 > 36) → type test globals as unknown, and run `bash .loop/tool.sh tsc | grep <new file>` before the full gate.
 Next: T11
+
+## Session 11 · T11 · 2026-10-25
+Did: CR-61 and WR-20. search_transcripts in database/repositories/transcript.rs wraps the UNION in ROW_NUMBER() OVER (PARTITION BY id ORDER BY kind, rank) and keeps best = 1. The ranking is: title (kind 0), then evidence by sequence (kind 1), then legacy transcripts by timestamp text (kind 2). The final order is ORDER BY sort_key DESC, id LIMIT 50, so the cap counts meetings and ties sort the same way every time.
+- 3 new Rust tests: title plus two segments gives one entry with the title as context, the earliest segment wins when the title misses, and a 60-segment meeting no longer crowds out a second one. The cap test now uses 60 meetings. All 3 new tests failed on base (3 rows, 2 rows, 49 of one meeting).
+- search-popover.test.tsx: a renderAndSearch helper, and a test that one CommandItem renders per result with unique values and no React "same key" warning. I checked that this test fails when fed duplicate ids.
+Assumptions: the dedupe lives only at the source. The popover is unchanged and has no client-side dedupe. The review noted that the bun test cannot fail on duplicates the backend no longer sends. That is accepted: the Rust test proves the dedupe, and the bun test proves the render contract.
+Learned:
+- transcript.rs was not rustfmt-clean on base (9 diff hunks). Running rustfmt on the whole file would reformat unrelated code, so keep the file's style.
+- The tsc errors in transcript-drawer.test.tsx and paginated-transcripts.test.tsx are pre-existing and count toward the capped tests/ total.
+Next: T12
