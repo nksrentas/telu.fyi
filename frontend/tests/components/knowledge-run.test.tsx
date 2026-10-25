@@ -251,6 +251,49 @@ describe('KnowledgeSection runs', () => {
     expect(calls('knowledge_cancel_extraction')[0][1]).toEqual({ meetingId: 'meeting-running' });
   });
 
+  test('a route check that fails before a start clears once the next check succeeds', async () => {
+    useResponses(view('meeting-flaky-route'));
+    responses.validate_provider_route = () => unavailableRoute;
+    await render(<KnowledgeSection meetingId="meeting-flaky-route" />);
+    await click('Find knowledge');
+    expect(calls('knowledge_start_extraction')).toHaveLength(0);
+    expect(button('Find knowledge').props.disabled).toBe(true);
+
+    responses.validate_provider_route = () => route('local');
+    await click('Check again');
+    expect(calls('get_current_provider_route')).toHaveLength(2);
+    expect(button('Find knowledge').props.disabled).toBe(false);
+    expect(hasButton('Check again')).toBe(false);
+    await click('Find knowledge');
+    expect(calls('knowledge_start_extraction')).toHaveLength(1);
+  });
+
+  test('Stop shows an error toast when the cancel is rejected', async () => {
+    const error = spyOn(toast, 'error');
+    const quiet = spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      useResponses(view('meeting-stop-fails', { latestRun: run({ status: 'running' }) }));
+      responses.knowledge_cancel_extraction = () => { throw 'KNOWLEDGE_INVALID_REQUEST'; };
+      await render(<KnowledgeSection meetingId="meeting-stop-fails" />);
+      await click('Stop');
+      expect(error).toHaveBeenCalledWith("Couldn't stop reading this meeting.");
+      expect(quiet).toHaveBeenCalledWith('Failed to stop knowledge extraction:', 'KNOWLEDGE_INVALID_REQUEST');
+    } finally {
+      error.mockRestore();
+      quiet.mockRestore();
+    }
+  });
+
+  test('Stop reloads the view when there was nothing to cancel', async () => {
+    useResponses(view('meeting-stop-done', { latestRun: run({ status: 'running' }) }));
+    responses.knowledge_cancel_extraction = () => false;
+    await render(<KnowledgeSection meetingId="meeting-stop-done" />);
+    responses.knowledge_get_meeting = () => view('meeting-stop-done', { latestRun: run() });
+    await click('Stop');
+    expect(calls('knowledge_get_meeting')).toHaveLength(2);
+    expect(content()).toContain('Nothing to review');
+  });
+
   test('succeeded runs without items explain nothing found or all abstained', async () => {
     useResponses(view('meeting-nothing', { latestRun: run() }));
     await render(<KnowledgeSection meetingId="meeting-nothing" />);

@@ -26,6 +26,7 @@ export const KNOWLEDGE_COPY = {
   malformed: "Telu couldn't use the model's answer. Your transcript is unchanged.",
   generic: "Telu couldn't finish reading this meeting. Your transcript is unchanged.",
   loadFailed: "Couldn't load knowledge for this meeting.",
+  stopFailed: "Couldn't stop reading this meeting.",
   abstentionTooltip: REVIEW_COPY.abstentionTooltip,
 };
 

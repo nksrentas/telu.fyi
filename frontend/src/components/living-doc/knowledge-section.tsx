@@ -117,6 +117,10 @@ function useRunStarter({ meetingId, routeState, onStarted, onNoEvidence, reload 
   const [starting, setStarting] = useState(false);
   const [routeBlocked, setRouteBlocked] = useState(false);
 
+  useEffect(() => {
+    if (routeState.status === 'validated') setRouteBlocked(false);
+  }, [routeState]);
+
   const startRun = useCallback(async (trigger: TriggerKind) => {
     if (routeState.status !== 'validated') {
       setRouteBlocked(true);
@@ -224,6 +228,7 @@ export function KnowledgeSection({
   const [routeState, setRouteState] = useState<ProviderRouteViewState>(INITIAL_ROUTE_STATE);
   const [noEvidence, setNoEvidence] = useState(!hasEvidence);
   const [regenerateOpen, setRegenerateOpen] = useState(false);
+  const [routeCheck, setRouteCheck] = useState(0);
   const regenerateRunId = useRef<string | null>(null);
   const { knowledge, loadFailed, setKnowledge, reload } = useMeetingKnowledge(meetingId);
   useKnowledgeAnchor();
@@ -273,9 +278,31 @@ export function KnowledgeSection({
       {label}
     </Button>
   );
+  const routeFailed = routeBlocked || (routeState.status !== 'validated' && routeState.status !== 'loading');
   const notice = (action: ReactNode) => (
-    <RunNotice routeState={routeState} blocked={routeBlocked} action={action} />
+    <RunNotice
+      routeState={routeState}
+      blocked={routeBlocked}
+      action={(
+        <>
+          {action}
+          {routeFailed && (
+            <Button variant="plain" size="sm" onClick={() => setRouteCheck((count) => count + 1)}>
+              Check again
+            </Button>
+          )}
+        </>
+      )}
+    />
   );
+  const stop = async () => {
+    try {
+      if (!(await cancelKnowledgeExtraction(meetingId))) await reload();
+    } catch (error) {
+      console.error('Failed to stop knowledge extraction:', error);
+      toast.error(KNOWLEDGE_COPY.stopFailed);
+    }
+  };
 
   const running = latestRun?.status === 'running';
   const autoPending = autoEligible && !latestRun && (!autoStartedMeetings.has(meetingId) || starting);
@@ -292,7 +319,7 @@ export function KnowledgeSection({
         </div>
       );
     }
-    if (running || autoPending) return <RunningRow onStop={running ? () => void cancelKnowledgeExtraction(meetingId) : undefined} />;
+    if (running || autoPending) return <RunningRow onStop={running ? () => void stop() : undefined} />;
     if (latestRun?.status === 'failed') return <FailedCard run={latestRun} notice={notice(startButton('Try again', 'user'))} />;
     if (latestRun?.status === 'succeeded' && !hasReviewItems) return <EmptyResult run={latestRun} />;
     if (latestRun && latestRun.status !== 'cancelled') return null;
@@ -314,6 +341,7 @@ export function KnowledgeSection({
     >
       <ProviderBoundary
         capability="summary"
+        refreshKey={routeCheck}
         className="hidden"
         showUnavailableAlert={false}
         onRouteStateChange={setRouteState}
