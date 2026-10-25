@@ -311,28 +311,34 @@ impl TranscriptsRepository {
             .collect())
     }
 
-    /// Helper function to extract a snippet of text around the first match of a query.
+    /// Works in character positions of the original text, because lowercasing can change byte lengths.
     fn get_match_context(transcript: &str, query: &str) -> String {
-        let transcript_lower = transcript.to_lowercase();
-        let query_lower = query.to_lowercase();
-
-        match transcript_lower.find(&query_lower) {
-            Some(match_index) => {
-                let start_index = match_index.saturating_sub(100);
-                let end_index = (match_index + query.len() + 100).min(transcript.len());
-
-                let mut context = String::new();
-                if start_index > 0 {
-                    context.push_str("...");
-                }
-                context.push_str(&transcript[start_index..end_index]);
-                if end_index < transcript.len() {
-                    context.push_str("...");
-                }
-                context
-            }
-            None => transcript.chars().take(200).collect(), // Fallback to the start of the transcript
+        const CONTEXT_CHARS: usize = 100;
+        let chars: Vec<char> = transcript.chars().collect();
+        let query_lower: String = query.chars().flat_map(char::to_lowercase).collect();
+        if query_lower.is_empty() {
+            return chars.iter().take(2 * CONTEXT_CHARS).collect();
         }
+        let mut lowered = String::new();
+        let mut char_of_byte = Vec::new();
+        for (index, ch) in chars.iter().enumerate() {
+            for lower in ch.to_lowercase() {
+                lowered.push(lower);
+                char_of_byte.extend(std::iter::repeat(index).take(lower.len_utf8()));
+            }
+        }
+
+        let Some(match_byte) = lowered.find(&query_lower) else {
+            return chars.iter().take(2 * CONTEXT_CHARS).collect();
+        };
+        let match_start = char_of_byte[match_byte];
+        let match_end = char_of_byte[match_byte + query_lower.len() - 1] + 1;
+        let start = match_start.saturating_sub(CONTEXT_CHARS);
+        let end = (match_end + CONTEXT_CHARS).min(chars.len());
+
+        let prefix = if start > 0 { "..." } else { "" };
+        let suffix = if end < chars.len() { "..." } else { "" };
+        format!("{prefix}{}{suffix}", chars[start..end].iter().collect::<String>())
     }
 }
 
@@ -619,5 +625,55 @@ mod transcript_search_tests {
 
         assert!(blank.is_empty());
         assert_eq!(capped.len(), 50);
+    }
+
+    #[test]
+    fn match_context_keeps_greek_case_insensitive_matches() {
+        let context = TranscriptsRepository::get_match_context("Η Συνάντηση ξεκινά αύριο.", "συνάντηση");
+
+        assert_eq!(context, "Η Συνάντηση ξεκινά αύριο.");
+    }
+
+    #[test]
+    fn match_context_survives_lowercase_that_grows_in_bytes() {
+        let transcript = format!("{} İstanbul trip", "İ".repeat(200));
+
+        let context = TranscriptsRepository::get_match_context(&transcript, "trip");
+
+        assert_eq!(context, format!("...{} İstanbul trip", "İ".repeat(90)));
+    }
+
+    #[test]
+    fn match_context_windows_by_characters_around_the_match() {
+        let transcript = format!("{}İstanbul{}", "🎉".repeat(150), "ş".repeat(150));
+
+        let context = TranscriptsRepository::get_match_context(&transcript, "İSTANBUL");
+
+        assert_eq!(context, format!("...{}İstanbul{}...", "🎉".repeat(100), "ş".repeat(100)));
+    }
+
+    #[test]
+    fn match_context_handles_matches_at_the_start_and_end() {
+        let at_start = TranscriptsRepository::get_match_context("Kickoff 🎉 notes", "kickoff");
+        let at_end = TranscriptsRepository::get_match_context("🎉 ended at İstanbul", "İSTANBUL");
+
+        assert_eq!(at_start, "Kickoff 🎉 notes");
+        assert_eq!(at_end, "🎉 ended at İstanbul");
+    }
+
+    #[test]
+    fn match_context_never_panics_on_mixed_width_text() {
+        let pieces = ["İ", "Σ", "🎉", "ß", "a", " ", "ﬃ", "K"];
+        for left in &pieces {
+            for right in &pieces {
+                let transcript = format!("{}{}{}", left.repeat(130), "target", right.repeat(130));
+                for query in ["target", "TARGET", "zzz", ""] {
+                    let context = TranscriptsRepository::get_match_context(&transcript, query);
+                    if query.eq_ignore_ascii_case("target") {
+                        assert!(context.contains("target"), "{left} {right} {query}");
+                    }
+                }
+            }
+        }
     }
 }
