@@ -230,8 +230,12 @@
       "touches": [
         "frontend/src-tauri/src/agenda/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "9c7eed6",
+        "ran": "cargo test --features coreml --lib agenda (6 pass); bash .loop/verify.sh (gate: all steps passed). Base failure: agenda_keeps_accepted_knowledge_after_a_failed_regenerate got card_state NoKnowledge, expected Reviewed",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "T13",

@@ -154,3 +154,12 @@ Learned:
 - transcript.rs was not rustfmt-clean on base (9 diff hunks). Running rustfmt on the whole file would reformat unrelated code, so keep the file's style.
 - The tsc errors in transcript-drawer.test.tsx and paginated-transcripts.test.tsx are pre-existing and count toward the capped tests/ total.
 Next: T12
+
+## Session 12 · T12 · 2026-10-25
+Did: WR-22. derive_card_state in agenda/mod.rs takes accepted_count, and the Reviewed branch is now `latest_run_status == Succeeded || accepted_count > 0`. A failed regenerate on a meeting with accepted items shows "N accepted", not No knowledge. The earlier checks (Recording, Finalizing, Extracting, ToReview, Incomplete) still win.
+- New test agenda_keeps_accepted_knowledge_after_a_failed_regenerate goes through list_day: seed_items, accept one, reject one, then a newer run that ends Failed (insert_running_run + finalize_run). On base it got NoKnowledge. Two new precedence-table cases: failed + accepted gives Reviewed, and incomplete + failed + accepted gives Incomplete.
+Learned:
+- The card state is worked out only in Rust. The TS side only reads cardState.
+- agenda/mod.rs and commands.rs were not rustfmt-clean on base, so keep the long-line style.
+- today-view.test.tsx:370 mocks cardState 'no_knowledge' with the default acceptedCount 2. Rust can no longer produce that combination. It's harmless (a UI-only mock) and was left alone, outside T12's touches.
+Next: T13
