@@ -457,8 +457,12 @@
       "touches": [
         "docs/telu/phase2-trust-fixes.md"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "d573123",
+        "ran": "bash .loop/verify.sh passed (gallery 152); script check: all 21 cited shas are ancestors of HEAD (git merge-base --is-ancestor), every quoted test title found by grep -F under frontend/tests, every Rust fn name found as 'fn <name>(' under frontend/src-tauri, all 4 gallery screens found in tests/visual/screens; read-only review subagent: 3 spec points (test-hardening wording, screen file names, out-of-scope line) fixed before commit",
+        "browser": "n/a (ui:false)"
+      }
     }
   ]
 }

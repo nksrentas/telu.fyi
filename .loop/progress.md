@@ -268,3 +268,15 @@ The knowledge/ and summary/ diff since the base is empty. The KNOW-07 status was
 No review subagent ran, because this item has no diff. The earlier items' reviews cover the code.
 Learned: the KNOW-07 status script reads only frozen paths (thresholds-v2.json and the eval reports). So a `git archive <base>` of those dirs plus .github is enough to reproduce the base's output without a worktree.
 Next: TR2
+
+## Session 23 · TR2 · 2026-10-25
+Did: wrote docs/telu/phase2-trust-fixes.md. It has four parts:
+- A table of fixed findings: id, one line, sha, proving test. CR-40 has two rows, one for the unit fix and one for the gallery proof.
+- A table of the extra checks: TE1–TE3, plus T18, the staged-model loop.
+- The 5 human checks still left from 02-VERIFICATION.md. The sixth, CR-40 Undo, is now covered by eaaf712 and 17255d0.
+- The four findings left open in knowledge/: WR-02, WR-05, WR-08, IN-03.
+A script checked every sha (ancestor of HEAD), every quoted test title and fn name (grep), and every gallery screen.
+Learned: test names for each fix can be read from `git show <sha> -U0 | grep '^+.*test('`. 02-VERIFICATION.md's human_verification frontmatter is the source of the human-check list.
+Lesson: [this project] the guard blocked the commit because I edited the doc after the gate ran. docs/ is inside the fingerprint, so apply review fixes before running the gate.
+Lesson: [this project] review found that "every fix has a base-failing test" is false for the test-hardening items (WR-82 to WR-86) → when summarising evidence, check each class of item against the claim.
+Next: none, all items pass
