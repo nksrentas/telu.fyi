@@ -181,3 +181,17 @@ Learned:
 - candidate-row.tsx derives "not eligible" from evidenceStatus for rows with an evidence problem (evidenceProblem). It reads item.eligibility only for valid accepted rows.
 - The scratch-break check works as edit → bun test -t '<name>' → git checkout -- <file>, with no stash.
 Next: T15
+
+## Session 15 · T15 · 2026-10-25
+Did: WR-85, test-only. The 12 component files already restored every mock. The leaks were elsewhere:
+- meeting-details-refresh: RecordingStateContext and page-content had no restore. summary-generation: next/navigation and RecordingStateContext had none. Both now capture the originals, spread them into the stubs, and restore them in afterAll.
+- analytics.test.ts and summary-language-preferences.test.js (the second uses double quotes) mocked @tauri-apps/api/core with no restore. Both now restore it.
+- paginated-transcripts had `afterAll(() => mock.module(...))`. Under bun 1.3.9 that restore did not apply: running it before agenda-service or analytics failed with the real invoke ("window is not defined"). A block body fixes it.
+- New tests/module-mocks-restored.test.ts reads every test file. It checks that each mocked specifier (any quote style) has a `() => original…` restore, and it forbids the expression-body afterAll. It was red on base for all 5 files.
+- Every file alone and every ordered pair of test files pass. Full bun run: 174 pass.
+Learned:
+- bun test with several paths does not run them in CLI order (hooks ran before lib). To prove order independence, loop over pairs both ways.
+- The guard only checks that a restore exists, not that it sits inside afterAll. Some stubs (sonner, ConfigContext, meeting-page) still don't spread their originals. That's harmless while they're restored.
+Lesson: [tests] my first guard regex matched only single quotes, and review found a double-quoted unrestored mock → a static scan over source must accept every quote style the codebase uses (the .js tests use double quotes).
+Lesson: [tests] `afterAll(() => mock.module(...))` silently failed to restore in bun 1.3.9 → write afterAll hooks with block bodies, and prove isolation with pair runs, not just the full run.
+Next: T16

@@ -288,8 +288,12 @@
       "touches": [
         "frontend/tests/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "45d12b5",
+        "ran": "bash .loop/verify.sh (cargo test, bun test 174 pass 0 fail, typecheck 36 cap, gallery 150 passed); each of the 12 tests/components files alone: agenda-review 4, app-shell 6, delete-meeting-alert 6, evidence-popover 8, knowledge-review 18, knowledge-run 13, knowledge-section 7, recording-host 7, search-popover 2, telu-design-system 9, today-view 14, transcript-drawer 6, all 0 fail; every ordered pair of test files under components, hooks, lib run in one bun process: 0 fail",
+        "base_failure": "new tests/module-mocks-restored.test.ts failed on base for meeting-details-refresh (RecordingStateContext, page-content), summary-generation (next/navigation, RecordingStateContext), analytics and summary-language-preferences (@tauri-apps/api/core) and paginated-transcripts (expression-body afterAll); on base, bun test lib/analytics.test.ts hooks/paginated-transcripts.test.tsx gave 2 fail and agenda-service + paginated gave 1 fail (window is not defined from the real invoke)"
+      }
     },
     {
       "id": "T16",
