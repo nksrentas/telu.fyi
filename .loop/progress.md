@@ -123,3 +123,13 @@ Learned:
 - LanguagePickerPopover (settings) is the only non-Radix overlay. Its Escape handler ignores defaultPrevented, but it never sits above the drawer.
 Lesson: [bussin-a11y] review found that the retry control unmounted on click and dropped focus to the body → a control that removes itself must move focus to a stable element first.
 Next: T9
+
+## Session 9 · T9 · 2026-10-25
+Did: CR-20. get_match_context in database/repositories/transcript.rs now works on a Vec<char> of the original text. It lowercases each char on its own, keeps a map from each lowercased byte to its original char index, and cuts a 100-char window on each side of the match. The query is lowercased per char too (char::to_lowercase, no final-sigma rule), so both sides fold the same way. An empty query returns the first 200 chars.
+- 5 new tests in transcript_search_tests: Greek, İstanbul with 200 İ before the match (panicked at the byte slice on base), emoji before the match with an exact window, match at start and end, and a no-panic sweep over mixed-width chars (İ, Σ, emoji, ß, ﬃ, K).
+Learned:
+- SQLite LOWER() folds ASCII only, while like_pattern lowercases the query in Rust. So a search for "Συνάντηση" or "İstanbul" never matches a row, whatever its case. Only the snippet helper was in scope for T9. Fixing it needs a Rust-side fold or a NOCASE/ICU approach.
+- "istanbul" does not match "İstanbul" under Unicode lowercasing (İ → i + U+0307).
+- Rust tests have no proptest or quickcheck. A nested loop over tricky chars stands in for a property test.
+Lesson: [tests] my first emoji-window test used the query "istanbul", which can't match "İstanbul" under Unicode lowercasing → for case-folding tests, derive the query from the expected lowercase form, not from ASCII intuition.
+Next: T10

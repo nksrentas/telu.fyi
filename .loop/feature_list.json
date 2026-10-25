@@ -172,8 +172,11 @@
       "touches": [
         "frontend/src-tauri/src/database/repositories/transcript.rs"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "448e6bf",
+        "ran": "cargo test --features coreml transcript --lib: 54 passed (5 new match_context tests); on base the İstanbul case panicked at transcript.rs:328 (byte slice) and the emoji-window and mixed-width cases failed; bash .loop/verify.sh passed"
+      }
     },
     {
       "id": "T10",
