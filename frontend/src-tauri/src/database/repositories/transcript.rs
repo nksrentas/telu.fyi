@@ -683,6 +683,27 @@ mod transcript_search_tests {
         assert_eq!(capped.len(), 50);
     }
 
+    #[tokio::test]
+    async fn transcript_search_handles_one_char_combining_mark_and_500_char_queries_within_the_cap() {
+        let pool = migrated_pool().await;
+        let long_query = "x".repeat(500);
+        let missing_query = "y".repeat(500);
+        for meeting in 0..60 {
+            let meeting_id = format!("018f5e27-2f68-7e27-9c90-7c72123160{meeting:02x}");
+            let evidence_id = format!("018f5e27-2f68-7e27-9c90-7c72123152{meeting:02x}");
+            titled_meeting(&pool, &meeting_id, "Standup").await;
+            insert_evidence(&pool, &meeting_id, &evidence_id, 0, &format!("Cafe\u{301} a {long_query} end")).await;
+        }
+
+        let mut counts = Vec::new();
+        for query in ["a", "\u{301}", "\u{301}\u{308}", long_query.as_str(), missing_query.as_str()] {
+            let results = TranscriptsRepository::search_transcripts(&pool, query).await.expect("search");
+            counts.push(results.len());
+        }
+
+        assert_eq!(counts, vec![50, 50, 0, 50, 0]);
+    }
+
     #[test]
     fn match_context_keeps_greek_case_insensitive_matches() {
         let context = TranscriptsRepository::get_match_context("Η Συνάντηση ξεκινά αύριο.", "συνάντηση");

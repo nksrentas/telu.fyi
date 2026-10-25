@@ -113,6 +113,18 @@ describe('SearchPopover inside SidebarProvider', () => {
     expect(searchCalls()).toEqual([{ query: 'roadmap' }]);
   });
 
+  test('an empty or whitespace-only query sends no search command', async () => {
+    jest.useFakeTimers();
+    await renderAndSearch('');
+    for (const query of [' ', '   ', '\t\n ', '\u00a0\u3000']) {
+      const input = root().find((node: ReactTestInstance) => node.type === 'input' && node.props.placeholder === SEARCH_PLACEHOLDER);
+      await act(async () => input.props.onChange({ target: { value: query } }));
+      await advance(SEARCH_DEBOUNCE_MS + 50);
+    }
+
+    expect(searchCalls()).toEqual([]);
+  });
+
   test('renders one CommandItem per result with a unique value and no duplicate-key warning', async () => {
     jest.useFakeTimers();
     searchResponse = [
