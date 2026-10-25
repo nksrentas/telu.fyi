@@ -1,10 +1,15 @@
 ---
 phase: 02-evidence-linked-post-meeting-knowledge
-verified: 2026-10-18T09:00:00Z
-status: gaps_found
-score: 6/7 must-haves verified
+verified: 2026-10-25T14:22:34Z
+status: passed
+score: 7/7 must-haves verified (1 by override)
 behavior_unverified: 0
-overrides_applied: 0
+overrides_applied: 1
+overrides:
+  - must_have: "SC5 / KNOW-07 and the ROADMAP exit gate: extraction on representative meetings meets thresholds declared before evaluation"
+    reason: "Deferred by the user on 2026-10-25, verbatim: \"Stop the 9B run and defer KNOW-07: record it as deferred in the planning docs so Phase 2 can close, and skip 02-43.\" The measured gate is still not met (the derived KNOW-07 status stays open with representative_gate_not_pass); 02-44 was stopped before scoring and 02-43 was skipped. KNOW-07 is tracked as Deferred in REQUIREMENTS.md."
+    accepted_by: "nrentas"
+    accepted_at: "2026-10-25T14:22:34Z"
 re_verification:
   previous_status: gaps_found
   previous_score: 6/7
@@ -31,7 +36,8 @@ gaps:
       - "Improve extraction quality where it measured below the bar: semantic support of the cited quote for the whole claim, claim correctness (especially questions), recall/evidence coverage, commitment owner/due attribution, and the share of items that survive review"
       - "Re-evaluate on a NEW held-out representative set (the 7 meetings in 6cb394a are spent for thresholds-v2), with fresh first runs after the fix, scored with --kind representative, disjoint from the pilot. Any threshold revision must be a new version declared in its own commit before scoring; thresholds-v2.json must not be edited after 6cb394a"
       - "Alternatively, the user explicitly re-scopes the Phase 2 exit gate (ROADMAP change or an accepted override). The verifier has not assumed this"
-deferred: []
+deferred:
+  - "KNOW-07 representative-quality gate (02-43, 02-44): deferred by the user on 2026-10-25"
 human_verification:
   - test: "Delegated KNOW-07 judgment (02-35 to 02-37): review the provenance recorded in 02-36-SUMMARY.md and 02-37-SUMMARY.md. Thresholds, held-out meeting choice, gold (fact gold is model-written) and labels/review were produced by Claude under the user's delegation on public AMI recordings."
     expected: "The user confirms the declared thresholds and the evaluation method as their own, or declares a new threshold version / chooses a different gold process before the next representative run."
@@ -57,7 +63,7 @@ human_verification:
 
 **Phase Goal:** Users can turn a completed meeting into trustworthy typed knowledge, inspect its exact evidence, and control what becomes eligible for future use.
 **Verified:** 2026-10-18 (HEAD 15c9b23). Phase-2 code and eval files have no uncommitted changes. The uncommitted files in the working tree are unrelated phase-1, config, ffmpeg build and recording-command files, which were not touched.
-**Status:** gaps_found
+**Status:** passed by override on 2026-10-25. The KNOW-07 gate below is still not met; the user deferred it (see `overrides` in the frontmatter), stopped 02-44 before scoring and skipped 02-43. The findings below are unchanged from the 2026-10-18 verification.
 **Re-verification:** Yes, after gap closure round 2 (plans 02-34 to 02-37).
 **Mode:** mvp (roadmap). Verification runs against the roadmap success criteria and the exit gate as the contract.
 
