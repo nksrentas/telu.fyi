@@ -368,8 +368,12 @@
         "frontend/tests/components/**",
         "frontend/tests/visual/screens/preparation.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "99ebcf4",
+        "ran": "bash .loop/verify.sh (gate: rust, bun incl. source-manifest 5 tests, gallery 178 passed)",
+        "browser": "WebKit gallery preparation-brief-manifest light+dark: popover lists 6 statuses with sentences and the dropped count"
+      }
     },
     {
       "id": "U7",
