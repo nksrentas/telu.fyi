@@ -205,3 +205,15 @@ Learned:
 - All fixture timestamps end in Z. The frozen now was the only naive date.
 Lesson: [this project] the item's verify step (TZ=America/Los_Angeles) can't fail on base on macOS WebKit → to prove a fix depends on the zone, override the browser context's timezoneId rather than the process TZ.
 Next: T17
+
+## Session 17 · T17 · 2026-10-25
+Did: browser proof of CR-40. tauri-ipc-stub.js gains two opt-in directives backed by a page-level `state` map that resets on each page load:
+- `{"$state": key, "initial": view}` returns the state (seeded from `initial` on first read).
+- `{"$review": key}` applies accept/reject/restore/reopen to the item there and returns the item view. It mirrors the Rust transitions (restore and reopen → proposed) and withItem's list moves and counts.
+- An isDirective helper replaces the repeated guard. Existing entries go through the unchanged $byArg/expand path.
+- New screen knowledge-review-undo in screens/knowledge.json (copies the pending-list fixture): accept A, reject B, then Undo on the "Accepted — eligible" toast. It waits for A's Accept button and for B's Restore under "Rejected (1)". Gallery: 152 tests (150 + 2).
+- Base proof: with review-block.tsx from 7c13d69 the screen times out waiting for A's Accept button.
+Learned:
+- Candidate rows and rejected rows both carry data-item-id, so `[data-item-id="…"] button:text-is("Accept")` scopes a step to one row. Accepted rows also show a Reject button, so an unscoped `button[aria-label="Reject"]` can hit the wrong row.
+- Sonner toasts match `[data-sonner-toast]:has-text("…")`.
+Next: T18

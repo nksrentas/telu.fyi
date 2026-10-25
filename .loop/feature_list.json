@@ -329,8 +329,12 @@
         "frontend/tests/visual/gallery.visual.ts",
         "frontend/tests/visual/screens/knowledge.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "17255d0",
+        "ran": "bash .loop/verify.sh (cargo, bun, node, tsc, 152 gallery tests = 150 + knowledge-review-undo light/dark); base proof: with review-block.tsx from 7c13d69 the screen times out waiting for A's Accept button after the first toast's Undo",
+        "browser": "knowledge-review-undo PNGs, light and dark: A 'Ship the beta on Friday' back in Proposed with Accept/Correct/Reject, B under Rejected (1) with Restore, B's Undo toast still visible"
+      }
     },
     {
       "id": "T18",
