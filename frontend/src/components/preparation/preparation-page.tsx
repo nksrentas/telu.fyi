@@ -193,6 +193,7 @@ function PlannedMeetingDoc({ meeting, initialSource, onBack }: PlannedMeetingDoc
                 aria-invalid={titleMissing}
                 aria-describedby={titleMissing ? "planned-title-error" : undefined}
                 value={draft.title}
+                title={draft.title}
                 placeholder="Name this meeting"
                 onChange={(event) => change({ title: event.target.value })}
                 className={cn(EDITABLE, "font-display text-large")}

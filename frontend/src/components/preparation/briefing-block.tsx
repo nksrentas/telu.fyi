@@ -78,9 +78,15 @@ function listNames(names: string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
 }
 
-function provenanceLine(briefing: StoredBriefing, labels: SourceLabels): string {
+const PROVENANCE_NAME_MAX = 48
+
+function shortName(name: string): string {
+  return name.length > PROVENANCE_NAME_MAX ? `${name.slice(0, PROVENANCE_NAME_MAX - 1).trimEnd()}…` : name
+}
+
+function provenanceLine(briefing: StoredBriefing, labels: SourceLabels, shorten: (name: string) => string): string {
   const used = briefing.manifest.filter((entry) => entry.status === "included" || entry.status === "truncated")
-  const documents = used.flatMap(({ source }) => (source.kind === "document" ? [sourceName(source, labels)] : []))
+  const documents = used.flatMap(({ source }) => (source.kind === "document" ? [shorten(sourceName(source, labels))] : []))
   const items = used.length - documents.length
   const parts = ["your purpose", ...documents]
   if (items > 0) parts.push(items === 1 ? "1 past-meeting item" : `${items} past-meeting items`)
@@ -263,7 +269,9 @@ export function BriefingBlock({ plannedMeetingId, revision, onOpenSource, onOpen
       {briefing && (
         <>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-            <p className="m-0 text-[12px] text-label-3">{provenanceLine(briefing, labels)}</p>
+            <p title={provenanceLine(briefing, labels, (name) => name)} className="m-0 text-[12px] text-label-3">
+              {provenanceLine(briefing, labels, shortName)}
+            </p>
             <SourceManifest
               manifest={briefing.manifest}
               droppedCount={briefing.droppedCount}

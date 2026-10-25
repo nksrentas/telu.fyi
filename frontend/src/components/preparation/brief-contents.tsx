@@ -80,6 +80,7 @@ function CitationChip({ claim, labels, onOpen }: CitationChipProps) {
   return (
     <button
       type="button"
+      title={name}
       onClick={() => onOpen(claim)}
       className={cn(
         CHIP,

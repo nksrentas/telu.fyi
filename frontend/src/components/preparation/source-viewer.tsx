@@ -201,7 +201,7 @@ export function SourceViewer({ target, onClose }: SourceViewerProps) {
     >
       <header className="flex items-start gap-2 px-4 pb-2 pt-3.5">
         <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[13px] font-semibold text-label">{view?.document.title ?? "Source"}</h2>
+          <h2 title={view?.document.title} className="truncate text-[13px] font-semibold text-label">{view?.document.title ?? "Source"}</h2>
           {view && !deleted && (
             <p className={cn("text-[11px] tabular-nums", older ? "text-label" : "text-label-2")}>
               {older ? `Version ${view.version.version} of ${view.latestVersion}` : view.document.format === "markdown" ? "Markdown" : "Text"}

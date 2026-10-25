@@ -2240,5 +2240,1626 @@
         "waitFor": "[role=dialog]"
       }
     ]
+  },
+  {
+    "name": "preparation-edge-twelve-sources",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and p",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 2048
+        },
+        {
+          "id": "d-2",
+          "title": "Source 2",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 4096
+        },
+        {
+          "id": "d-3",
+          "title": "Source 3",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 6144
+        },
+        {
+          "id": "d-4",
+          "title": "Source 4",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-4-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 8192
+        },
+        {
+          "id": "d-5",
+          "title": "Source 5",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-5-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 10240
+        },
+        {
+          "id": "d-6",
+          "title": "Source 6",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-6-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 12288
+        },
+        {
+          "id": "d-7",
+          "title": "Source 7",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-7-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 14336
+        },
+        {
+          "id": "d-8",
+          "title": "Source 8",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-8-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 16384
+        },
+        {
+          "id": "d-9",
+          "title": "Source 9",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-9-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-10",
+          "title": "Source 10",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-10-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 20480
+        },
+        {
+          "id": "d-11",
+          "title": "Source 11",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-11-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 22528
+        },
+        {
+          "id": "d-12",
+          "title": "Source 12",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-12-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 24576
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-3-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-4-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-5-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-6-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-7-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-8-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-9-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-10-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-11-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-12-v1"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v1": {
+            "document": {
+              "id": "d-1",
+              "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v1",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Source 2",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-3-v1": {
+            "document": {
+              "id": "d-3",
+              "title": "Source 3",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-3-v1",
+              "documentId": "d-3",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-4-v1": {
+            "document": {
+              "id": "d-4",
+              "title": "Source 4",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-4-v1",
+              "documentId": "d-4",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-5-v1": {
+            "document": {
+              "id": "d-5",
+              "title": "Source 5",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-5-v1",
+              "documentId": "d-5",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-6-v1": {
+            "document": {
+              "id": "d-6",
+              "title": "Source 6",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-6-v1",
+              "documentId": "d-6",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-7-v1": {
+            "document": {
+              "id": "d-7",
+              "title": "Source 7",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-7-v1",
+              "documentId": "d-7",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-8-v1": {
+            "document": {
+              "id": "d-8",
+              "title": "Source 8",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-8-v1",
+              "documentId": "d-8",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-9-v1": {
+            "document": {
+              "id": "d-9",
+              "title": "Source 9",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-9-v1",
+              "documentId": "d-9",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-10-v1": {
+            "document": {
+              "id": "d-10",
+              "title": "Source 10",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-10-v1",
+              "documentId": "d-10",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-11-v1": {
+            "document": {
+              "id": "d-11",
+              "title": "Source 11",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-11-v1",
+              "documentId": "d-11",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-12-v1": {
+            "document": {
+              "id": "d-12",
+              "title": "Source 12",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-12-v1",
+              "documentId": "d-12",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": false,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            }
+          ],
+          "claims": [
+            {
+              "text": "Point 1 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S1#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 2 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 3 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S3#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 4 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S4#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 5 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S5#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 6 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S6#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 7 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S7#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 8 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S8#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 9 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S9#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 10 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S10#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 11 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S11#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 12 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S12#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 700
+    }
+  },
+  {
+    "name": "preparation-edge-twelve-brief",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and planning and p",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 2048
+        },
+        {
+          "id": "d-2",
+          "title": "Source 2",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 4096
+        },
+        {
+          "id": "d-3",
+          "title": "Source 3",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-3-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 6144
+        },
+        {
+          "id": "d-4",
+          "title": "Source 4",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-4-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 8192
+        },
+        {
+          "id": "d-5",
+          "title": "Source 5",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-5-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 10240
+        },
+        {
+          "id": "d-6",
+          "title": "Source 6",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-6-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 12288
+        },
+        {
+          "id": "d-7",
+          "title": "Source 7",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-7-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 14336
+        },
+        {
+          "id": "d-8",
+          "title": "Source 8",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-8-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 16384
+        },
+        {
+          "id": "d-9",
+          "title": "Source 9",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-9-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-10",
+          "title": "Source 10",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-10-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 20480
+        },
+        {
+          "id": "d-11",
+          "title": "Source 11",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-11-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 22528
+        },
+        {
+          "id": "d-12",
+          "title": "Source 12",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-12-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 24576
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-3-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-4-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-5-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-6-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-7-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-8-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-9-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-10-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-11-v1"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-12-v1"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v1": {
+            "document": {
+              "id": "d-1",
+              "title": "Quarterly roadmap review with design, research and the partner team to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to settle scope to s",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v1",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Source 2",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-3-v1": {
+            "document": {
+              "id": "d-3",
+              "title": "Source 3",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-3-v1",
+              "documentId": "d-3",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-4-v1": {
+            "document": {
+              "id": "d-4",
+              "title": "Source 4",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-4-v1",
+              "documentId": "d-4",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-5-v1": {
+            "document": {
+              "id": "d-5",
+              "title": "Source 5",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-5-v1",
+              "documentId": "d-5",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-6-v1": {
+            "document": {
+              "id": "d-6",
+              "title": "Source 6",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-6-v1",
+              "documentId": "d-6",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-7-v1": {
+            "document": {
+              "id": "d-7",
+              "title": "Source 7",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-7-v1",
+              "documentId": "d-7",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-8-v1": {
+            "document": {
+              "id": "d-8",
+              "title": "Source 8",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-8-v1",
+              "documentId": "d-8",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-9-v1": {
+            "document": {
+              "id": "d-9",
+              "title": "Source 9",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-9-v1",
+              "documentId": "d-9",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-10-v1": {
+            "document": {
+              "id": "d-10",
+              "title": "Source 10",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-10-v1",
+              "documentId": "d-10",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-11-v1": {
+            "document": {
+              "id": "d-11",
+              "title": "Source 11",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-11-v1",
+              "documentId": "d-11",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-12-v1": {
+            "document": {
+              "id": "d-12",
+              "title": "Source 12",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-12-v1",
+              "documentId": "d-12",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": false,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 100
+            }
+          ],
+          "claims": [
+            {
+              "text": "Point 1 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S1#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 2 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 3 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S3#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-3-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 4 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S4#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-4-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 5 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S5#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-5-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 6 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S6#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-6-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 7 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S7#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-7-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 8 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S8#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-8-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 9 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S9#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-9-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 10 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S10#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-10-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 11 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S11#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-11-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Point 12 from this source, cited to its exact passage.",
+              "status": "cited",
+              "sourceRef": "S12#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-12-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      },
+      {
+        "hover": "[data-manifest-trigger]"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 700
+    }
   }
 ]
