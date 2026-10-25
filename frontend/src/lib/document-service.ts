@@ -88,3 +88,7 @@ export function replaceDocument(
 export function deleteDocument(documentId: string): Promise<DocumentResult<null>> {
   return call('documents_delete', { documentId });
 }
+
+export function deleteDocumentImpact(documentId: string): Promise<DocumentResult<number>> {
+  return call('documents_delete_impact', { documentId });
+}

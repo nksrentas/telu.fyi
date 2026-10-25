@@ -1,15 +1,25 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
-import { ClipboardPaste, FileUp } from "lucide-react"
+import { ClipboardPaste, FileUp, MoreHorizontal } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { DeleteSourceAlert } from "@/components/preparation/delete-source-alert"
 import { KnowledgePicker } from "@/components/preparation/knowledge-picker"
 import {
   importDocument,
   listDocuments,
+  getDocumentVersion,
   pasteDocument,
+  replaceDocument,
   type DocumentFormat,
   type DocumentResult,
   type DocumentSummary,
@@ -29,6 +39,7 @@ const SOURCE_ERRORS: Record<string, string> = {
   SOURCE_UNREADABLE: "Couldn't read that file. Check that it still exists.",
   SELECTION_TOO_LARGE: "A meeting can include up to 12 documents.",
   SOURCE_NOT_ELIGIBLE: "That source can no longer be included.",
+  DOCUMENT_NOT_FOUND: "This source was deleted.",
 }
 const FALLBACK_ERROR = "Couldn't add this source."
 const LOAD_ERROR = "Couldn't load sources."
@@ -48,7 +59,28 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function useSources(plannedMeetingId: string) {
+function selectedVersionIds(sources: SelectedSource[]): string[] {
+  return sources.flatMap((source) => (source.kind === "document" ? [source.versionId] : []))
+}
+
+function isOneOf(versionIds: Set<string>) {
+  return (source: SelectedSource) => source.kind === "document" && versionIds.has(source.versionId)
+}
+
+async function selectedVersionsOf(document: DocumentSummary, listed: DocumentSummary[], selected: string[]): Promise<Set<string>> {
+  const latestIds = new Set(listed.map((summary) => summary.latestVersionId))
+  const owned = await Promise.all(
+    selected.map(async (versionId) => {
+      if (versionId === document.latestVersionId) return versionId
+      if (latestIds.has(versionId)) return null
+      const view = await getDocumentVersion(versionId)
+      return view.ok && view.value.document.id === document.id ? versionId : null
+    })
+  )
+  return new Set(owned.filter((versionId): versionId is string => versionId !== null))
+}
+
+function useSources(plannedMeetingId: string, onChanged: () => void) {
   const [documents, setDocuments] = useState<DocumentSummary[] | null>(null)
   const [selection, setSelection] = useState<SelectedSource[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -110,18 +142,58 @@ function useSources(plannedMeetingId: string) {
     [reload, select]
   )
 
-  return { documents, selection, error, setError, select, add }
+  const replace = useCallback(
+    async (previous: DocumentSummary, result: DocumentResult<DocumentVersion | null>): Promise<string | null> => {
+      if (!result.ok) return result.code
+      if (!result.value) return null
+      const owned = await selectedVersionsOf(previous, documents ?? [], selectedVersionIds(latest.current))
+      await reload()
+      const next = result.value
+      if (next.extractionStatus === "extracted" && owned.size > 0) {
+        const code = await select((current) => {
+          const first = current.findIndex(isOneOf(owned))
+          return current.flatMap((source, index): SelectedSource[] => {
+            if (!isOneOf(owned)(source)) return [source]
+            return index === first ? [{ kind: "document", versionId: next.id }] : []
+          })
+        })
+        if (code) setError(sourceErrorMessage(code))
+      }
+      onChanged()
+      return null
+    },
+    [documents, reload, select, onChanged]
+  )
+
+  const removed = useCallback(
+    async (document: DocumentSummary) => {
+      const owned = await selectedVersionsOf(document, documents ?? [], selectedVersionIds(latest.current))
+      await reload()
+      if (owned.size > 0) {
+        const code = await select((current) => current.filter((source) => !isOneOf(owned)(source)))
+        if (code) setError(sourceErrorMessage(code))
+      }
+      onChanged()
+    },
+    [documents, reload, select, onChanged]
+  )
+
+  return { documents, selection, error, setError, select, add, replace, removed }
 }
 
 interface SourcesPanelProps {
   plannedMeetingId: string
   onOpenSource: (versionId: string) => void
+  onSourcesChanged: () => void
 }
 
-export function SourcesPanel({ plannedMeetingId, onOpenSource }: SourcesPanelProps) {
-  const { documents, selection, error, setError, select, add } = useSources(plannedMeetingId)
+export function SourcesPanel({ plannedMeetingId, onOpenSource, onSourcesChanged }: SourcesPanelProps) {
+  const { documents, selection, error, setError, select, add, replace, removed } = useSources(plannedMeetingId, onSourcesChanged)
   const [pasting, setPasting] = useState(false)
-  const included = new Set(selection.flatMap((source) => (source.kind === "document" ? [source.versionId] : [])))
+  const [replacing, setReplacing] = useState<DocumentSummary | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DocumentSummary | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const included = new Set(selectedVersionIds(selection))
 
   const showError = (code: string) => setError(sourceErrorMessage(code))
 
@@ -136,6 +208,11 @@ export function SourcesPanel({ plannedMeetingId, onOpenSource }: SourcesPanelPro
 
   const runImport = async () => {
     const code = await add(await importDocument())
+    if (code) showError(code)
+  }
+
+  const runReplaceImport = async (document: DocumentSummary) => {
+    const code = await replace(document, await replaceDocument(document.id, { kind: "import" }))
     if (code) showError(code)
   }
 
@@ -174,11 +251,34 @@ export function SourcesPanel({ plannedMeetingId, onOpenSource }: SourcesPanelPro
                 included={included.has(document.latestVersionId)}
                 onToggle={() => toggle(document.latestVersionId)}
                 onOpen={() => onOpenSource(document.latestVersionId)}
+                onReplacePaste={() => setReplacing(document)}
+                onReplaceImport={() => void runReplaceImport(document)}
+                onDelete={() => {
+                  setDeleteTarget(document)
+                  setDeleteOpen(true)
+                }}
               />
             ))}
           </ul>
         )}
         <PasteSourceDialog open={pasting} onOpenChange={setPasting} onSubmit={(title, text) => pasteDocument(title, text).then(add)} />
+        <PasteSourceDialog
+          replacing={replacing}
+          open={replacing !== null}
+          onOpenChange={(open) => !open && setReplacing(null)}
+          onSubmit={(_title, text) =>
+            replacing ? replaceDocument(replacing.id, { kind: "paste", text }).then((result) => replace(replacing, result)) : Promise.resolve(null)
+          }
+        />
+        {deleteTarget && (
+          <DeleteSourceAlert
+            documentId={deleteTarget.id}
+            title={deleteTarget.title}
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            onDeleted={() => void removed(deleteTarget)}
+          />
+        )}
       </section>
       <KnowledgePicker selection={selection} select={select} onError={showError} />
     </>
@@ -190,9 +290,12 @@ interface SourceRowProps {
   included: boolean
   onToggle: () => void
   onOpen: () => void
+  onReplacePaste: () => void
+  onReplaceImport: () => void
+  onDelete: () => void
 }
 
-function SourceRow({ document, included, onToggle, onOpen }: SourceRowProps) {
+function SourceRow({ document, included, onToggle, onOpen, onReplacePaste, onReplaceImport, onDelete }: SourceRowProps) {
   const failed = document.extractionStatus === "failed"
   const label = included ? `Included in the brief: ${document.title}` : `Not included in the brief: ${document.title}`
 
@@ -230,17 +333,33 @@ function SourceRow({ document, included, onToggle, onOpen }: SourceRowProps) {
           )}
         />
       </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="plain" icon aria-label={`More for ${document.title}`} className="size-6 flex-none">
+            <MoreHorizontal className="size-3.5" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={onReplacePaste}>Replace with pasted text…</DropdownMenuItem>
+          <DropdownMenuItem onSelect={onReplaceImport}>Replace from a file…</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="danger" onSelect={onDelete}>
+            Delete…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </li>
   )
 }
 
 interface PasteSourceDialogProps {
+  replacing?: DocumentSummary | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (title: string, text: string) => Promise<string | null>
 }
 
-function PasteSourceDialog({ open, onOpenChange, onSubmit }: PasteSourceDialogProps) {
+function PasteSourceDialog({ replacing, open, onOpenChange, onSubmit }: PasteSourceDialogProps) {
   const [title, setTitle] = useState("")
   const [text, setText] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -269,18 +388,26 @@ function PasteSourceDialog({ open, onOpenChange, onSubmit }: PasteSourceDialogPr
       <DialogContent>
         <form onSubmit={submit} className="grid gap-3">
           <DialogHeader>
-            <DialogTitle>Paste a source</DialogTitle>
-            <DialogDescription>Stored on this Mac. Every version is kept.</DialogDescription>
+            <DialogTitle>{replacing ? `Replace “${replacing.title}”` : "Paste a source"}</DialogTitle>
+            <DialogDescription>
+              {replacing
+                ? `Adds version ${replacing.latestVersion + 1}. Earlier versions and the briefs built from them are kept.`
+                : "Stored on this Mac. Every version is kept."}
+            </DialogDescription>
           </DialogHeader>
-          <label htmlFor="paste-source-title" className="text-[12px] font-semibold text-label-2">
-            Title
-          </label>
-          <input
-            id="paste-source-title"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            className="h-8 rounded-[7px] bg-fill px-2.5 text-[13px] text-label outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
-          />
+          {!replacing && (
+            <>
+              <label htmlFor="paste-source-title" className="text-[12px] font-semibold text-label-2">
+                Title
+              </label>
+              <input
+                id="paste-source-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="h-8 rounded-[7px] bg-fill px-2.5 text-[13px] text-label outline-none focus-visible:shadow-[0_0_0_2px_var(--accent)]"
+              />
+            </>
+          )}
           <label htmlFor="paste-source-text" className="text-[12px] font-semibold text-label-2">
             Text
           </label>
@@ -302,8 +429,8 @@ function PasteSourceDialog({ open, onOpenChange, onSubmit }: PasteSourceDialogPr
             <Button type="button" variant="plain" size="sm" onClick={() => close(false)}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={saving || !title.trim() || !text.trim()}>
-              Add source
+            <Button type="submit" size="sm" disabled={saving || (!replacing && !title.trim()) || !text.trim()}>
+              {replacing ? "Add version" : "Add source"}
             </Button>
           </DialogFooter>
         </form>

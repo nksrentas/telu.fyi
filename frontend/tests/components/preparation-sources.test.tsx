@@ -16,6 +16,7 @@ const ipc = mock(async (command: string, args: Record<string, unknown> = {}): Pr
 });
 
 const originalDialog = { ...await import('../../src/components/ui/dialog') };
+const originalDropdown = { ...await import('../../src/components/ui/dropdown-menu') };
 const Passthrough = ({ children }: { children?: ReactNode }) => <>{children}</>;
 mock.module('../../src/components/ui/dialog', () => ({
   ...originalDialog,
@@ -25,6 +26,14 @@ mock.module('../../src/components/ui/dialog', () => ({
   DialogFooter: Passthrough,
   DialogTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2>,
   DialogDescription: ({ children }: { children?: ReactNode }) => <p>{children}</p>,
+}));
+
+mock.module('../../src/components/ui/dropdown-menu', () => ({
+  DropdownMenu: Passthrough,
+  DropdownMenuTrigger: Passthrough,
+  DropdownMenuContent: () => null,
+  DropdownMenuSeparator: () => null,
+  DropdownMenuItem: Passthrough,
 }));
 
 const { SourcesPanel } = await import('../../src/components/preparation/sources-panel');
@@ -69,6 +78,7 @@ beforeAll(() => {
 afterAll(() => {
   globalWithWindow.window = originalWindow;
   mock.module('../../src/components/ui/dialog', () => originalDialog);
+  mock.module('../../src/components/ui/dropdown-menu', () => originalDropdown);
 });
 
 beforeEach(() => {
@@ -98,7 +108,7 @@ async function settle() {
 
 async function renderPanel() {
   await act(async () => {
-    renderer = create(<SourcesPanel plannedMeetingId="plan-1" onOpenSource={openSource} />);
+    renderer = create(<SourcesPanel plannedMeetingId="plan-1" onOpenSource={openSource} onSourcesChanged={() => {}} />);
   });
   await settle();
   return renderer!.root;

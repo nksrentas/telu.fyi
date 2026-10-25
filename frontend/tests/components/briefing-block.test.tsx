@@ -186,7 +186,7 @@ async function settle() {
 
 async function renderBlock() {
   await act(async () => {
-    renderer = create(<BriefingBlock plannedMeetingId="plan-1" onOpenSource={openSource} onOpenTranscript={openTranscript} />);
+    renderer = create(<BriefingBlock plannedMeetingId="plan-1" revision={0} onOpenSource={openSource} onOpenTranscript={openTranscript} />);
   });
   await settle();
   await settle();
@@ -206,6 +206,17 @@ function commands() {
 }
 
 describe('BriefingBlock', () => {
+  test('a new revision reloads the stored brief', async () => {
+    await renderBlock();
+    const loads = () => commands().filter((command) => command === 'prep_get_briefing').length;
+    expect(loads()).toBe(1);
+    await act(async () => {
+      renderer!.update(<BriefingBlock plannedMeetingId="plan-1" revision={1} onOpenSource={openSource} onOpenTranscript={openTranscript} />);
+    });
+    await settle();
+    expect(loads()).toBe(2);
+  });
+
   test('a remote route shows its destination before prep_generate is called', async () => {
     const root = await renderBlock();
     expect(textOf(root)).toContain('Remote · openrouter.ai');
