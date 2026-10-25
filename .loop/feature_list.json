@@ -442,8 +442,12 @@
         "frontend/src-tauri/src/preparation/**",
         "frontend/src-tauri/tests/fixtures/preparation/**"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "455f2e0",
+        "ran": "bash .loop/verify.sh (cargo lib+integration, bun, node, typecheck, gallery 166 passed); cargo test preparation::evaluation --lib 3 passed",
+        "browser": "n/a (ui:false)"
+      }
     },
     {
       "id": "E1",
