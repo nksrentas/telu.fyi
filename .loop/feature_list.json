@@ -155,8 +155,12 @@
         "frontend/tests/components/transcript-drawer.test.tsx",
         "frontend/tests/visual/screens/delete-alert.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "264d4f5",
+        "ran": "bash .loop/verify.sh (cargo, bun, node, typecheck, gallery 150 passed); new bun tests failed on base: Try again not found in delete alert, drawer onClose called on a defaultPrevented Escape",
+        "browser": "gallery delete-alert-impact-failed light and dark: error copy with Try again link, Delete disabled, Cancel focused"
+      }
     },
     {
       "id": "T9",

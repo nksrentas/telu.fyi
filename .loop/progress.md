@@ -111,3 +111,15 @@ Lesson: [tests] the first gate failed typecheck: Draft.basedOnRevisionId was typ
 Lesson: [bussin-a11y] review found that isComposing alone misses IME Enter in WebKit, the app's only runtime → IME Enter guards check isComposing || keyCode === 229.
 Lesson: [tests] a guard computed at the top of a keydown handler broke an existing Escape test that passed no nativeEvent → read event fields only in the branch that needs them.
 Next: T8
+
+## Session 8 · T8 · 2026-10-25
+Did: IN-45 and IN-43.
+- useDeletionImpact in delete-meeting-alert.tsx has an attempt counter and returns { state, retry }. The error copy now ends with an inline "Try again" button that moves focus to Cancel (the button unmounts on retry) and reloads the counts. Delete stays disabled until the counts load.
+- useEscapeToClose in transcript-drawer.tsx ignores an Escape with defaultPrevented. Radix DismissableLayer (1.1.11) listens on document in the capture phase and calls preventDefault before onDismiss, so the topmost popover, menu or alert closes first and the next Escape closes the drawer.
+- Gallery screen delete-alert-impact-failed added to screens/delete-alert.json.
+- 2 new tests: one in delete-meeting-alert.test.tsx (Try again, refetch, Delete enabled, Cancel focused) and a "TranscriptDrawer Escape" describe in transcript-drawer.test.tsx with a stub document that collects keydown listeners. Both failed on base.
+Learned:
+- transcript-drawer.test.tsx has no document by default, and useEscapeToClose returns early without one. The Escape describe installs a stub document in beforeAll and restores it in afterAll.
+- LanguagePickerPopover (settings) is the only non-Radix overlay. Its Escape handler ignores defaultPrevented, but it never sits above the drawer.
+Lesson: [bussin-a11y] review found that the retry control unmounted on click and dropped focus to the body → a control that removes itself must move focus to a stable element first.
+Next: T9
