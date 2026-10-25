@@ -35,3 +35,11 @@ Learned:
 - The gate's long output is truncated in the tool view; it is saved under tool-results and `tail`/`grep` on that file show the result. Shell pipes and redirects need approval in loop sessions.
 - forgetAll() also fires on reopen ("Move back to review"). T3 (an undo entry expires when its toast closes) can hook into the same `live` list via sonner's onDismiss/onAutoClose.
 Next: T2
+
+## Session 2 · T2 · 2026-10-25
+Did: WR-41. useAcceptAll keeps only the requested ids from the returned view and counts those whose reviewState is 'accepted'; the toast count and the Undo list use that set. When Rust accepted none, an info toast (REVIEW_TOAST.noneAccepted) replaces "Accepted 0 items" and there is no Undo. Two new tests; on base they got "Accepted 3 items" and a success toast. Picked up the uncommitted work of the first T2 attempt, which had the code and tests in place; the gate passed this time.
+Learned:
+- Rust apply_accept_all (knowledge/review.rs:120-136) skips items that are not proposed in the DB. An item that a stale UI sees as proposed but that was already accepted elsewhere comes back 'accepted' and is still counted. Only a Rust change can tell those apart, and Rust is out of scope.
+- To prove a test fails on base without git stash, write `git show HEAD:<file>` over the file, run the test, then copy your saved version back.
+Lesson: [this project] the first T2 session failed without committing and left no progress note → when a session runs out, write a progress line about the uncommitted work before stopping.
+Next: T3

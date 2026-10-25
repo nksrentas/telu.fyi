@@ -26,13 +26,19 @@
       "ui": false,
       "description": "WR-41: Accept all reports and undoes only the items Rust actually accepted. The component compares the meeting view returned by knowledge_accept_all with the view before, so the toast count and the undo list exclude items that were not proposed. No change to knowledge/commands.rs.",
       "verify": "bun test: with 3 requested ids where the returned view shows 2 accepted, the toast says 2 and Undo reopens exactly those 2.",
-      "depends_on": ["T1"],
+      "depends_on": [
+        "T1"
+      ],
       "touches": [
         "frontend/src/components/living-doc/review-block.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "4b8bffa",
+        "ran": "bash .loop/verify.sh (gate: cargo, bun, node, typecheck, gallery 146 passed); bun test knowledge-review.test.tsx 13 pass",
+        "base_failure": "on base review-block.tsx: expected 'Accepted 2 items', received 'Accepted 3 items'; nothing-accepted case got a success toast instead of none"
+      }
     },
     {
       "id": "T3",
@@ -40,7 +46,9 @@
       "ui": false,
       "description": "WR-40 and IN-41: the Accept-all stagger timers are cleared on unmount and when the user makes a newer decision, so a late timer never overwrites it; the ⌘Z listener is attached once, not on every render; an undo entry expires when its toast closes.",
       "verify": "bun test with fake timers: a reject issued during the stagger is not overwritten when the timers fire; unmounting clears the timers (no state update after unmount); addEventListener for keydown is called once across 5 re-renders; ⌘Z after the toast closes calls nothing.",
-      "depends_on": ["T2"],
+      "depends_on": [
+        "T2"
+      ],
       "touches": [
         "frontend/src/components/living-doc/review-block.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
@@ -68,7 +76,9 @@
       "ui": true,
       "description": "WR-43 and IN-44: a failed knowledge load shows an error state with a Retry button instead of a permanent skeleton or spinner, and the knowledge-updated listen promise has a catch that logs without throwing.",
       "verify": "bun test: knowledge_get_meeting rejecting renders the error text and Retry, and Retry calls it again; a rejected listen does not produce an unhandled rejection. A gallery screen 'knowledge-load-failed' in screens/knowledge.json passes light and dark.",
-      "depends_on": ["T4"],
+      "depends_on": [
+        "T4"
+      ],
       "touches": [
         "frontend/src/components/living-doc/knowledge-section.tsx",
         "frontend/src/components/living-doc/knowledge-run-states.tsx",
@@ -84,7 +94,9 @@
       "ui": false,
       "description": "WR-44 and WR-45: a failed route check no longer leaves routeBlocked stuck (the next successful check clears it), and Stop handles a rejected cancel with a toast instead of discarding the promise.",
       "verify": "bun test in tests/components/knowledge-run.test.tsx: route check fails then succeeds and Find knowledge is enabled again; knowledge_cancel_extraction rejecting shows the error toast.",
-      "depends_on": ["T5"],
+      "depends_on": [
+        "T5"
+      ],
       "touches": [
         "frontend/src/components/living-doc/knowledge-section.tsx",
         "frontend/tests/components/knowledge-run.test.tsx"
@@ -98,7 +110,9 @@
       "ui": false,
       "description": "WR-46 and WR-47: a correction records the revision the user started editing from, not the one current at save time, so a concurrent change surfaces as a conflict; Enter while an IME composition is active does not save.",
       "verify": "bun test in knowledge-review.test.tsx: the item's revision changes between opening the editor and saving, and knowledge_correct_item receives the original basedOnRevisionId; a keydown Enter with isComposing true does not call it.",
-      "depends_on": ["T3"],
+      "depends_on": [
+        "T3"
+      ],
       "touches": [
         "frontend/src/components/living-doc/candidate-row.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
@@ -130,7 +144,9 @@
       "description": "CR-20: transcript search never slices a string at byte offsets taken from its lowercased copy. get_match_context in frontend/src-tauri/src/database/repositories/transcript.rs works in character positions on the original text, so Greek, emoji and characters whose lowercase has a different byte length cannot panic or return the wrong window.",
       "verify": "cargo test --manifest-path frontend/src-tauri/Cargo.toml --features coreml transcript --lib with cases for Greek 'Συνάντηση', 'İstanbul' (lowercase grows), an emoji before the match and a match at the very start and end; each returns context containing the match and none panics. The İstanbul case panics or fails on the base code.",
       "depends_on": [],
-      "touches": ["frontend/src-tauri/src/database/repositories/transcript.rs"],
+      "touches": [
+        "frontend/src-tauri/src/database/repositories/transcript.rs"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -155,7 +171,10 @@
       "ui": false,
       "description": "CR-61 and WR-20: search results are unique per meeting and match, so the command list never has duplicate keys or values. Dedupe in the repository query or its caller (outside knowledge/), keeping the best match per meeting.",
       "verify": "cargo test ... transcript --lib: a meeting matching in its title and in two segments returns one entry; bun test: the popover renders one CommandItem per result with unique key and value and no React key warning.",
-      "depends_on": ["T9", "T10"],
+      "depends_on": [
+        "T9",
+        "T10"
+      ],
       "touches": [
         "frontend/src-tauri/src/database/repositories/transcript.rs",
         "frontend/src/components/app-shell/search-popover.tsx",
@@ -171,7 +190,9 @@
       "description": "WR-22: an agenda card shows its accepted knowledge state after a failed regenerate when the meeting still has accepted items, instead of falling back to No knowledge (frontend/src-tauri/src/agenda/mod.rs).",
       "verify": "cargo test ... agenda --lib: seed a meeting with accepted items and a failed latest run; the card state reports the accepted count, not NoKnowledge.",
       "depends_on": [],
-      "touches": ["frontend/src-tauri/src/agenda/**"],
+      "touches": [
+        "frontend/src-tauri/src/agenda/**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -195,7 +216,9 @@
       "ui": false,
       "description": "Weak tests WR-82, WR-83 and WR-84 can fail again: the validate-before-start order test asserts validate was called; the corrected-value test asserts the value exists before comparing it; the eligibility test uses a fixture the UI derives eligibility from and asserts on text the UI really renders.",
       "verify": "bun test passes, and for each of the three, a scratch edit that breaks the behaviour makes that test fail (record the failing output in the evidence; do not commit the scratch edit).",
-      "depends_on": ["T7"],
+      "depends_on": [
+        "T7"
+      ],
       "touches": [
         "frontend/tests/components/knowledge-run.test.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
@@ -209,8 +232,12 @@
       "ui": false,
       "description": "WR-85: every component test file restores its mock.module calls in afterAll, so each file passes alone and in the full run regardless of order.",
       "verify": "bun test --cwd frontend passes; each file under tests/components passes when run alone (loop over them in one command and record the counts).",
-      "depends_on": ["T14"],
-      "touches": ["frontend/tests/**"],
+      "depends_on": [
+        "T14"
+      ],
+      "touches": [
+        "frontend/tests/**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -234,7 +261,10 @@
       "ui": true,
       "description": "Browser proof of CR-40: the IPC stub gains a small opt-in stateful directive (a per-screen state object that review commands update and knowledge_get_meeting reads), and a gallery screen runs accept A, reject B, then clicks the first toast's Undo and shows A back in Proposed while B stays Rejected. Existing screens behave exactly as before.",
       "verify": "bash .loop/tool.sh gallery 'review-undo' passes and its screenshot shows A proposed and B rejected; the full gallery still passes with the same screen count plus the new one.",
-      "depends_on": ["T1", "T16"],
+      "depends_on": [
+        "T1",
+        "T16"
+      ],
       "touches": [
         "frontend/tests/visual/tauri-ipc-stub.js",
         "frontend/tests/visual/gallery.visual.ts",
@@ -250,7 +280,9 @@
       "description": "Automated version of human check 5, with a staged model instead of a real one: an integration test frontend/src-tauri/tests/knowledge_review_loop.rs drives a run, accepts one item, corrects one (fills Owner), rejects one, regenerates with a reply that re-types the rejected claim, restores it, then deletes the meeting, using only the crate's public API and its own staged completer. It asserts no resurrection, the restored item's state, and zero residue after delete.",
       "verify": "cargo test --manifest-path frontend/src-tauri/Cargo.toml --features coreml --test knowledge_review_loop passes. If a needed function is not public, do not change knowledge/: write 'Blocked: T18' with the missing function names in progress.md.",
       "depends_on": [],
-      "touches": ["frontend/src-tauri/tests/knowledge_review_loop.rs"],
+      "touches": [
+        "frontend/src-tauri/tests/knowledge_review_loop.rs"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -260,7 +292,9 @@
       "ui": false,
       "description": "Undo after the item changed elsewhere (a regenerate superseded it, or another window decided it): Undo fails with a plain toast ('This item changed since. Nothing was undone.') and changes no other item.",
       "verify": "bun test: knowledge_review_item rejecting with the stale-revision code shows that toast and makes no second call.",
-      "depends_on": ["T3"],
+      "depends_on": [
+        "T3"
+      ],
       "touches": [
         "frontend/src/components/living-doc/review-block.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
@@ -274,7 +308,10 @@
       "ui": false,
       "description": "Double clicks: a second click on Accept, Reject, Restore or Undo while the first call is in flight sends nothing.",
       "verify": "bun test with a pending invoke: two clicks produce one knowledge_review_item call for each control.",
-      "depends_on": ["TE1", "T7"],
+      "depends_on": [
+        "TE1",
+        "T7"
+      ],
       "touches": [
         "frontend/src/components/living-doc/review-block.tsx",
         "frontend/src/components/living-doc/candidate-row.tsx",
@@ -290,7 +327,9 @@
       "ui": false,
       "description": "Search edges: an empty or whitespace query sends nothing; a one-character query, a query of only combining marks and a 500-character query neither panic nor return more than the result cap.",
       "verify": "cargo test ... transcript --lib for the Rust cases; bun test for the empty query.",
-      "depends_on": ["T11"],
+      "depends_on": [
+        "T11"
+      ],
       "touches": [
         "frontend/src-tauri/src/database/repositories/transcript.rs",
         "frontend/src/components/app-shell/search-popover.tsx",
@@ -305,8 +344,20 @@
       "ui": true,
       "description": "Everything that held still holds: the full gate (cargo, bun, node contract tests including the Phase 1 static gates that grep api.rs, event-card.tsx and SidebarProvider.tsx, typecheck, every gallery screen) passes, the frozen paths are unchanged since the base, and node .github/verify-phase2-know07-status.cjs prints the same status as at the base.",
       "verify": "bash .loop/gate.sh passes; git diff --stat <base> -- frontend/src-tauri/src/knowledge frontend/src-tauri/src/summary is empty; the KNOW-07 status output equals the base's.",
-      "depends_on": ["T6", "T8", "T12", "T13", "T15", "T17", "T18", "TE2", "TE3"],
-      "touches": ["**"],
+      "depends_on": [
+        "T6",
+        "T8",
+        "T12",
+        "T13",
+        "T15",
+        "T17",
+        "T18",
+        "TE2",
+        "TE3"
+      ],
+      "touches": [
+        "**"
+      ],
       "passes": false,
       "evidence": null
     },
@@ -316,8 +367,12 @@
       "ui": false,
       "description": "Resolution notes for the GSD review: docs/telu/phase2-trust-fixes.md lists every finding fixed here (id, one line, commit sha, the test that proves it), the human checks still left for a person (packaged window chrome, real recording, copy review, the delegated KNOW-07 judgment, the real-provider loop), and the findings deliberately left because they live in knowledge/ (WR-02, WR-05, WR-08, IN-03).",
       "verify": "The file exists; every commit sha it names exists on this branch and every test it names exists.",
-      "depends_on": ["TR1"],
-      "touches": ["docs/telu/phase2-trust-fixes.md"],
+      "depends_on": [
+        "TR1"
+      ],
+      "touches": [
+        "docs/telu/phase2-trust-fixes.md"
+      ],
       "passes": false,
       "evidence": null
     }
