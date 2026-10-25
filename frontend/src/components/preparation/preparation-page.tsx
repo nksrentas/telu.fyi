@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { CalendarDays, ChevronLeft, Lock, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { TranscriptDrawer } from "@/components/living-doc/transcript-drawer"
+import { BriefingBlock, type TranscriptTarget } from "@/components/preparation/briefing-block"
 import { SourceViewer, type SourceTarget } from "@/components/preparation/source-viewer"
 import { SourcesPanel } from "@/components/preparation/sources-panel"
 import { Button } from "@/components/ui/button"
@@ -160,7 +162,19 @@ interface PlannedMeetingDocProps {
 function PlannedMeetingDoc({ meeting, initialSource, onBack }: PlannedMeetingDocProps) {
   const { draft, status, change } = useAutosave(meeting)
   const [source, setSource] = useState<SourceTarget | null>(initialSource)
+  const [transcript, setTranscript] = useState<TranscriptTarget | null>(null)
+  const [transcriptOpen, setTranscriptOpen] = useState(false)
   const closeSource = useCallback(() => setSource(null), [])
+  const closeTranscript = useCallback(() => setTranscriptOpen(false), [])
+  const openSource = useCallback((target: SourceTarget) => {
+    setTranscriptOpen(false)
+    setSource(target)
+  }, [])
+  const openTranscript = useCallback((target: TranscriptTarget) => {
+    setSource(null)
+    setTranscript(target)
+    setTranscriptOpen(true)
+  }, [])
   const titleMissing = !draft.title.trim()
 
   return (
@@ -211,10 +225,20 @@ function PlannedMeetingDoc({ meeting, initialSource, onBack }: PlannedMeetingDoc
               className={cn(EDITABLE, "block resize-none text-[15px] leading-[1.55] tracking-[-0.005em]")}
             />
           </section>
-          <SourcesPanel plannedMeetingId={meeting.id} onOpenSource={(versionId) => setSource({ versionId })} />
+          <SourcesPanel plannedMeetingId={meeting.id} onOpenSource={(versionId) => openSource({ versionId })} />
+          <BriefingBlock plannedMeetingId={meeting.id} onOpenSource={openSource} onOpenTranscript={openTranscript} />
         </div>
       </main>
       <SourceViewer target={source} onClose={closeSource} />
+      {transcript && (
+        <TranscriptDrawer
+          meetingId={transcript.meetingId}
+          title={transcript.title}
+          open={transcriptOpen}
+          onClose={closeTranscript}
+          highlight={transcript.highlight}
+        />
+      )}
     </>
   )
 }

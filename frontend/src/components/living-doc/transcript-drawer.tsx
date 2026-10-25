@@ -7,7 +7,7 @@ import { Copy, FolderOpen, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/telu-ui/indicators"
 import { usePaginatedTranscripts } from "@/hooks/usePaginatedTranscripts"
-import { listMeetingEvidence, type EvidenceSegmentView } from "@/lib/knowledge-service"
+import { listMeetingEvidence, type EvidenceLinkView, type EvidenceSegmentView, type KnowledgeItemView } from "@/lib/knowledge-service"
 import { cn } from "@/lib/utils"
 import type { Transcript } from "@/types"
 
@@ -20,6 +20,17 @@ export interface EvidenceSpan {
 export interface EvidenceHighlight {
   evidenceIds: string[]
   spans: EvidenceSpan[]
+}
+
+export function claimLinks(item: KnowledgeItemView): EvidenceLinkView[] {
+  return item.evidence.filter((link) => link.role === "claim")
+}
+
+export function highlightFor(links: EvidenceLinkView[]): EvidenceHighlight {
+  return {
+    evidenceIds: Array.from(new Set(links.map((link) => link.evidenceId))),
+    spans: links.map((link) => ({ evidenceId: link.evidenceId, start: link.rawStart, end: link.rawEnd })),
+  }
 }
 
 export interface TranscriptDrawerHandle {

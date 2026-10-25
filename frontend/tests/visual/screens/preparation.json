@@ -722,5 +722,958 @@
         "waitFor": "text=Keep the translucent sidebar"
       }
     ]
+  },
+  {
+    "name": "preparation-brief-idle",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": null,
+        "briefing": null
+      },
+      "get_current_provider_route": {
+        "capability": "summary",
+        "providerId": "openrouter",
+        "modelId": "anthropic/claude-sonnet",
+        "locationClass": "remote",
+        "sanitizedOrigin": "openrouter.ai",
+        "encrypted": true,
+        "validationState": "validated",
+        "resolvedAddresses": []
+      },
+      "validate_provider_route": {
+        "capability": "summary",
+        "providerId": "openrouter",
+        "modelId": "anthropic/claude-sonnet",
+        "locationClass": "remote",
+        "sanitizedOrigin": "openrouter.ai",
+        "encrypted": true,
+        "validationState": "validated",
+        "resolvedAddresses": []
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-preparing",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "running",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": null,
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": null
+        },
+        "briefing": null
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-ready",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": false,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 420
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "truncated",
+              "kept": 2,
+              "total": 5,
+              "reason": "SOURCE_BUDGET",
+              "tokens": 300
+            },
+            {
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 12
+            }
+          ],
+          "claims": [
+            {
+              "text": "Markdown and plain-text import ships with immutable versions by the end of January.",
+              "status": "cited",
+              "sourceRef": "S1#1",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Every statement in a brief must cite the exact passage it came from.",
+              "status": "cited",
+              "sourceRef": "S1#2",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 237, \"end\": 340}",
+              "quote": "q"
+            },
+            {
+              "text": "The design partner beta goes out on Oct 6.",
+              "status": "cited",
+              "sourceRef": "S3",
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "passageId": null,
+              "locatorJson": null,
+              "quote": "q"
+            },
+            {
+              "text": "Two senior engineer offers are still open, and one closes next week.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 0, \"end\": 80}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v2"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            },
+            {
+              "claim": {
+                "text": "Who reviews the briefs before design partners see them?",
+                "status": "cited",
+                "sourceRef": "S3",
+                "source": {
+                  "kind": "knowledge",
+                  "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                  "itemId": "k-dec"
+                },
+                "passageId": null,
+                "locatorJson": null,
+                "quote": "q"
+              },
+              "rationale": "The beta date was agreed without naming a reviewer."
+            },
+            {
+              "claim": {
+                "text": "Can the second offer wait until the beta ships?",
+                "status": "cited",
+                "sourceRef": "S2#0",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-2-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 0, \"end\": 80}",
+                "quote": "q"
+              },
+              "rationale": "One offer closes the week before the beta."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-failed",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "failed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": null,
+          "failureCode": "PREP_MODEL_FAILED",
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": null
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
+  },
+  {
+    "name": "preparation-brief-stale",
+    "path": "/preparation?id=plan-new",
+    "ipc": {
+      "planning_get": {
+        "id": "plan-new",
+        "title": "Roadmap sync",
+        "startUtc": null,
+        "purpose": "Agree the Q1 plan",
+        "createdUtc": "2026-09-27T06:00:00.000Z",
+        "updatedUtc": "2026-09-27T06:00:00.000Z"
+      },
+      "documents_list": [
+        {
+          "id": "d-1",
+          "title": "Q1 roadmap",
+          "format": "markdown",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-1-v2",
+          "latestVersion": 2,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 18432
+        },
+        {
+          "id": "d-2",
+          "title": "Hiring notes",
+          "format": "text",
+          "availability": "available",
+          "createdUtc": "2026-09-27T06:00:00.000Z",
+          "latestVersionId": "d-2-v1",
+          "latestVersion": 1,
+          "extractionStatus": "extracted",
+          "failureCode": null,
+          "byteSize": 3200
+        }
+      ],
+      "prep_list_sources": [
+        {
+          "kind": "document",
+          "versionId": "d-1-v2"
+        },
+        {
+          "kind": "document",
+          "versionId": "d-2-v1"
+        },
+        {
+          "kind": "knowledge",
+          "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+          "itemId": "k-dec"
+        }
+      ],
+      "documents_get_version": {
+        "$byArg": "versionId",
+        "cases": {
+          "d-1-v2": {
+            "document": {
+              "id": "d-1",
+              "title": "Q1 roadmap",
+              "format": "markdown",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-1-v2",
+              "documentId": "d-1",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          },
+          "d-2-v1": {
+            "document": {
+              "id": "d-2",
+              "title": "Hiring notes",
+              "format": "text",
+              "availability": "available",
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "version": {
+              "id": "d-2-v1",
+              "documentId": "d-2",
+              "version": 1,
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "byteSize": 100,
+              "charCount": 100,
+              "parserVersion": "text-1",
+              "extractionStatus": "extracted",
+              "failureCode": null,
+              "managedPath": null,
+              "createdUtc": "2026-09-27T06:00:00.000Z"
+            },
+            "latestVersion": 1,
+            "passages": []
+          }
+        }
+      },
+      "prep_get_briefing": {
+        "run": {
+          "id": "run-1",
+          "plannedMeetingId": "plan-new",
+          "status": "completed",
+          "providerId": "builtin-ai",
+          "modelId": "qwen3.5:4b",
+          "locationClass": "local",
+          "sanitizedOrigin": "This device",
+          "promptVersion": "prep-briefing-v2",
+          "briefingId": "brief-1",
+          "failureCode": null,
+          "startedUtc": "2026-09-27T06:10:00.000Z",
+          "finishedUtc": "2026-09-27T06:11:00.000Z"
+        },
+        "briefing": {
+          "id": "brief-1",
+          "promptVersion": "prep-briefing-v2",
+          "createdUtc": "2026-09-27T06:11:00.000Z",
+          "droppedCount": 0,
+          "droppedQuestionCount": 0,
+          "stale": true,
+          "manifest": [
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 420
+            },
+            {
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "status": "truncated",
+              "kept": 2,
+              "total": 5,
+              "reason": "SOURCE_BUDGET",
+              "tokens": 300
+            },
+            {
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "status": "included",
+              "reason": "WITHIN_BUDGET",
+              "tokens": 12
+            }
+          ],
+          "claims": [
+            {
+              "text": "Markdown and plain-text import ships with immutable versions by the end of January.",
+              "status": "cited",
+              "sourceRef": "S1#1",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 135, \"end\": 217}",
+              "quote": "q"
+            },
+            {
+              "text": "Every statement in a brief must cite the exact passage it came from.",
+              "status": "cited",
+              "sourceRef": "S1#2",
+              "source": {
+                "kind": "document",
+                "versionId": "d-1-v2"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 237, \"end\": 340}",
+              "quote": "q"
+            },
+            {
+              "text": "The design partner beta goes out on Oct 6.",
+              "status": "cited",
+              "sourceRef": "S3",
+              "source": {
+                "kind": "knowledge",
+                "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                "itemId": "k-dec"
+              },
+              "passageId": null,
+              "locatorJson": null,
+              "quote": "q"
+            },
+            {
+              "text": "Two senior engineer offers are still open, and one closes next week.",
+              "status": "cited",
+              "sourceRef": "S2#0",
+              "source": {
+                "kind": "document",
+                "versionId": "d-2-v1"
+              },
+              "passageId": "p-1",
+              "locatorJson": "{\"start\": 0, \"end\": 80}",
+              "quote": "q"
+            }
+          ],
+          "questions": [
+            {
+              "claim": {
+                "text": "Is the end of January still realistic for import?",
+                "status": "cited",
+                "sourceRef": "S1#1",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-1-v2"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 135, \"end\": 217}",
+                "quote": "q"
+              },
+              "rationale": "The roadmap ties import to the January milestone."
+            },
+            {
+              "claim": {
+                "text": "Who reviews the briefs before design partners see them?",
+                "status": "cited",
+                "sourceRef": "S3",
+                "source": {
+                  "kind": "knowledge",
+                  "meetingId": "7b1c2d3e-4f50-4a6b-8c7d-9e0f1a2b3c4d",
+                  "itemId": "k-dec"
+                },
+                "passageId": null,
+                "locatorJson": null,
+                "quote": "q"
+              },
+              "rationale": "The beta date was agreed without naming a reviewer."
+            },
+            {
+              "claim": {
+                "text": "Can the second offer wait until the beta ships?",
+                "status": "cited",
+                "sourceRef": "S2#0",
+                "source": {
+                  "kind": "document",
+                  "versionId": "d-2-v1"
+                },
+                "passageId": "p-1",
+                "locatorJson": "{\"start\": 0, \"end\": 80}",
+                "quote": "q"
+              },
+              "rationale": "One offer closes the week before the beta."
+            }
+          ]
+        }
+      }
+    },
+    "steps": [
+      {
+        "waitFor": "#briefing-heading"
+      }
+    ],
+    "viewport": {
+      "width": 1100,
+      "height": 1500
+    }
   }
 ]

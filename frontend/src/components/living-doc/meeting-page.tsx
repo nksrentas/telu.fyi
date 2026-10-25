@@ -24,7 +24,7 @@ import type { EvidenceLinkView } from "@/lib/knowledge-service"
 import type { MeetingLifecycle } from "@/types"
 import { DeleteMeetingAlert, isDeleteDisabled } from "./delete-meeting-alert"
 import { formatMeetingDay } from "./meeting-header"
-import { TranscriptDrawer, type EvidenceHighlight, type TranscriptDrawerHandle } from "./transcript-drawer"
+import { TranscriptDrawer, highlightFor, type EvidenceHighlight, type TranscriptDrawerHandle } from "./transcript-drawer"
 
 const TOOLBAR_HEIGHT = 52
 const DRAWER_SPACE = 366
@@ -58,13 +58,6 @@ export const EvidenceNavigationContext = createContext<EvidenceNavigation>({
 
 export function useEvidenceNavigation(): EvidenceNavigation {
   return useContext(EvidenceNavigationContext)
-}
-
-export function highlightFor(links: EvidenceLinkView[]): EvidenceHighlight {
-  return {
-    evidenceIds: Array.from(new Set(links.map((link) => link.evidenceId))),
-    spans: links.map((link) => ({ evidenceId: link.evidenceId, start: link.rawStart, end: link.rawEnd })),
-  }
 }
 
 export function useEvidenceDrawer(initialEvidenceId: string | null) {
