@@ -93,8 +93,12 @@
         "frontend/tests/components/knowledge-section.test.tsx",
         "frontend/tests/visual/screens/knowledge.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "7cefa12",
+        "ran": "bash .loop/verify.sh (gate green; one rerun after an unrelated peek-inline-transcript light timeout). New knowledge-section tests failed on base: no 'Couldn't load knowledge' text (skeleton), and an unhandled 'listen failed' rejection. The autoGenerate test fails when the !knowledge guard is reverted to base's '!knowledge && !autoPending'.",
+        "browser": "gallery knowledge-load-failed light and dark: error card with CircleX, 'Couldn't load knowledge for this meeting.' and Try again; no spinner"
+      }
     },
     {
       "id": "T6",
