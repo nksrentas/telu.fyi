@@ -53,6 +53,7 @@ beforeEach(() => {
     planning_get: () => PLANNED,
     documents_list: () => [],
     prep_list_sources: () => [],
+    api_get_meetings: () => [],
     planning_update: (args) => ({ ...PLANNED, title: args.title, startUtc: args.startUtc, purpose: args.purpose }),
   };
 });
