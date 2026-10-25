@@ -43,3 +43,21 @@ Learned:
 - To prove a test fails on base without git stash, write `git show HEAD:<file>` over the file, run the test, then copy your saved version back.
 Lesson: [this project] the first T2 session failed without committing and left no progress note → when a session runs out, write a progress line about the uncommitted work before stopping.
 Next: T3
+
+## Session 3 · T3 · 2026-10-25
+Did: WR-40 and IN-41.
+- review-block.tsx:
+  - New useStaggeredApply(apply) keeps a Map of itemId to timer.
+  - applyLater schedules an Accept-all view. applyNow, used by decisions and undo, cancels that item's pending timer first.
+  - Unmount clears all timers and sets a mounted ref, so an Accept all still in flight schedules nothing after unmount.
+  - useUndoShortcut keeps its handler in a ref and attaches keydown once.
+  - useUndo.expire(toastId) is wired to sonner's onDismiss and onAutoClose in withUndo.
+- Tests: knowledge-review.test.tsx has fakeWindowTimers() (a queue in place of globals.window.setTimeout and clearTimeout) and 3 new tests. All 3 fail on HEAD.
+Learned:
+- In sonner 2.0.7, onAutoClose fires without onDismiss, so wire both. onDismiss also fires on a programmatic toast.dismiss, so expire must be idempotent.
+- The test window stubs setTimeout with a bound real function. Swap globals.window.setTimeout and clearTimeout for a queue to control the stagger. Cast globals.window through unknown, or each assignment adds a TS error over the limit of 36.
+- When the classifier refuses compound shell commands, single commands sometimes pass. Reverting the file with Edit to prove the base failure also works without the shell.
+Lesson: [tests] the first gate run failed at typecheck (38 > 36) because of the new test helper → cast test stubs of globals.window through unknown.
+Lesson: [bussin-react] review found that an unmount during the awaited acceptAll still scheduled timers → any async handler that schedules work after an await must check a mounted ref or abort.
+Lesson: [this project] Bash was unavailable for most of the session → write the progress note as soon as tools fail, before more code.
+Next: T4

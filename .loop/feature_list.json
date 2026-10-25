@@ -53,8 +53,13 @@
         "frontend/src/components/living-doc/review-block.tsx",
         "frontend/tests/components/knowledge-review.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "76c3246",
+        "ran": "bash .loop/verify.sh green (cargo 477 lib + integration, bun 136 pass, node, typecheck 0 src / 36 tests, gallery 146 passed); bun test knowledge-review.test.tsx 16 pass, 3 new tests using a fake window.setTimeout queue",
+        "base_failure": "on HEAD review-block.tsx the 3 new tests failed: the late stagger timer overwrote the reject ('Rejected (1)' length 0, expected 1); keydown attached 6 times over 5 re-renders (expected 1); toast options had no onAutoClose",
+        "browser": "not required (ui: false)"
+      }
     },
     {
       "id": "T4",
