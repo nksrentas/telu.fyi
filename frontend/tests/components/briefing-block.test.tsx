@@ -291,6 +291,7 @@ describe('BriefingBlock', () => {
     expect(text).toContain('The launch moved once already.');
     expect(text).toContain('Prepared from your purpose, Q1 roadmap and 1 past-meeting item · Oct 25, 14:02 · 1 left out');
     expect(textOf(button(root, 'Prepare again'))).toBe('Prepare again');
+    expect(textOf(button(root, 'What was used'))).toBe('What was used');
   });
 
   test('a claim whose source was deleted has no chip to open', async () => {

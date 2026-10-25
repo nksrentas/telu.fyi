@@ -5,6 +5,7 @@ import { CircleX, RefreshCw } from "lucide-react"
 import { toast } from "sonner"
 
 import { BriefContents, sourceName, useSourceLabels, type SourceLabels } from "@/components/preparation/brief-contents"
+import { SourceManifest } from "@/components/preparation/source-manifest"
 import type { SourceTarget } from "@/components/preparation/source-viewer"
 import { claimLinks, highlightFor, type EvidenceHighlight } from "@/components/living-doc/transcript-drawer"
 import { formatRunTime } from "@/components/living-doc/run-details-popover"
@@ -257,7 +258,14 @@ export function BriefingBlock({ plannedMeetingId, onOpenSource, onOpenTranscript
       {status()}
       {briefing && (
         <>
-          <p className="m-0 text-[12px] text-label-3">{provenanceLine(briefing, labels)}</p>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <p className="m-0 text-[12px] text-label-3">{provenanceLine(briefing, labels)}</p>
+            <SourceManifest
+              manifest={briefing.manifest}
+              droppedCount={briefing.droppedCount}
+              labels={labels}
+            />
+          </div>
           <BriefContents briefing={briefing} labels={labels} onOpen={openClaim} />
         </>
       )}
