@@ -190,8 +190,12 @@
         "frontend/src/components/Sidebar/SidebarProvider.tsx",
         "frontend/tests/components/search-popover.test.tsx"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "672e12a",
+        "ran": "bash .loop/verify.sh green (cargo, bun, node, typecheck 36 in tests/, gallery 150 passed); new tests/components/search-popover.test.tsx with fake timers: on base it got 11 api_search_transcripts calls after 10 unrelated provider re-renders instead of 1",
+        "browser": "not a UI item"
+      }
     },
     {
       "id": "T11",

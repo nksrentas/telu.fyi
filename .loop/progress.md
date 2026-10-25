@@ -133,3 +133,14 @@ Learned:
 - Rust tests have no proptest or quickcheck. A nested loop over tricky chars stands in for a property test.
 Lesson: [tests] my first emoji-window test used the query "istanbul", which can't match "İstanbul" under Unicode lowercasing → for case-folding tests, derive the query from the expected lowercase form, not from ASCII intuition.
 Next: T10
+
+## Session 10 · T10 · 2026-10-25
+Did: CR-60. searchTranscripts in SidebarProvider.tsx is wrapped in React.useCallback with [] deps: it uses only the useState setters and the imported invoke. search-popover.tsx is unchanged, because its [query, search] effect is correct once search is stable.
+- New tests/components/search-popover.test.tsx renders the real SidebarProvider with the real SearchPopover under bun's jest.useFakeTimers. It types 'roadmap', advances past the debounce and expects one call, then flips isMeetingActive 10 times through useSidebar and expects no more calls. On base the second assertion got 11 calls.
+Learned:
+- On base the search looped by itself: every search flips isSearching, the provider re-renders, searchTranscripts gets a new identity, and the debounce effect re-arms. So an open popover re-queried every 200 ms.
+- bun 1.3.9 supports jest.useFakeTimers / jest.advanceTimersByTime from 'bun:test'.
+- cmdk's Command needs document.activeElement.hasAttribute and document.querySelector in the bun harness.
+- Stubbing window/document in a test: cast globalThis as unknown as { window?: unknown; document?: unknown }. Typed stubs add TS errors to the capped tests/ count.
+Lesson: [tests] the first gate failed typecheck because the new test's window/document stubs added 2 TS errors (38 > 36) → type test globals as unknown, and run `bash .loop/tool.sh tsc | grep <new file>` before the full gate.
+Next: T11
