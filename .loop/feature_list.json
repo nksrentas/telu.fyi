@@ -391,8 +391,12 @@
         "frontend/tests/components/**",
         "frontend/tests/visual/screens/preparation.json"
       ],
-      "passes": false,
-      "evidence": null
+      "passes": true,
+      "evidence": {
+        "commit": "a24ef51",
+        "ran": "bash .loop/verify.sh (bun 209+ tests incl. source-actions 11, typecheck, cargo, gallery 184 WebKit light+dark)",
+        "browser": "WebKit gallery: preparation-source-menu, preparation-delete-source-alert ('2 briefs cite this source'), preparation-replace-source ('Adds version 3'), light and dark"
+      }
     },
     {
       "id": "L1",
